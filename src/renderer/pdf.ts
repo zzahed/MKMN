@@ -73,9 +73,12 @@ async function renderPagePng(doc: unknown, n: number): Promise<Uint8Array> {
 export async function readPdf(file: File, o?: ReadPdfOptions): Promise<string> {
   const stopped = () => !!o?.signal?.aborted;
   if (stopped()) throw new PdfAborted();
-  // pdf.js calls Promise.try; without it the read hangs instead of failing.
+  // pdf.js calls Promise.try and Uint8Array toHex; without them the read hangs or fails deep inside pdf.js.
   if (typeof (Promise as unknown as { try?: unknown }).try !== "function") {
-    throw new Error("PDF reading needs Node.js 24 or later (Promise.try is missing).");
+    throw new Error("PDF reading needs Node.js 26 or later (Promise.try is missing).");
+  }
+  if (typeof (Uint8Array.prototype as unknown as { toHex?: unknown }).toHex !== "function") {
+    throw new Error("PDF reading needs Node.js 26 or later (Uint8Array toHex is missing).");
   }
   const pdfjsLib = await pdfjs();
   if (stopped()) throw new PdfAborted(); // the library load can take a while: the stop is honoured even there

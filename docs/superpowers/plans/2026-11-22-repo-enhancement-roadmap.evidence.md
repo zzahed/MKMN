@@ -40,6 +40,8 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 - Task 9: Ruling: `lint-type` calls `pnpm regen:check` instead of the three generator lines in QE P-1 — the same three commands, one place to change them. `--coverage` and the `coverage/` upload are left out until Task 19, as the brief says. Actions are pinned to the commit each tag points to (the peeled commit for annotated tags). Cost if wrong: none for behaviour.
 - Task 9: Ruling: `release.yml` uploads only `dist/MKMN-*-arm64-Setup.exe`, the path `installer.nsi` (`OutFile`) and `scripts/Build-Windows.ps1` write. Cost if wrong: the upload finds no file and fails loudly (`if-no-files-found: error`).
 
+- Task 9 (after CI run 45056310505): Ruling by the owner: require Node.js 26, replacing Task 3's `>=24`. Changed `engines`, both workflows, `scripts/Build-Windows.ps1`, the README and `.npmrc`; `scripts/Bundle-Sidecar.ps1` now refuses to bundle a Node older than 26, because the installer ships that runtime and Node 24 does not block network access for generated code. The `readPdf` guard also checks `Uint8Array.prototype.toHex`. New `tests/node-version.test.ts` keeps all of these on one major. Cost if wrong: contributors on Node 24 can no longer install.
+
 ## Follow-ups (owner decides)
 
 | found in task | item | decision |
@@ -55,3 +57,16 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 |---|---|---|---|
 | 5 | deferred to the Linux CI job (Task 9) | fails only on Linux; two hypotheses tested and ruled out on Windows | 2026-11-22 |
 | 6 | deferred to the Linux CI job (Task 9) | fails only on Linux; two hypotheses tested and ruled out on Windows | 2026-11-22 |
+
+## CI run 45056310505 (PR 6, commit 36a4040, Node 24.22.3)
+
+| job | result | failing tests |
+|---|---|---|
+| lint-type | pass | |
+| unit (2) | pass | |
+| unit (1) | fail | `bench.test.ts` estimated label (summary `tokPerSecEstimated` false; the per-test labels pass); `computerUsePanel.test.tsx` focus; `pdf-lifecycle.test.ts` ×3 (`a.toHex is not a function`) |
+| unit (3) | fail | `check-artifact-shared.test.ts` (reason is `Identifier 'S' has already been declared`); `isolation.test.ts` network lock (`CONNECTED`) |
+| windows-arm64-tests | fail | `check-artifact-shared`, `isolation`, `pdf-lifecycle` ×3 (same as Linux); `state-machines.test.ts` generator check (stale on a Windows checkout); `ocr.test.ts` rebuilt flag (the known intermittent one) |
+| security | fail | `cargo audit`: `url` 2.5.8, RUSTSEC-2026-0592, fixed in 2.5.9; six "unmaintained" warnings allowed. `pnpm audit` passed; gitleaks did not run |
+
+Finding: `check-artifact-shared`, `isolation` and `pdf-lifecycle` fail on both Linux and Windows under Node 24 and pass under Node 26 locally, so their cause is the Node version, not the system. Task 6 is one of them, so it is not Linux-only. `isolation`: Node 24's `--permission` does not restrict network access, so generated code can open connections when the sidecar runs on Node 24. `pdf-lifecycle`: pdf.js 6.5 calls `Uint8Array.prototype.toHex`, which Node 24 lacks (the app reads PDFs in WebView2, where it exists; only the test runs pdf.js in Node).
