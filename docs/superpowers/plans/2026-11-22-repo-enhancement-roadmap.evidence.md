@@ -53,6 +53,11 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 
 - Task 9 (after CI run 45063349828): clippy passed on 1.100.0 and every JavaScript test passed; `cargo test` ran in CI for the first time and `supervisor::tests::a_held_port_is_reported_as_a_conflict_without_spawning_a_server` failed with "GenieX is not installed". Root cause: `start` checks for an installed GenieX before the port, and the test used whatever GenieX the machine has; this host has one, the runner has none. Not reproducible here (`find_geniex` falls back to the real install), so the CI panic is the evidence. Fix in the test: it passes its own fake geniex.exe (a copy of PowerShell declared v0.11.0, never run), as the adoption tests already do. Cost if wrong: none for the app.
 
+- Task 10: Ruling: Step 4 runs on Node 26, not Node 24 — the owner required Node 26 after CI showed Node 24 does not deny network (CI run 45056310505), which is the release blocker Step 4 names. Cost if wrong: none; Node 24 can no longer install.
+- Task 10: Ruling: the probe fails closed. QE P-5 returns `out !== "CONNECTED"`, so no output, a timeout or a crash would count as proof; here only an explicit `ERR_ACCESS_DENIED` does. It connects to port 9 with nothing listening, so it needs no server and works for `runSync` too (`proveNetworkDeniedSync`), and runs with an empty environment so `NODE_OPTIONS` cannot add `--allow-net`. Cost if wrong: a runtime whose probe cannot start runs no generated code.
+- Task 10: Ruling: the verdict is asked lazily on the first isolated run and kept for the life of the runner (one per sidecar start), not at start-up, so a sidecar that never runs generated code spawns no probe. A refusal propagates as an error, exactly as a failed spawn of the isolated process already did; how callers report that is unchanged. Cost if wrong: the first check waits about 0.2 s for the probe.
+- Task 10: Ruling: QE-1.4(d) negatives — DNS, UDP and `fetch` — are all denied by Node 26's permission model (checked by hand, then as a test). Step 5 asks for a release notes template, which did not exist and is not in the task's file list: added `docs/releases/RELEASE_NOTES_TEMPLATE.md` with a Bundled runtime section. Cost if wrong: one new docs file.
+
 ## Follow-ups (owner decides)
 
 | found in task | item | decision |
@@ -70,6 +75,7 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 |---|---|---|---|
 | 5 | deferred to the Linux CI job (Task 9) | fails only on Linux; two hypotheses tested and ruled out on Windows | 2026-11-22 |
 | 6 | deferred to the Linux CI job (Task 9) | fails only on Linux; two hypotheses tested and ruled out on Windows | 2026-11-22 |
+| 9 | owner gate accepted (CI workflow, Node 26, Rust 1.100.0, CONTRIBUTING rule) after review of PR 6 | repo policy and CI (C4) | 2026-11-22 |
 
 ## CI run 45056310505 (PR 6, commit 36a4040, Node 24.22.3)
 

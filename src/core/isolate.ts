@@ -10,6 +10,8 @@
 // no addons, no network. Without a runner (the tests, the browser preview) they run in
 // place, exactly as before.
 
+import { execFile, spawnSync } from "child_process";
+
 export type IsolatedOp = "runExamples" | "smokeRun" | "playPageRun" | "judgeScenes" | "codeChecks" | "runCases";
 
 export interface IsolationRunner {
@@ -26,6 +28,36 @@ export function isolation(): IsolationRunner | null { return current; }
  *  own code and the packages it loads): no write, child process, worker, addon or network flag. */
 export function lockedNodeArgs(readDirs: string[], script: string): string[] {
   return ["--permission", ...readDirs.map((d) => `--allow-fs-read=${d}`), script];
+}
+
+/** Raised instead of running generated code on a Node.js that does not enforce the network ban. */
+export class IsolationUnsafeError extends Error {
+  constructor() {
+    super("Generated code is turned off: this Node.js runtime cannot block network access.");
+    this.name = "IsolationUnsafeError";
+  }
+}
+
+/** A locked process tries one TCP connection and prints how it ended. Nothing needs to listen:
+ *  a runtime that enforces the ban answers ERR_ACCESS_DENIED before any packet is sent, and one
+ *  that does not answers ECONNREFUSED (or CONNECTED). */
+const PROBE = `const s = require("net").connect(9, "127.0.0.1"); s.on("connect", () => { console.log("CONNECTED"); s.destroy(); }); s.on("error", (e) => console.log(e.code));`;
+const PROBE_MS = 10_000;
+/** Only this answer proves the ban: no output, a timeout or a crash is never taken as proof. */
+const denied = (stdout: unknown): boolean => String(stdout ?? "").trim() === "ERR_ACCESS_DENIED";
+
+/** Whether `nodePath`, started with the same locked flags as the isolated checks, really blocks
+ *  network access. Asked once before the first isolated run; false refuses generated code. */
+export function proveNetworkDenied(nodePath: string, readDirs: string[]): Promise<boolean> {
+  return new Promise((resolve) => {
+    execFile(nodePath, [...lockedNodeArgs(readDirs, "-e"), PROBE], { windowsHide: true, timeout: PROBE_MS, env: {} }, (_e, stdout) => resolve(denied(stdout)));
+  });
+}
+
+/** proveNetworkDenied for a synchronous first run. */
+export function proveNetworkDeniedSync(nodePath: string, readDirs: string[]): boolean {
+  const r = spawnSync(nodePath, [...lockedNodeArgs(readDirs, "-e"), PROBE], { windowsHide: true, timeout: PROBE_MS, encoding: "utf8", env: {} });
+  return !r.error && denied(r.stdout);
 }
 
 /** What crosses the process boundary: one JSON line in, one JSON line out. */
