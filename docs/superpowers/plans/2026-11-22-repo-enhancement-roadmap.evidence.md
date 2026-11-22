@@ -58,6 +58,9 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 - Task 10: Ruling: the verdict is asked lazily on the first isolated run and kept for the life of the runner (one per sidecar start), not at start-up, so a sidecar that never runs generated code spawns no probe. A refusal propagates as an error, exactly as a failed spawn of the isolated process already did; how callers report that is unchanged. Cost if wrong: the first check waits about 0.2 s for the probe.
 - Task 10: Ruling: QE-1.4(d) negatives — DNS, UDP and `fetch` — are all denied by Node 26's permission model (checked by hand, then as a test). Step 5 asks for a release notes template, which did not exist and is not in the task's file list: added `docs/releases/RELEASE_NOTES_TEMPLATE.md` with a Bundled runtime section. Cost if wrong: one new docs file.
 
+- Task 11: Ruling: `cargo audit` is not installed on this host, and installing it means downloading and compiling a tool, so Step 1's Rust result is taken from the `security` job of CI run 45064583668, which runs the same command on the same lockfile. Findings: `pnpm audit` none (local and CI); `cargo audit` 0 vulnerabilities and 6 allowed warnings — unmaintained `chrono` 0.4.45, `proc-macro-error` 1.0.4, `zbus_names` 4.3.5, `zvariant` 5.15.1, `zvariant_derive` 5.15.1, and unsound `glib` 0.18.5 (RUSTSEC-2024-0429); `glib` is not built for `aarch64-pc-windows-msvc` (`cargo tree -i glib` prints nothing), so it does not reach the shipped app. gitleaks: no leaks. No high or critical finding, so no waiver is needed. The `security` job in `ci.yml` already ran all three, so it is unchanged. Cost if wrong: a local-only advisory database difference.
+- Task 11: Ruling: CodeQL uses `build-mode: none` (JavaScript and TypeScript need no build) and also runs on pushes to `main`, so the Security tab has a baseline for `main`. Cost if wrong: one extra scan per merge.
+
 ## Follow-ups (owner decides)
 
 | found in task | item | decision |
@@ -68,6 +71,8 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 | 9 | `pnpm regen` rewrites `src/core/page/icons.generated.ts` with different content although `lucide-static` is 1.68.0 in both the lockfile and `node_modules`: the committed file is stale. Left unchanged here (not a Task 9 file) | |
 | 7 | `src/core/knowledge/vectors.ts` keeps the same `size:mtimeMs` memo stamp, so a same-size rewrite in one tick is not seen there either | |
 | 9 | CI installs the newest stable Rust, so a new clippy lint can fail CI with no code change, and this host (1.99.1) cannot see it first. Pin one Rust version (a `rust-toolchain.toml`) for CI and local builds | done: pinned to 1.100.0 |
+| 11 | `.github/workflows/release.yml` still uses five actions by tag (`@v4`, `@stable`), against the rule to pin every action to a commit. Dependabot's `github-actions` updates will propose versions; pinning them is a change to `release.yml` | |
+| 11 | GitHub warns that `actions/checkout`, `setup-node`, `upload-artifact`, `pnpm/action-setup` and `gitleaks-action` v4/v2 target Node 20, which runners force onto Node 24; Dependabot should propose the newer versions | |
 
 ## Owner waivers and deferrals
 
