@@ -42,6 +42,9 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 
 - Task 9 (after CI run 45056310505): Ruling by the owner: require Node.js 26, replacing Task 3's `>=24`. Changed `engines`, both workflows, `scripts/Build-Windows.ps1`, the README and `.npmrc`; `scripts/Bundle-Sidecar.ps1` now refuses to bundle a Node older than 26, because the installer ships that runtime and Node 24 does not block network access for generated code. The `readPdf` guard also checks `Uint8Array.prototype.toHex`. New `tests/node-version.test.ts` keeps all of these on one major. Cost if wrong: contributors on Node 24 can no longer install.
 
+- Task 5: Root cause (hypothesis 3, from CI run 45057924047): `summary.tokPerSecEstimated` is false because every test's `tokPerSec` is null — `src/core/chat.ts:484` gives a rate only for a stream that took over 50 ms, and the test's mock waits 1 ms between about 6 chunks. A 1 ms timer lasts about 1 ms on Linux (about 6 ms in all) but about 15–20 ms on Windows. Confirmed on Windows by setting the delay to 0: the test failed at the same line, 814. Fix in the test: 20 ms between chunks. The code is right not to time a 6 ms burst.
+- Task 7 follow-up `tests/ocr.test.ts`: Root cause: the knowledge index memo trusts `size:mtimeMs`; the test rewrites the store at the same size, and a probe on this host found 140 of 200 back-to-back rewrites keep the same mtime. A real bug, not only a test one: another writer in the same tick is not seen. Fix: while the store's mtime is within 2 s of when the memo entry was made, the store's text is hashed and compared; once found unchanged later, the stamp alone is trusted again. New test in `tests/knowledge-fast.test.ts` pins both writes to one second and failed 3/3 before the fix. Cost if wrong: a memory hit made within 2 s of a store write reads and hashes the store file once more.
+
 ## Follow-ups (owner decides)
 
 | found in task | item | decision |
@@ -50,6 +53,7 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 | 7 | Intermittent failures seen in full runs on Windows, both passing alone: `tests/ocr.test.ts` "an older store is rebuilt" (`rebuilt` came back false; likely the index memo is keyed by a file time that does not change within one tick) and `tests/computerUsePanel.test.tsx` "Enter opens the picker" (focus timing). Not caused by this plan's changes | |
 | 5 | The error branch of `BenchRunner.test` returns no `tokensEstimated`; an errored test has no usage, so it should say `true` | |
 | 9 | `pnpm regen` rewrites `src/core/page/icons.generated.ts` with different content although `lucide-static` is 1.68.0 in both the lockfile and `node_modules`: the committed file is stale. Left unchanged here (not a Task 9 file) | |
+| 7 | `src/core/knowledge/vectors.ts` keeps the same `size:mtimeMs` memo stamp, so a same-size rewrite in one tick is not seen there either | |
 
 ## Owner waivers and deferrals
 
@@ -70,3 +74,15 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 | security | fail | `cargo audit`: `url` 2.5.8, RUSTSEC-2026-0592, fixed in 2.5.9; six "unmaintained" warnings allowed. `pnpm audit` passed; gitleaks did not run |
 
 Finding: `check-artifact-shared`, `isolation` and `pdf-lifecycle` fail on both Linux and Windows under Node 24 and pass under Node 26 locally, so their cause is the Node version, not the system. Task 6 is one of them, so it is not Linux-only. `isolation`: Node 24's `--permission` does not restrict network access, so generated code can open connections when the sidecar runs on Node 24. `pdf-lifecycle`: pdf.js 6.5 calls `Uint8Array.prototype.toHex`, which Node 24 lacks (the app reads PDFs in WebView2, where it exists; only the test runs pdf.js in Node).
+
+## CI run 45057924047 (PR 6, commit 64522c9, Node 26.13.1)
+
+| job | result | failing tests |
+|---|---|---|
+| lint-type | pass | |
+| unit (2), unit (3) | pass | |
+| security | pass | `pnpm audit`, `cargo audit` (six unmaintained warnings allowed) and gitleaks all pass |
+| unit (1) | fail | `bench.test.ts` estimated label: `r.summary.tokPerSecEstimated` is false at line 814 while every test's `tokensEstimated` is true at line 813 (Task 5, Linux only) |
+| windows-arm64-tests | fail | `ocr.test.ts` "an older store is rebuilt": `old.rebuilt` false at line 145. It failed in both Windows CI runs, so on that runner it is not intermittent |
+
+Node 26 cleared `isolation`, `check-artifact-shared` (Task 6), `pdf-lifecycle` ×3 and `computerUsePanel`; the CRLF fix cleared `state-machines`.
