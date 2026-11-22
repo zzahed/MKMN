@@ -1,13 +1,13 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { execFile, execFileSync } from "node:child_process";
 import { createServer, type AddressInfo } from "node:net";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
 import { runExamples, smokeRun } from "../src/core/construct/sandbox";
 import { runCases } from "../src/core/benchChecks";
 import { codeChecks } from "../src/core/labCode";
-import { IsolationUnsafeError, lockedNodeArgs, proveNetworkDenied, proveNetworkDeniedSync, setIsolation } from "../src/core/isolate";
-import { codeDirs, lockedNodeRunner } from "../src/sidecar/isolation";
+import { IsolationUnsafeError, lockedNodeArgs, setIsolation } from "../src/core/isolate";
+import { codeDirs, lockedNodeRunner, proveNetworkDenied, proveNetworkDeniedSync } from "../src/sidecar/isolation";
 
 /**
  * Code a model wrote was run with node:vm INSIDE the sidecar: Node says vm is not a
@@ -116,6 +116,13 @@ describe("generated code runs only on a runtime that is proven to block the netw
     expect(await proveNetworkDenied(process.execPath, dirs())).toBe(true);
     expect(proveNetworkDeniedSync(process.execPath, dirs())).toBe(true);
   }, 60_000);
+
+  it("the shared isolation module imports nothing that only Node has: the window bundles it", () => {
+    // src/core/construct/sandbox.ts reaches the window's bundle, and it imports src/core/isolate.ts;
+    // a Node built-in there breaks `vite build` ("execFile" is not exported by "__vite-browser-external")
+    const src = readFileSync(path.join(root, "src", "core", "isolate.ts"), "utf8");
+    expect(src).not.toMatch(/from\s+"(node:)?(child_process|fs|net|dgram|dns|os|path|http|https)"/);
+  });
 
   it("fails closed: no answer from the probe is never taken as a denied network", async () => {
     expect(await proveNetworkDenied(NO_NODE, dirs())).toBe(false);

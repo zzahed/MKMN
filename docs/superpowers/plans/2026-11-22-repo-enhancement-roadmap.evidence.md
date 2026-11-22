@@ -61,6 +61,8 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 - Task 11: Ruling: `cargo audit` is not installed on this host, and installing it means downloading and compiling a tool, so Step 1's Rust result is taken from the `security` job of CI run 45064583668, which runs the same command on the same lockfile. Findings: `pnpm audit` none (local and CI); `cargo audit` 0 vulnerabilities and 6 allowed warnings — unmaintained `chrono` 0.4.45, `proc-macro-error` 1.0.4, `zbus_names` 4.3.5, `zvariant` 5.15.1, `zvariant_derive` 5.15.1, and unsound `glib` 0.18.5 (RUSTSEC-2024-0429); `glib` is not built for `aarch64-pc-windows-msvc` (`cargo tree -i glib` prints nothing), so it does not reach the shipped app. gitleaks: no leaks. No high or critical finding, so no waiver is needed. The `security` job in `ci.yml` already ran all three, so it is unchanged. Cost if wrong: a local-only advisory database difference.
 - Task 11: Ruling: CodeQL uses `build-mode: none` (JavaScript and TypeScript need no build) and also runs on pushes to `main`, so the Security tab has a baseline for `main`. Cost if wrong: one extra scan per merge.
 
+- Task 10 (after CI run 45067081101): Ruling: `proveNetworkDenied` and `proveNetworkDeniedSync` live in `src/sidecar/isolation.ts`, not `src/core/isolate.ts` as the plan's interface names. Core's module reaches the window's bundle through `src/core/construct/sandbox.ts`, and its `child_process` import broke `vite build` on the Windows job (`"execFile" is not exported by "__vite-browser-external"`). I had checked only for direct imports from `src/renderer` and an old `dist` build, and the local gate does not run `vite build`. `IsolationUnsafeError` stays in core (no Node API). A new test fails if `src/core/isolate.ts` imports a Node built-in; `pnpm run build:renderer` passes again. Cost if wrong: none for behaviour; only the module named in the plan differs.
+
 ## Follow-ups (owner decides)
 
 | found in task | item | decision |
@@ -73,6 +75,8 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 | 9 | CI installs the newest stable Rust, so a new clippy lint can fail CI with no code change, and this host (1.99.1) cannot see it first. Pin one Rust version (a `rust-toolchain.toml`) for CI and local builds | done: pinned to 1.100.0 |
 | 11 | `.github/workflows/release.yml` still uses five actions by tag (`@v4`, `@stable`), against the rule to pin every action to a commit. Dependabot's `github-actions` updates will propose versions; pinning them is a change to `release.yml` | |
 | 11 | GitHub warns that `actions/checkout`, `setup-node`, `upload-artifact`, `pnpm/action-setup` and `gitleaks-action` v4/v2 target Node 20, which runners force onto Node 24; Dependabot should propose the newer versions | |
+| 10 | `tests/computerUsePanel.test.tsx` failed once more on Linux ("the picker answers the keyboard", CI run 45067081101), a second test in the file already logged for focus timing | |
+| 10 | The standard gate does not include `vite build`, so a Node import reaching the window bundle is caught only by the Windows CI job. Adding `pnpm run build:renderer` to `lint-type` would catch it on Linux in about 20 s | |
 
 ## Owner waivers and deferrals
 
