@@ -2298,7 +2298,7 @@ impl GenieXSupervisor {
 
         // Publish the child under the same lock as cancellation so a stop either sees
         // the child or prevents it from being created.
-        let (pid, stdout, stderr, spawn_epoch) = {
+        let (stdout, stderr, spawn_epoch) = {
             let mut state = self.inner.write().await;
             if state.cancel_generation != generation { return Err("The GenieX start was cancelled.".into()); }
             let mut child = cmd.spawn().map_err(|e| format!("Failed to spawn geniex.exe: {}", e))?;
@@ -2317,7 +2317,7 @@ impl GenieXSupervisor {
                 Ok(()) => state.append_log(format!("[supervisor] Process {pid} configured with Tier 2 Inference-Critical (ABOVE_NORMAL, Unthrottled)")),
                 Err(e) => state.append_log(format!("[supervisor] Warning: Failed to apply Tier 2 QoS to PID {pid}: {e}")),
             }
-            (pid, stdout, stderr, state.epoch)
+            (stdout, stderr, state.epoch)
         };
 
         // Spawn background log reader tasks for stdout & stderr with active hardware verification
@@ -2744,7 +2744,7 @@ impl GenieXSupervisor {
                         }
                     }
                     // every 15 s: did GenieX release the model while it kept running (its own idle timeout)?
-                    if tick % 5 == 0 {
+                    if tick.is_multiple_of(5) {
                         let answer = client.get(&status_url).send().await.ok();
                         let body = match answer {
                             Some(r) if r.status().is_success() => r.json::<serde_json::Value>().await.ok(),
