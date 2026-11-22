@@ -223,6 +223,27 @@ describe("the index in memory", () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
+  it("a store rewritten within the same clock tick, at the same size, is not answered from memory", () => {
+    // A file's modification time moves in ticks; two writes inside one tick leave the same time.
+    // The test pins both writes to one whole second so this happens on every run, as it did on CI.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "know-memo-"));
+    const files: KnowledgeFileLike[] = [{ id: "f", name: "f.md", content: "# Notes\nThe heron count is 41." }];
+    const store = path.join(dir, "p.json");
+    const tick = Math.floor(Date.now() / 1000);
+    expect(openKnowledgeIndex(dir, "p", files).source).toBe("built");
+    fs.utimesSync(store, tick, tick);
+    expect(openKnowledgeIndex(dir, "p", files).source).toBe("store"); // the memory now holds this time
+    const stored = JSON.parse(fs.readFileSync(store, "utf8"));
+    fs.writeFileSync(store, JSON.stringify({ ...stored, version: 2 })); // same size: one digit changed
+    fs.utimesSync(store, tick, tick);
+    const again = openKnowledgeIndex(dir, "p", files);
+    expect(again.source).not.toBe("memory");
+    expect(again.rebuilt).toBe(true);
+    // and with nothing rewritten, the very next open is served from memory as before
+    expect(openKnowledgeIndex(dir, "p", files).source).toBe("memory");
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
   it("holds at most four projects: the least recently asked is read from its store again", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "know-memo-"));
     const files = (n: number): KnowledgeFileLike[] => [{ id: `f${n}`, name: `f${n}.md`, content: `# Part ${n}\nProject ${n} keeps its own notes.` }];

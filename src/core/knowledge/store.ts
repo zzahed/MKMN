@@ -232,7 +232,7 @@ export function openKnowledgeIndex(dir: string | null, projectId: string, files:
   // (another process, an older version) sends the open down the usual read-or-rebuild way.
   const key = liveKey(dir, projectId);
   const cached = memo.get(key);
-  if (cached && cached.hash === hash && cached.stamp === stampOf(file)) {
+  if (cached && cached.hash === hash && cached.stamp === stampOf(file) && !rewrittenInTick(cached, file)) {
     memo.delete(key);
     memo.set(key, cached); // most recently used last
     if (live.get(key)?.state === "indexing") stepState(dir, projectId, "indexing", "indexed");
@@ -241,9 +241,12 @@ export function openKnowledgeIndex(dir: string | null, projectId: string, files:
   let docs: StoredDoc[] = [];
   let rebuilt = true;
   let hadStored = false;
+  let storeText: string | null = null; // the store file's text as this open read or wrote it
   try {
     if (file && existsSync(file)) {
-      const stored = JSON.parse(readFileSync(file, "utf8")) as StoredIndex;
+      const text = readFileSync(file, "utf8");
+      const stored = JSON.parse(text) as StoredIndex;
+      storeText = text;
       if (stored?.version === 3 && stored.hash === hash && Array.isArray(stored.docs)) {
         docs = stored.docs;
         rebuilt = false;
@@ -290,7 +293,10 @@ export function openKnowledgeIndex(dir: string | null, projectId: string, files:
     if (file) try {
       mkdirSync(dir!, { recursive: true });
       const stored: StoredIndex = { version: 3, hash, docs };
-      writeAtomic(file, JSON.stringify(stored));
+      const text = JSON.stringify(stored);
+      storeText = null;
+      writeAtomic(file, text);
+      storeText = text;
     } catch (e) {
       // the index still works from memory this session; the next open rebuilds
       console.error(`[knowledge] the index could not be kept: ${(e as Error).message}`);
@@ -301,7 +307,10 @@ export function openKnowledgeIndex(dir: string | null, projectId: string, files:
     stepState(dir, projectId, tracked, "indexed");
   }
   const { postings, lengths } = buildPostings(docs);
-  const entry: Built = { hash, docs, postings, lengths, stamp: stampOf(file) };
+  const entry: Built = {
+    hash, docs, postings, lengths, stamp: stampOf(file),
+    mtimeMs: mtimeOf(file), madeAt: Date.now(), storeHash: storeText === null ? null : hashText(storeText),
+  };
   memo.delete(key);
   memo.set(key, entry);
   while (memo.size > 1 && (memo.size > MEMO_PROJECTS || [...memo.values()].reduce((n, b) => n + charsOf(b), 0) > MEMO_CHARS)) memo.delete(memo.keys().next().value as string);
@@ -314,6 +323,12 @@ interface Built {
   hash: string;
   /** The store file's size and modification time when this entry was made ("" with no store). */
   stamp: string;
+  /** The store file's modification time when this entry was made; null with no store file. */
+  mtimeMs: number | null;
+  /** When this entry was made, or when its store's text was last found unchanged. */
+  madeAt: number;
+  /** A hash of the store file's text as this entry knows it; null when the store was not kept. */
+  storeHash: string | null;
   docs: StoredDoc[];
   postings: Map<string, Posting[]>;
   lengths: number[];
@@ -333,6 +348,30 @@ const stampOf = (file: string | null): string => {
   if (!file) return "";
   try { const st = statSync(file); return `${st.size}:${st.mtimeMs}`; } catch { return "missing"; }
 };
+const mtimeOf = (file: string | null): number | null => {
+  if (!file) return null;
+  try { return statSync(file).mtimeMs; } catch { return null; }
+};
+
+/**
+ * Modification times move in ticks (a millisecond to two seconds, by file system), so a store
+ * rewritten in the same tick as it was last written keeps its time, and its size too when only
+ * a digit changed: the stamp cannot see that rewrite. While the store's time is that close to
+ * when this entry was made, the store's text is compared instead (read and hashed, not parsed);
+ * once it is found unchanged later than that, the stamp alone is trusted again.
+ */
+const TICK_MS = 2000;
+function rewrittenInTick(b: Built, file: string | null): boolean {
+  if (!file || b.mtimeMs === null) return false;
+  if (b.mtimeMs < b.madeAt - TICK_MS) return false;
+  if (b.storeHash === null) return true;
+  let text: string;
+  try { text = readFileSync(file, "utf8"); } catch { return true; }
+  if (hashText(text) !== b.storeHash) return true;
+  b.madeAt = Date.now();
+  return false;
+}
+
 const memo = new Map<string, Built>();
 
 function indexOver(b: Built, rebuilt: boolean, source: KnowledgeIndex["source"]): KnowledgeIndex {
