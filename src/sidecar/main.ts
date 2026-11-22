@@ -43,7 +43,7 @@ import type { AgentRunEvent } from "../shared/agent";
 import { headlessAsk } from "./headless";
 import { startUnknownModelCheck } from "./unknownModelCheck";
 import { checkArtifact } from "../core/construct/checkArtifact";
-import { knowledgeDirOf, knowledgeIndexStatus, buildKnowledgeIndexNow, openKnowledgeIndex } from "../core/knowledge/store";
+import { knowledgeDirOf, knowledgeIndexStatus, buildKnowledgeIndexNow, openKnowledgeIndex, removeKnowledgeFiles } from "../core/knowledge/store";
 import { filesHashOf } from "../core/knowledge/index";
 import { openVectorIndex } from "../core/knowledge/vectors";
 import { installVectorModel, removeVectorModel, vectorEmbedder, vectorModelStatus } from "../core/knowledge/vectorModel";
@@ -3110,6 +3110,12 @@ const MEDIA_DIR = dataFile("media");
 // screen shows. Observed from the store and this process's tracker, never a rebuild.
 dispatcher.register("knowledgeStatus", (projectId: string, filesHash: string) =>
   knowledgeIndexStatus(knowledgeDirOf(), String(projectId), String(filesHash ?? "")));
+
+// A deleted project's knowledge: its index and vectors in the knowledge folder, and the full
+// knowledge text a chat offloaded (the chats' offload folder, Workspace\harness\offload).
+// Returns the names of the files removed.
+dispatcher.register("knowledgeForget", (projectId: string) =>
+  removeKnowledgeFiles(knowledgeDirOf(), path.join(journalDir(), "offload"), String(projectId)));
 
 // The index build, started by the Files panel's add/remove: the same
 // machine-tracked build a chat's retrieval would run, begun in the background here so

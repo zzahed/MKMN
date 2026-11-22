@@ -382,6 +382,7 @@ export interface OpenNpuApi {
   readMedia(mediaId: string): Promise<{ dataUrl: string } | null>;
   projects(): Promise<Project[]>;
   saveProject(p: Project): Promise<Project[]>;
+  /** Removes the project, then its knowledge index, search vectors and offloaded knowledge text in the sidecar (a failure there is logged, not thrown). */
   deleteProject(id: string): Promise<Project[]>;
   artifacts(): Promise<Artifact[]>;
   /** Insert or update; chat artifacts use a stable id so a regenerated answer replaces the old one. */

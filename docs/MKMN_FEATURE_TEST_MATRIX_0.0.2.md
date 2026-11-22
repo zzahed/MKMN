@@ -2,7 +2,7 @@
 
 MKMN 0.0.2 requires Qualcomm GenieX v0.11.0 or newer for local inference and checks it before any GenieX server starts or is adopted. This inventory is generated from source.
 
-Generated from 40 host commands, 132 sidecar methods, 0 Settings groups, 51 Settings sections, 107 Settings rows, 4 Smart functions, 9 screens and 45 scripts.
+Generated from 40 host commands, 133 sidecar methods, 0 Settings groups, 51 Settings sections, 107 Settings rows, 4 Smart functions, 9 screens and 45 scripts.
 
 ## How to read the result column
 
@@ -218,25 +218,26 @@ node scripts/generate-feature-matrix.mjs --check
 | SID111 | `appShutdown` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
 | SID112 | `launchSite` | Websites | tests/siteOpen.test.ts | CONTRACT |
 | SID113 | `knowledgeStatus` | Knowledge | tests/knowledge-vectors.test.ts (vector path, store, pinned install); tests/multilingual-search.test.tsx; tests/knowledge-panel.test.ts; tests/knowledge-lifecycle.test.ts | CONTRACT |
-| SID114 | `knowledgeBuild` | Knowledge | tests/knowledge-vectors.test.ts (vector path, store, pinned install); tests/multilingual-search.test.tsx; tests/knowledge-panel.test.ts; tests/knowledge-lifecycle.test.ts | CONTRACT |
-| SID115 | `vectorModelStatus` | Knowledge | tests/knowledge-vectors.test.ts (vector path, store, pinned install); tests/multilingual-search.test.tsx; tests/knowledge-panel.test.ts; tests/knowledge-lifecycle.test.ts | CONTRACT |
-| SID116 | `vectorModelInstall` | Knowledge | tests/knowledge-vectors.test.ts (vector path, store, pinned install); tests/multilingual-search.test.tsx; tests/knowledge-panel.test.ts; tests/knowledge-lifecycle.test.ts | CONTRACT |
-| SID117 | `vectorModelRemove` | Knowledge | tests/knowledge-vectors.test.ts (vector path, store, pinned install); tests/multilingual-search.test.tsx; tests/knowledge-panel.test.ts; tests/knowledge-lifecycle.test.ts | CONTRACT |
-| SID118 | `saveMedia` | Media | tests/media-persistence.test.ts; tests/upload-ownership.test.ts | CONTRACT |
-| SID119 | `readMedia` | Media | tests/media-persistence.test.ts; tests/upload-ownership.test.ts | CONTRACT |
-| SID120 | `tasks` | Tasks | tests/workspace.test.ts (store only) | CONTRACT |
-| SID121 | `saveTask` | Tasks | tests/workspace.test.ts (store only) | CONTRACT |
-| SID122 | `forgetConversation` | Privacy | tests/forget-conversation.test.ts | CONTRACT |
-| SID123 | `deleteTask` | Tasks | tests/workspace.test.ts (store only) | CONTRACT |
-| SID124 | `runTask` | Tasks | tests/workspace.test.ts (store only) | CONTRACT; live PASS |
-| SID125 | `humainKeySaved` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID126 | `humainSaveKey` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID127 | `humainModels` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID128 | `humainRealtimeOpen` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID129 | `humainRealtimeEvents` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID130 | `humainRealtimeSend` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID131 | `humainRealtimeClose` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID132 | `humainOperation` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID114 | `knowledgeForget` | Privacy | tests/forget-conversation.test.ts; tests/knowledge-forget.test.ts | CONTRACT |
+| SID115 | `knowledgeBuild` | Knowledge | tests/knowledge-vectors.test.ts (vector path, store, pinned install); tests/multilingual-search.test.tsx; tests/knowledge-panel.test.ts; tests/knowledge-lifecycle.test.ts | CONTRACT |
+| SID116 | `vectorModelStatus` | Knowledge | tests/knowledge-vectors.test.ts (vector path, store, pinned install); tests/multilingual-search.test.tsx; tests/knowledge-panel.test.ts; tests/knowledge-lifecycle.test.ts | CONTRACT |
+| SID117 | `vectorModelInstall` | Knowledge | tests/knowledge-vectors.test.ts (vector path, store, pinned install); tests/multilingual-search.test.tsx; tests/knowledge-panel.test.ts; tests/knowledge-lifecycle.test.ts | CONTRACT |
+| SID118 | `vectorModelRemove` | Knowledge | tests/knowledge-vectors.test.ts (vector path, store, pinned install); tests/multilingual-search.test.tsx; tests/knowledge-panel.test.ts; tests/knowledge-lifecycle.test.ts | CONTRACT |
+| SID119 | `saveMedia` | Media | tests/media-persistence.test.ts; tests/upload-ownership.test.ts | CONTRACT |
+| SID120 | `readMedia` | Media | tests/media-persistence.test.ts; tests/upload-ownership.test.ts | CONTRACT |
+| SID121 | `tasks` | Tasks | tests/workspace.test.ts (store only) | CONTRACT |
+| SID122 | `saveTask` | Tasks | tests/workspace.test.ts (store only) | CONTRACT |
+| SID123 | `forgetConversation` | Privacy | tests/forget-conversation.test.ts; tests/knowledge-forget.test.ts | CONTRACT |
+| SID124 | `deleteTask` | Tasks | tests/workspace.test.ts (store only) | CONTRACT |
+| SID125 | `runTask` | Tasks | tests/workspace.test.ts (store only) | CONTRACT; live PASS |
+| SID126 | `humainKeySaved` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID127 | `humainSaveKey` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID128 | `humainModels` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID129 | `humainRealtimeOpen` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID130 | `humainRealtimeEvents` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID131 | `humainRealtimeSend` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID132 | `humainRealtimeClose` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID133 | `humainOperation` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
 
 ## Settings groups
 

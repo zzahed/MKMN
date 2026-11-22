@@ -13,7 +13,7 @@
  *
  * Node only (it reads and writes the store): the renderer never imports it.
  */
-import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 
 /** The index is written to a temp file and renamed over the old one: a crash mid-write never leaves half a file. */
 function writeAtomic(file: string, text: string): void {
@@ -26,6 +26,10 @@ import { mkmnPaths } from "../../shared/paths";
 import { hashText } from "../memo";
 import { sectionsOf, tokenize, type KnowledgeFileLike } from "./index";
 import { nextState } from "../../shared/stateMachines";
+import { safeIdOf } from "./ids";
+import { forgetVectorProject } from "./vectors";
+
+export { safeIdOf };
 import type { KnowledgeIndexState } from "../../shared/stateMachines.generated";
 
 /** Where a project's knowledge index lives: `<workspace>/knowledge/<project>.json`. */
@@ -34,7 +38,7 @@ export function knowledgeDirOf(env: NodeJS.ProcessEnv = process.env): string {
 }
 
 const indexFileOf = (dir: string, projectId: string): string =>
-  path.join(dir, `${projectId.replace(/[^A-Za-z0-9._-]/g, "_")}.json`);
+  path.join(dir, `${safeIdOf(projectId)}.json`);
 
 interface StoredDoc {
   fileId: string;
@@ -405,6 +409,33 @@ function indexOver(b: Built, rebuilt: boolean, source: KnowledgeIndex["source"])
 /** Forget the in-memory indexes (tests; a host that wants the store read again). */
 export function forgetKnowledgeIndexes(): void {
   memo.clear();
+}
+
+/**
+ * Everything a deleted project leaves for its knowledge: the index and its vectors in
+ * `knowledgeDir`, and the full knowledge text the chat offloads to `offloadDir`. The file names
+ * come from safeIdOf, so nothing outside the two folders is reached. The project's index and
+ * vectors held in this process are forgotten too, and its build state is dropped, so the next
+ * open builds afresh. Returns the names of the files removed; files that are not there are skipped.
+ */
+export function removeKnowledgeFiles(knowledgeDir: string, offloadDir: string, projectId: string): string[] {
+  const id = safeIdOf(projectId);
+  const targets: Array<[string, string]> = [
+    [knowledgeDir, `${id}.json`],
+    [knowledgeDir, `${id}.vectors`],
+    [offloadDir, `knowledge-${id}.txt`],
+  ];
+  const removed: string[] = [];
+  for (const [dir, name] of targets) {
+    const file = path.join(dir, name);
+    if (!existsSync(file)) continue;
+    rmSync(file, { force: true });
+    removed.push(name);
+  }
+  memo.delete(liveKey(knowledgeDir, projectId));
+  live.delete(liveKey(knowledgeDir, projectId));
+  forgetVectorProject(knowledgeDir, projectId);
+  return removed;
 }
 
 // ---------------------------------------------------------------- the background build

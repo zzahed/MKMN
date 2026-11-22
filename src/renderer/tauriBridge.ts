@@ -1370,6 +1370,10 @@ export function createTauriApi(): OpenNpuApi {
       const list = getLocalJson<Project[]>("mkmn.projects", []).filter((p) => p.id !== id);
       if (!setLocalJson("mkmn.projects", list)) throw new Error("The project could not be removed: local storage refused the write.");
       await refreshTaskProjects(id, null);
+      // its knowledge index, vectors and offloaded knowledge text go with it. Not awaited: the
+      // project is already removed, and a busy sidecar may take up to its call timeout (600 s)
+      // to answer, so a failure here is logged, never thrown
+      void sidecarCall<string[]>("knowledgeForget", id).catch((e) => console.error(`[projects] the knowledge files of a deleted project could not be removed: ${(e as Error).message}`));
       return list;
     },
 
