@@ -135,12 +135,20 @@ export function modelFolders(name: string, dir = modelsDir(), exists = fs.exists
   const names = hasPrecision
     ? [precisionSpecific, `models--${precisionSpecific}`]
     : [base, flat, `models--${flat}`];
-  const candidates = [...new Set(names)].map((n) => path.join(dir, n)).filter((p) => {
+  const inside = (p: string): boolean => {
     // Containment: a name that escapes the models directory (`../x`, a drive, a reparse
     // target outside) must never be deleted by the fallback removal path.
     const rel = path.relative(dir, p);
-    if (!rel || rel === "." || rel.startsWith("..") || path.isAbsolute(rel)) return false;
-    return exists(p);
+    return !!rel && rel !== "." && !rel.startsWith("..") && !path.isAbsolute(rel);
+  };
+  const candidates = [...new Set(names)].map((n) => path.join(dir, n)).flatMap((p) => {
+    if (!inside(p)) return [];
+    if (exists(p)) return [p];
+    // Canonical names are lower case; the cache keeps the publisher's spelling. On a
+    // case-sensitive folder the exact path misses, so the one folder that matches apart
+    // from case is used. Two such folders are ambiguous, and then nothing is selected.
+    const folded = foldCase(dir, path.relative(dir, p));
+    return folded && inside(folded) && exists(folded) ? [folded] : [];
   });
   if (candidates.length === 0) return [];
   // Real-path containment: a candidate must still resolve INSIDE the real models
@@ -159,6 +167,20 @@ export function modelFolders(name: string, dir = modelsDir(), exists = fs.exists
   } catch {
     return [];
   }
+}
+
+/** `rel` under `dir`, each segment spelt as it is on disk when exactly one entry matches it apart from case; null otherwise. */
+function foldCase(dir: string, rel: string): string | null {
+  let at = dir;
+  for (const seg of rel.split(/[\\/]/).filter(Boolean)) {
+    if (seg === "." || seg === "..") return null;
+    let entries: string[];
+    try { entries = fs.readdirSync(at); } catch { return null; }
+    const hits = entries.filter((e) => e.toLowerCase() === seg.toLowerCase());
+    if (hits.length !== 1) return null;
+    at = path.join(at, hits[0]);
+  }
+  return at;
 }
 
 /** Terminal control sequences (cursor, colours, "?25l") and stray control characters, so an error reads as text. */
