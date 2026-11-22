@@ -64,6 +64,158 @@
 
 ---
 
+## Execution Control (loop & graph contracts)
+
+This section makes the plan follow [Loop & graph engineering](https://github.com/FlorianBruniaux/claude-code-ultimate-guide/blob/main/guide/core/loop-graph-engineering.md). It sets how tasks are run, stopped, checked and accepted. A task's steps say *what* to build. This section says *when it counts as done*.
+
+### C1. Control structure (smallest that works)
+
+- **Each task is a bounded agent loop.** It has one goal, local tool feedback (tests, type check) and the stop rules in C2.
+- **Running the plan is a static workflow graph (C3).** It has known branches (pass, rework, escalate), a review gate, owner gates and a checkpoint per task. Those must be explicit, so a plain loop is not enough.
+- **No dynamic graph.** New work found during a task (an extra bug, a missing test) is not added as a node at run time. It goes in the evidence ledger under *Follow-ups*, and the owner decides whether it becomes a task. The task list, allowed files, gates and budgets are the static control plane. They change only by a reviewed edit to this plan.
+- **No orchestrator beyond one session.** One task is in flight at a time (C6).
+
+### C2. Default loop contract (applies to every task)
+
+| Field | Contract |
+|---|---|
+| Goal and input | The task's section in this plan, the source item in the map above, and the **base revision**: `git rev-parse HEAD` on `claude/admiring-mendel-4b05nf` at task start, recorded in the ledger. |
+| State | Kept outside the model context in three places: (1) git commits on the working branch, (2) the task's checkboxes in this file, (3) one row per task in the evidence ledger `docs/superpowers/plans/2026-11-22-repo-enhancement-roadmap.evidence.md`. Writers: the implementer updates commits and checkboxes; the verifier writes evidence; the reviewer writes the verdict; only the owner writes *Accepted by* for owner-gated tasks. |
+| Actions | Edit only the files the task lists, plus tests it names. Run local commands. Commit to `claude/admiring-mendel-4b05nf` only. No push to `main`, no GitHub settings, no secrets, no signing material. Anything outside the list → stop and escalate. |
+| Observation | Output and exit status of the task's verification commands; reviewer findings; CI results once Task 9 lands. A model's "done" is an observation, never acceptance evidence. |
+| Verification | Deterministic first: the task's own commands, then the **standard gate**: `pnpm typecheck`, `pnpm exec vitest run`, `node scripts/check-language.mjs`, and `pnpm regen:check` once Task 9 lands. All exit 0, with no new failures or skips compared to the base revision's ledger row. Then a fresh-context review of the diff against this plan and the source item (C4). |
+| Stop and escalation | **Success:** gate green and reviewer accepts (or the owner accepts, for gated tasks). **Failure:** rework budget used up, or a policy violation (touched an unlisted file, a red test disabled or skipped to get green, a secret in the diff). **Budget:** 2 rework cycles (a cycle = reviewer rejects or gate fails after implement). **Timeout:** 2× the QE effort estimate, or 1 working session where there is none. **Escalate to the owner:** a scope, risk or authority question (C4), an uncertain external effect (C5), or a timeout. |
+| Evidence | Ledger row: task, base rev, head rev, each command with exit status, test totals (pass/fail/skip), stop reason, reviewer verdict and findings, accepted by. Paths are repo-relative. No personal names beyond the GitHub owner, no home paths, no model identifiers. |
+
+**Feedback horizons.**
+- **Inner loop:** C2 per task.
+- **Outer loop:** the phase gates in C3, plus CI on the PR. The acceptance authority is the owner.
+- **Meta loop:** changes to this section or to task budgets. They are versioned by editing this file in a separate commit and judged against the ledger of finished tasks, not against a single run.
+
+### C3. Graph contract — plan execution
+
+```yaml
+graph: mkmn-roadmap-execution
+version: 1
+owner: repository owner
+state:
+  base_revision:    { writer: dispatch,     validator: "commit exists on working branch" }
+  task_id:          { writer: dispatch,     validator: "task number in this plan" }
+  patch_ref:        { writer: implement,    validator: "commit(s) exist after base_revision" }
+  evidence:         { writer: verify,       validator: "every command has exit status recorded" }
+  rework_budget:    { writer: retry_router, initial: 2, min: 0, max: 2, rule: "decrement by 1 on verify fail or review reject while > 0" }
+  verdict:          { writer: review | owner_gate, values: [accept, reject, escalate] }
+nodes:
+  dispatch:     { purpose: "admit next task (C6), record base_revision", timeout: none }
+  implement:    { input: task section, output: patch_ref, side_effects: "local files, commits on working branch only" }
+  verify:       { input: patch_ref, output: evidence, deterministic: true }
+  retry_router: { input: [evidence, verdict, rework_budget] }
+  review:       { input: [task section, source item, diff, evidence], authority: "accept or escalate; cannot accept without passing evidence" }
+  owner_gate:   { input: [diff, evidence, review verdict], authority: "accept, reject, escalate" }
+terminals:
+  done:      "accepted with evidence"
+  failed:    "rework budget exhausted, or policy violation"
+  escalated: "owner decision needed; task parked, next independent task may be admitted"
+edges:
+  - dispatch -> implement:      "phase gate open and WIP limit free (C6)"
+  - implement -> verify:        "patch_ref exists"
+  - implement -> failed:        "policy violation"
+  - implement -> escalated:     "task needs a file, permission or decision outside its contract"
+  - verify -> review:           "standard gate + task commands all exit 0"
+  - verify -> retry_router:     "any command non-zero"
+  - review -> done:             "accept, task not owner-gated (C4)"
+  - review -> owner_gate:       "accept, task owner-gated (C4)"
+  - review -> retry_router:     "reject with findings"
+  - review -> escalated:        "ambiguous requirement or high impact"
+  - retry_router -> implement:  "budget decremented"
+  - retry_router -> failed:     "budget 0"
+  - owner_gate -> done:         "owner accepts"
+  - owner_gate -> retry_router: "owner rejects with findings"
+  - owner_gate -> escalated:    "owner defers"
+forbidden:
+  - "implement -> done (creator cannot accept its own work)"
+  - "review -> done when evidence missing or red"
+  - "any node -> push to main / GitHub settings change"
+joins:
+  phase_gate:
+    expected: "every task in the phase is done, or marked deferred by the owner in the ledger"
+    missing_input: "next phase stays closed; tasks in it are not dispatched"
+    exception: "Phases 4-5 (Tasks 14-18) may start once Phase 1 is done; they do not depend on Phases 2-3"
+checkpoint:
+  boundary: "after each node's write to the ledger"
+  resume: >
+    Re-read this plan, the ledger and `git log base..HEAD`. A task with commits but no evidence row
+    resumes at verify, not implement. A task with evidence but no verdict resumes at review.
+    A rework count is never reset by a resume.
+  base_moved: "if main or the base revision changed under an unaccepted task, re-run verify on the merged head; old evidence is void"
+completion:
+  done:      "reviewer (ungated) or owner (gated)"
+  failed:    "verify / retry_router, recorded in ledger"
+  escalated: "any node; only the owner can close it"
+```
+
+The graph checks that a route is valid. It does not prove the result is correct. Correctness comes from the task's tests plus review, and for gated tasks the owner.
+
+### C4. Who decides what (judgment allocation)
+
+| Decision | Decided by | Tasks |
+|---|---|---|
+| Tests, type check, generator check, language check, coverage threshold | Deterministic gate (C2). No human or reviewer may override a red result. | all |
+| Diff matches the task and source item; no scope creep | Fresh-context reviewer (subagent or new session) given the task text, source item, diff and evidence | all |
+| Security, privacy or saved-data behaviour | **Owner gate** after review | 3 (engine-strict blocks Node 22 installs), 10, 11 (waivers), 12, 13, 16 |
+| Repo policy, CI or contributor-facing rules | **Owner gate** | 9, 14, 15 |
+| Large refactors | **Owner gate** per extracted module | 22, 23 |
+| Release blocker: Node 24 does not block network (Task 10 step 4) | **Owner** — pin a Node version, strip modules, or hold the release | 10 |
+| Skip vs fix for a root-caused failure | Reviewer, if the evidence shows a Windows-only cause; otherwise owner | 4–7 |
+| Branch protection, code signing, Discussions, topics, DPAPI, mass reformat, releases | **Owner only** (Phase 8) | — |
+
+**Reviewer independence is measured, not assumed.** In the ledger, record each review verdict and any defect found later in an accepted task (a *false accept*). The owner also spot-checks one ungated accepted task in five, and records whether they agree. If false accepts appear, move that task type to the owner gate.
+
+### C5. External effects and durability
+
+| Effect | Rule |
+|---|---|
+| `git commit` | Local and repeatable. A resume checks `git log` before redoing a step. |
+| `git push -u origin claude/admiring-mendel-4b05nf` | Idempotent. If rejected because the remote has commits, fetch and merge (never force-push), then re-run verify. |
+| Opening a draft PR (Tasks 9, 11, 20) | Ask the owner first. **Before creating one, list open PRs for the branch, and reuse one if it exists.** If the create call times out, list again before retrying. If it is still unclear, escalate. Never open a second PR. |
+| CI runs | Read results. Never re-trigger with empty commits or by closing and reopening the PR. |
+| GitHub settings, releases, signing | Not agent actions (C4). |
+
+Resuming a task is not claimed to work until it has been exercised. **Drill:** the first task run in a fresh session (expected: Task 2) starts only from this file, the ledger and git. Its ledger row records whether resume found the right next step.
+
+### C6. Admission and WIP limit
+
+- One task in implement → verify → review at a time. The next task is admitted only when the current one reaches a terminal state.
+- No new task while `main` or the open PR has red CI from this plan's work. In-flight rework may finish.
+- Escalated tasks are parked. Other tasks whose phase gate is open may continue.
+- Phases are admitted in order: 0 → 1 → 2 → 3, with Phases 4–5 allowed after Phase 1 (C3 joins), then 6 → 7.
+
+### C7. Per-task overrides to the default contract
+
+| Task | Budget / timeout | Extra stop or escalation rule |
+|---|---|---|
+| 1 | default / 1 h | — |
+| 2 | default / 6 h | Escalate if a gated test also fails on Windows CI (it must still run there). |
+| 3 | default / 4 h | Owner gate: `engine-strict` refuses installs on Node 22. |
+| 4–7 | 2 hypotheses tested, then **stop** / 2× QE estimate | No fix without a recorded root cause. A skip needs evidence that the behaviour is Windows-only. Otherwise escalate. Task 5: 50/50 repeat runs is the success bar. |
+| 8 | default / 1 h | If unhandled errors remain at their source, escalate rather than silence them. |
+| 9 | default / 1 day | Done only when the PR's CI is green on GitHub, not just locally. Draft PR follows C5. |
+| 10 | 1 rework / 2 days | Step 4 failure → `escalated`, a release blocker. A probe that reports "unsafe" on Node 24 is a defect, not a pass. |
+| 11 | default / 1 day | A high or critical finding without a fix → owner waiver in the ledger, or `escalated`. |
+| 12–13 | default / 1 day | Owner gate. Review Focus 3–4 tests must exist before review. |
+| 15 | default / 1 day | No mass reformat. A diff over ~200 changed lines outside configs → escalate. |
+| 16 | default / 1 day | Owner gate. The storage-key test must pass on a copy of a real old profile if the owner can supply one. |
+| 19 | default / 1 day | Thresholds below baseline are not allowed. Record the baseline in the ledger. |
+| 20 | default / 2 days | `pnpm exec playwright test --trace off` exits 0 locally and in CI. |
+| 21 | default / 1 day | Accepted only on Windows ARM64 CI evidence, because it cannot run in a Linux container. |
+| 22–23 | 1 module per loop; default budget per module | Method-name snapshot (22) or stage golden tests (23) unchanged, otherwise `failed` for that module. |
+
+### C8. Trace fields (ledger columns)
+
+`task` · `phase` · `plan_version` (commit of this file) · `base_rev` · `head_rev` · `executor` (native / subagent, session link; no model identifier) · `commands` (command → exit status) · `tests` (pass/fail/skip vs base) · `rework_used` · `stop_reason` (done / failed: reason / escalated: reason / timeout) · `reviewer` · `verdict` + findings · `accepted_by` · `follow_ups` · `false_accept_later` (filled in when found).
+
+---
+
 ## Phase 0 — Green the suite on Linux
 
 ### Task 1: README contract strings + top-of-page warnings
@@ -342,7 +494,22 @@ it("states the non-endorsement near the top", () => expect(head).toMatch(/not (a
 - No large rewrite or architecture change; strengthen existing patterns.
 - No Intel/AMD/Mac support.
 
-## Suggested order
+## Order
 
-Week 1: Tasks 1–3, 8, 9 (suite green + CI), then 10 and 12.
-Week 2: Tasks 4–7, 11, 14, 18. Then Phases 4–7 as time allows.
+Admission follows C6. Phase 0 (Tasks 1–8) → Phase 1 (Task 9) → Phase 2 (10–11) → Phase 3 (12–13), with Phases 4–5 (14–18) allowed after Phase 1 → Phase 6 (19–21) → Phase 7 (22–23). Within Phase 0, run 1, 2, 3 and 8 first: they unblock the gate's baseline for Tasks 4–7.
+
+## Selection checklist (loop & graph engineering §10)
+
+- [x] The structure is the smallest that fits: a bounded agent loop per task, and one static graph for the review and owner gates (C1).
+- [x] Each loop has success, failure, timeout, budget and escalation exits (C2, C7).
+- [x] State, side effects, evidence and retention are kept outside the model context: git, plan checkboxes and the ledger (C2, C5). The ledger is kept with the plan and deleted with it.
+- [x] Every node, edge, join, retry and checkpoint has a contract (C3).
+- [x] A static policy constrains new work. There is no dynamic task creation; follow-ups need the owner (C1).
+- [x] Deterministic checks own what they can decide, and no one overrides a red gate (C4).
+- [x] Human authority is named for ambiguity, exceptions, release and irreversible effects (C4, Phase 8).
+- [x] Reviewer independence is measured through false accepts and owner spot-checks (C4).
+- [ ] Resume and side-effect idempotency are tested under interruption. **Open until the C5 drill runs.**
+- [x] Traces rebuild routing, state changes, evidence and verdicts without sensitive data (C8).
+- [x] Evaluation records the plan version, budget, task set and failure modes (C8). The model identifier is deliberately left out of repository files, per this repo's rules; the session link stands in for it.
+
+Before widening scope, for example running tasks in parallel or letting agents push or merge, close the open item above and update C6 in a reviewed commit.
