@@ -68,6 +68,7 @@ jobs:
         run: |
           pnpm --ignore-workspace install --frozen-lockfile; if ($LASTEXITCODE) { exit $LASTEXITCODE }
           pnpm rebuild esbuild;                              if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          pnpm run build;                                    if ($LASTEXITCODE) { exit $LASTEXITCODE }
           pnpm run build:sidecar;                            if ($LASTEXITCODE) { exit $LASTEXITCODE }
           $env:MKMN_REQUIRE_SIDECAR = "1"
           pnpm test;                                         if ($LASTEXITCODE) { exit $LASTEXITCODE }
