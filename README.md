@@ -179,7 +179,7 @@ keeps your chats and settings (`%APPDATA%\MKMN`, `%LOCALAPPDATA%\MKMN`).
 <br>
 
 On a Snapdragon X laptop with Windows 11, install Node.js 26+ (ARM64),
-pnpm 10.26.1, Rust 1.90+ with the `aarch64-pc-windows-msvc` target, Visual
+pnpm 10.26.1, Rust 1.100.0 (pinned in `rust-toolchain.toml`; rustup installs it) with the `aarch64-pc-windows-msvc` target, Visual
 Studio Build Tools (MSVC ARM64 + Windows 11 SDK), and NSIS 3 for the installer.
 
 ```powershell

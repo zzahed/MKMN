@@ -1,0 +1,7 @@
+# The one Rust version for CI and local builds. rustup installs it the first time cargo runs
+# here. To move to a newer Rust, change it here and in the workflows (tests/rust-version.test.ts
+# checks they agree), then fix any new clippy warnings.
+[toolchain]
+channel = "1.100.0"
+components = ["clippy"]
+targets = ["aarch64-pc-windows-msvc"]
