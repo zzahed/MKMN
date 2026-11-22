@@ -18,7 +18,7 @@ afterEach(async () => {
   for (const dir of folders.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-function manager() {
+function manager(extra: Partial<ConstructorParameters<typeof ServerManager>[0]> = {}) {
   const children: any[] = [];
   const spawnFn = (() => {
     const child: any = new EventEmitter();
@@ -36,7 +36,8 @@ function manager() {
   }) as any;
   const m = new ServerManager({
     exe: "not-a-real-runtime", spawnFn, pollMs: 1, readyTimeoutMs: 100,
-    fetchFn: (async () => ({ ok: true })) as any
+    fetchFn: (async () => ({ ok: true })) as any,
+    ...extra
   });
   managers.push(m);
   return { m, children };
@@ -122,8 +123,33 @@ describe("NPU process ownership (orchestration, not hardware tests)", () => {
     vi.useRealTimers();
   });
 
+  it("re-issues the kill by the platform it is given, whatever system runs the test", async () => {
+    // the host pretends to be Linux; the manager is told it runs the Windows kill policy
+    const real = Object.getOwnPropertyDescriptor(process, "platform")!;
+    Object.defineProperty(process, "platform", { value: process.platform === "win32" ? "linux" : process.platform });
+    try {
+      const { m, children } = manager({ platform: "win32" });
+      await m.start(4096);
+      const child = children[0];
+      let kills = 0;
+      child.kill = () => {
+        if (++kills >= 3) { child.exitCode = 0; queueMicrotask(() => child.emit("close", 0)); }
+        return true;
+      };
+      vi.useFakeTimers();
+      const start = m.start(8192);
+      const settled = start.then(() => "ready", (e: Error) => e.message);
+      await vi.advanceTimersByTimeAsync(16000);
+      expect(await settled).toBe("ready");
+      expect(kills).toBe(3);
+    } finally {
+      Object.defineProperty(process, "platform", real);
+    }
+  });
+
   it("confirms the exit of a wedged process once a re-issued kill acts", async () => {
-    const { m, children } = manager();
+    // the Windows kill policy (taskkill, re-issued every 5 s), injected so the test holds on every system
+    const { m, children } = manager({ platform: "win32" });
     await m.start(4096);
     const child = children[0];
     const kill = child.kill;
