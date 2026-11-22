@@ -6,6 +6,7 @@ The state record for `2026-11-22-repo-enhancement-roadmap.md` (see its sections 
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 1 | 0 | fd402bd | fd402bd | de7ef23 | native (inline) | `pnpm exec vitest run tests/readme-header.test.ts tests/version.test.ts tests/build-docs.test.ts` → 1 before (4 failed), 0 after; `node scripts/check-language.mjs` → 0 | 7/0/0 in the three files; full suite failures 2 → 0 | 0 | done | pending final review | — | — | — | — |
 | 2 | 0 | fd402bd | de7ef23 | (this commit) | native (inline) | six named files → 0 (40 passed, 0 skipped on Windows) | Windows skip count unchanged (0 new skips); Linux not run here | 0 | done (Linux half unverified until CI, Task 9) | pending final review | — | — | — | — |
+| 3 | 0 | fd402bd | 5ed8ef0 | (this commit) | native (inline) | `pnpm exec vitest run tests/pdf-runtime.test.ts` → 1 before (3 failed: 2 s timeout, no engines, no engine-strict), 0 after; with `tests/pdf-lifecycle.test.ts` → 0 (10 passed); `pnpm --ignore-workspace install --frozen-lockfile --offline` → 0 | +3 tests, all pass | 0 | done, awaiting owner gate | pending final review | — | **owner gate open**: `engine-strict` refuses installs on Node 22 | QE-1.3(c): test that the bundled sidecar Node major equals the CI Node major | — |
 
 ## Baseline (before Task 1)
 
@@ -20,6 +21,7 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 ## Rulings
 
 - Task 2: Ruling: the RED step (22 failures on Linux) cannot be observed on this Windows host — the gating was written from reading each test, and the Windows run proves the tests still run and pass here. Linux proof is deferred to the Task 9 `unit` job. Cost if wrong: a test still fails on Linux and shows up red in CI.
+- Task 3: Ruling: the guard goes in `readPdf` in `src/renderer/pdf.ts`, not `src/core/pdf.ts` — `readPdf` is the function the plan's test calls and the only place pdf.js is loaded; `src/core/pdf.ts` never imports pdf.js. Cost if wrong: none for behaviour; only the file named in the plan differs.
 - Task 2: Ruling: `tests/npu-reset-command.test.ts` already guards its PowerShell calls with `onWindows`, so it is left unchanged. Cost if wrong: none found.
 
 

@@ -20,6 +20,9 @@
     "tauri"
   ],
   "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "dev:renderer": "vite",
     "build:renderer": "vite build",
