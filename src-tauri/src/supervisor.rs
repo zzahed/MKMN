@@ -3211,6 +3211,9 @@ mod tests {
         let sup = GenieXSupervisor::new();
         let mut req = serve_req(Some("org/model"));
         req.port = Some(port);
+        // a geniex.exe of the test's own, so the test does not depend on GenieX being
+        // installed on the machine that runs it (a CI runner has none); it is never run
+        req.exe = Some(installed_fake_exe().to_string_lossy().into_owned());
 
         let err = sup.start(req).await.expect_err("a held port must not start");
         assert!(err.contains(&port.to_string()), "{err}");
@@ -3469,6 +3472,21 @@ while($true){{
             std::thread::sleep(Duration::from_millis(50));
         }
         FakeGeniex { child, port, exe }
+    }
+
+    /// A geniex.exe that passes the install and version checks but serves nothing: a copy
+    /// of PowerShell under that name, declared as v0.11.0, in a folder of its own.
+    fn installed_fake_exe() -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("mkmn-installed-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let exe = dir.join("geniex.exe");
+        crate::capabilities::test_versions::declare(&exe, "v0.11.0");
+        if !exe.exists() {
+            let windir = std::env::var("WINDIR").expect("WINDIR");
+            let ps = Path::new(&windir).join("System32").join("WindowsPowerShell").join("v1.0").join("powershell.exe");
+            copy_powershell(&ps, &exe).expect("copy powershell as geniex.exe");
+        }
+        exe
     }
 
     fn adopt_req(fake: &FakeGeniex, model: &str) -> StartServerRequest {

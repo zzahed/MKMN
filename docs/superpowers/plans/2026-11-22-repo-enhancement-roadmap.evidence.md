@@ -51,6 +51,8 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 
 - Task 9: Ruling by the owner: pin one Rust version. `rust-toolchain.toml` at the repository root (cargo is run from there) names 1.100.0, with clippy and the ARM64 target; both workflows pass `toolchain: 1.100.0`; the README names it. 1.100.0, not this host's 1.99.1: it is the current stable and the version CI already ran, and either choice made rustup download a toolchain here. New `tests/rust-version.test.ts` keeps them in step. Clippy `-D warnings` and `cargo test` pass on 1.100.0 locally. Cost if wrong: contributors download 1.100.0 on their first build.
 
+- Task 9 (after CI run 45063349828): clippy passed on 1.100.0 and every JavaScript test passed; `cargo test` ran in CI for the first time and `supervisor::tests::a_held_port_is_reported_as_a_conflict_without_spawning_a_server` failed with "GenieX is not installed". Root cause: `start` checks for an installed GenieX before the port, and the test used whatever GenieX the machine has; this host has one, the runner has none. Not reproducible here (`find_geniex` falls back to the real install), so the CI panic is the evidence. Fix in the test: it passes its own fake geniex.exe (a copy of PowerShell declared v0.11.0, never run), as the adoption tests already do. Cost if wrong: none for the app.
+
 ## Follow-ups (owner decides)
 
 | found in task | item | decision |
