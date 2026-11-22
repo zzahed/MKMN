@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { itWindows } from "./helpers/platform";
 
 /**
  * Runtime contracts that the installed build must keep (seen on an installed build):
@@ -124,7 +125,7 @@ describe("closing the window cannot hang the process", () => {
 });
 
 describe("after-close checking knows what a real process is", () => {
-  it("Check-After-Close.ps1 resolves paths and treats 0-thread records as dead", () => {
+  itWindows("Check-After-Close.ps1 resolves paths and treats 0-thread records as dead", () => {
     const script = join(ROOT, "scripts", "Check-After-Close.ps1");
     expect(existsSync(script), "scripts/Check-After-Close.ps1 is missing").toBe(true);
     const s = read("scripts/Check-After-Close.ps1");

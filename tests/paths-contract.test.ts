@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { itWindows } from "./helpers/platform";
 
 /**
  * One directory layout, read by everything (seen on an installed build): the Rust host keeps settings,
@@ -67,7 +68,7 @@ describe("the directory layout is one resolver", () => {
 });
 
 describe("the scripts resolve paths instead of guessing them", () => {
-  it("Resolve-MkmnPaths.ps1 returns the real layout as JSON", () => {
+  itWindows("Resolve-MkmnPaths.ps1 returns the real layout as JSON", () => {
     const local = mkdtempSync(join(tmpdir(), "mkmn-local-"));
     const roaming = mkdtempSync(join(tmpdir(), "mkmn-roaming-"));
     const install = mkdtempSync(join(tmpdir(), "mkmn-install-"));
@@ -93,7 +94,7 @@ describe("the scripts resolve paths instead of guessing them", () => {
     expect(r.legacyDataDir.toLowerCase()).toBe(join(roaming, "MKMN").toLowerCase());
   });
 
-  it("the resolver's JSON survives an in-script capture, not only a direct spawn", () => {
+  itWindows("the resolver's JSON survives an in-script capture, not only a direct spawn", () => {
     // Live-Relaunch-Check.ps1 and Check-After-Close.ps1 call the resolver with
     // `& $resolver -Json | ConvertFrom-Json`. A direct console write bypasses that
     // pipeline, so the caller sees nothing and reports that the install is missing.
