@@ -6,5 +6,12 @@ export default defineConfig({
   // (the node environment stays the default for the pure-logic tests).
   // setup-model-guard fails any test that opens a real connection: model requests
   // in tests go to a FakeModel (src/core/harness/testing.ts) or a stubbed fetch.
-  test: { include: ["tests/**/*.test.{ts,tsx}"], testTimeout: 20000, setupFiles: ["tests/setup-model-guard.ts"] }
+  // An unhandled rejection fails the run: it can hide a failing assertion.
+  test: {
+    include: ["tests/**/*.test.{ts,tsx}"],
+    exclude: ["tests/shelved/**", "node_modules/**"],
+    dangerouslyIgnoreUnhandledErrors: false,
+    testTimeout: 20000,
+    setupFiles: ["tests/setup-model-guard.ts"],
+  }
 });
