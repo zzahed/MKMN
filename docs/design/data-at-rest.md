@@ -28,8 +28,8 @@ decision. Nothing here decides it.
 | Chats | The window's storage (`opennpu.conversations`), WebView2 profile `%LOCALAPPDATA%\app.mkmn.desktop\EBWebView` | Every message, attached document text, summaries | The person deletes the chat (8 s Undo), or clears the app's data |
 | Projects, artifacts, tasks (window copy) | The same storage (`mkmn.projects`, `mkmn.artifacts`, `mkmn.tasks`) | Project files' text, generated files | The person deletes them |
 | Artifact versions | The same storage (`mkmn.versions.<id>`) | Every version of every file | Deleting a file deletes all its versions |
-| Run journals | `Workspace\harness\*.jsonl` | Each step of a turn: sections sent, replies | **Deleting the chat** (since this review: the run header names the chat, `src/core/harness/forget.ts`). Journals written before that, and runs with no chat (scheduled tasks, benchmarks), stay until removed by hand |
-| Offloaded payloads | `Workspace\harness\offload\` | Long replies, a chat's folded history, a project's full knowledge text | The chat's own payloads go with the chat. A project's knowledge payload goes with the project (`removeKnowledgeFiles`, `src/core/knowledge/store.ts`) |
+| Run journals | `Workspace\harness\*.jsonl` | Each step of a turn: sections sent, replies | **Deleting the chat** (since this review: the run header names the chat, `src/core/harness/forget.ts`). Journals written before that, and runs with no chat (scheduled tasks, benchmarks), stay until removed by hand, or until older than `privacy.retentionDays` when that is set (`src/core/retention.ts`, at sidecar start) |
+| Offloaded payloads | `Workspace\harness\offload\` | Long replies, a chat's folded history, a project's full knowledge text | The chat's own payloads go with the chat. A project's knowledge payload goes with the project (`removeKnowledgeFiles`, `src/core/knowledge/store.ts`). With `privacy.retentionDays` set, any payload older than that goes at sidecar start |
 | Knowledge index | `Workspace\knowledge\<project>.json` | The project's files cut into sections | Rebuilt when the files change. **Deleting the project** deletes it (`removeKnowledgeFiles`) |
 | Search vectors | `Workspace\knowledge\<project>.vectors` | Embeddings of the sections | As the index: deleted with the project |
 | Scheduled tasks | `tasks.json` in the data folder | Task prompts and schedules | The person deletes the task |
@@ -40,7 +40,10 @@ decision. Nothing here decides it.
 
 ## Not covered yet (open items)
 
-- No retention period: journals, payloads and versions are kept until deleted.
+- Retention covers run journals and offloaded payloads only, and is off by default
+  (`privacy.retentionDays`, null). It has no Settings control yet: it is set in
+  `Config\settings.json`. Artifact versions live in the window's storage, which the
+  sidecar cannot reach, and are kept until deleted.
 - "Copy full log" and support copies are made by the person; nothing checks
   them for document text before they are shared.
 - Secure deletion (overwriting before removal) is not done. On an SSD with

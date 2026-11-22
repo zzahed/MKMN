@@ -26,7 +26,7 @@ export function storedKeysFromTypes(text) {
     return m[1];
   };
   // Object-typed fields whose leaves the schema declares individually.
-  const expand = new Set(["speculativeDecoding", "dynamic", "turnBudget"]);
+  const expand = new Set(["speculativeDecoding", "dynamic", "turnBudget", "privacy"]);
   const stripRecords = (t) => {
     let prev;
     do { prev = t; t = t.replace(/Record<[^<>]*>/g, "R"); } while (t !== prev);

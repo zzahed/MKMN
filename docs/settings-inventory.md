@@ -4,7 +4,7 @@ Generated from `src/shared/settingsSchema.ts` — the ONE declaration of every
 stored key. Regenerate with `node scripts/generate-settings-schema.mjs --write`;
 `--check` fails when this file is stale (pinned by `tests/settings-schema.test.ts`).
 
-102 stored keys, 11 groups. A key with **hidden** in its
+103 stored keys, 11 groups. A key with **hidden** in its
 last column has no control of its own, for the reason recorded there; the schema
 still declares its default, so nothing restates one.
 
@@ -15,7 +15,7 @@ still declares its default, so nothing restates one.
 | App settings | 5 | 2 |
 | Models | 8 | 0 |
 | Speed & memory | 23 | 5 |
-| Chats & answers | 8 | 5 |
+| Chats & answers | 9 | 5 |
 | Files & projects | 16 | 9 |
 | Shared cloud tools | 2 | 0 |
 | HUMAIN Fuse | 4 | 3 |
@@ -67,6 +67,7 @@ still declares its default, so nothing restates one.
 | `autoCompact` | boolean | `true` |  | chat | everyday | chats | Keep long chats going | now | yes — build (sec-chats-long) |
 | `effort` | enum | `"auto"` | `auto` · `off` · `low` · `medium` · `high` | message | everyday | chats | Thinking | now | yes — build (sec-chats-thinking) |
 | `humainMode` | enum | `"local"` | `local` · `fuse` · `node` | app | everyday | chats | Chat location | now | yes — chats (sec-chats-location) |
+| `privacy.retentionDays` | number | `null` | 1 – 3650 | app | advanced | chats | Keep chat records for | restart | hidden — no Settings control yet: set it in Config/settings.json; the sidecar reads it at start (src/core/retention.ts) |
 | `subagents` | boolean | `false` |  | chat | everyday | chats | Sub-agents | now | yes — build (sec-chats-agents) |
 | `toolsOnCommand` | boolean | `false` |  | chat | everyday | chats | Tools on / only | now | yes — behavior (sec-chats-tools) |
 | `turnBudget` | object | `null` |  | chat | advanced | chats | Turn budget | now | hidden — the pair is edited as two selects; the policy owns the unset fallback |

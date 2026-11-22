@@ -7,6 +7,7 @@
  * that keeps this process a plain Node program.
  */
 import { journalDir } from "../core/harness/journal";
+import { pruneForSettings } from "../core/retention";
 import { forgetConversation } from "../core/harness/forget";
 import { taskProjectView } from "../core/taskKnowledge";
 import { raceAbort } from "../core/abortable";
@@ -470,6 +471,16 @@ void geniexVersionTag().then((v) => {
   const kept = failuresOfThisGeniex(settings().loadFailures, v);
   if (Object.keys(kept).length !== Object.keys(settings().loadFailures ?? {}).length) saveSettings({ loadFailures: kept });
 }).catch(() => undefined);
+
+// Retention (privacy.retentionDays, docs/design/data-at-rest.md): once at start, before any chat
+// runs, the run journals and offloaded payloads older than the setting are removed. Unset (the
+// default) removes nothing. Only the count is logged, never a file name or its contents.
+try {
+  const pruned = pruneForSettings(settings(), [journalDir(), path.join(journalDir(), "offload")], Date.now());
+  if (pruned.length) console.error(`[retention] removed ${pruned.length} run records and offloaded replies older than ${settings().privacy?.retentionDays} days`);
+} catch (e) {
+  console.error(`[retention] old run records could not be removed: ${(e as Error).message}`);
+}
 
 /** Models installed in GenieX that no catalog, pack or custom entry names: listed too (they were invisible). */
 let installedOnlyCache: CatalogEntry[] = [];
