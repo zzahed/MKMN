@@ -32,7 +32,9 @@
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.renderer.json --noEmit && tsc -p tsconfig.sidecar.json --noEmit",
     "dist": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\Build-Windows.ps1",
-    "licenses": "node scripts/licenses.cjs"
+    "licenses": "node scripts/licenses.cjs",
+    "regen": "node scripts/generate-settings-schema.mjs && node scripts/generate-state-machines.mjs && node scripts/generate-feature-matrix.mjs && node scripts/build-xblocks.js && node scripts/vendor-icons.js",
+    "regen:check": "node scripts/generate-settings-schema.mjs --check && node scripts/generate-state-machines.mjs --check && node scripts/generate-feature-matrix.mjs --check"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.12.4",

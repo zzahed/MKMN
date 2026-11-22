@@ -36,6 +36,10 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 - Task 7: Root cause: `ServerManager.stopCurrent` re-issues the kill every 5 s only when `process.platform === "win32"`; elsewhere it sends one `kill()`, so the test's wedged process (it acts on the third kill) never exits, and `await start` waits past the 11 s the test advances until the 20 s test timeout. Confirmed on Windows by overriding `process.platform`.
 - Task 7: Ruling: added a `platform` option to `ServerManager` (defaults to `process.platform`) and run the wedged-process test with the Windows kill policy injected. No real-process variant was added under `itWindows`: the file never had one (its processes are fakes with no pid, so no real `taskkill` runs), and a real one would spawn and kill a process in a unit test. Cost if wrong: the real `taskkill` re-issue is still covered only by reading the code and by the Windows smoke checks.
 
+- Task 9: Ruling: no new test file — the task names none and changes only workflow, script and document files; the proof is `pnpm regen:check` exiting 0 locally and the CI run itself. Cost if wrong: a broken `regen` script is caught only when someone runs it.
+- Task 9: Ruling: `lint-type` calls `pnpm regen:check` instead of the three generator lines in QE P-1 — the same three commands, one place to change them. `--coverage` and the `coverage/` upload are left out until Task 19, as the brief says. Actions are pinned to the commit each tag points to (the peeled commit for annotated tags). Cost if wrong: none for behaviour.
+- Task 9: Ruling: `release.yml` uploads only `dist/MKMN-*-arm64-Setup.exe`, the path `installer.nsi` (`OutFile`) and `scripts/Build-Windows.ps1` write. Cost if wrong: the upload finds no file and fails loudly (`if-no-files-found: error`).
+
 ## Follow-ups (owner decides)
 
 | found in task | item | decision |
@@ -43,8 +47,11 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 | 3 | QE-1.3(c): a test that the bundled sidecar Node major equals the CI Node major | |
 | 7 | Intermittent failures seen in full runs on Windows, both passing alone: `tests/ocr.test.ts` "an older store is rebuilt" (`rebuilt` came back false; likely the index memo is keyed by a file time that does not change within one tick) and `tests/computerUsePanel.test.tsx` "Enter opens the picker" (focus timing). Not caused by this plan's changes | |
 | 5 | The error branch of `BenchRunner.test` returns no `tokensEstimated`; an errored test has no usage, so it should say `true` | |
+| 9 | `pnpm regen` rewrites `src/core/page/icons.generated.ts` with different content although `lucide-static` is 1.68.0 in both the lockfile and `node_modules`: the committed file is stale. Left unchanged here (not a Task 9 file) | |
 
 ## Owner waivers and deferrals
 
 | task | what | reason | date |
 |---|---|---|---|
+| 5 | deferred to the Linux CI job (Task 9) | fails only on Linux; two hypotheses tested and ruled out on Windows | 2026-11-22 |
+| 6 | deferred to the Linux CI job (Task 9) | fails only on Linux; two hypotheses tested and ruled out on Windows | 2026-11-22 |

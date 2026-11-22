@@ -16,6 +16,22 @@ cargo check --manifest-path src-tauri\Cargo.toml   # when Rust changed
 
 All of them must pass. Pull requests target `main`.
 
+If you changed a settings key, a state machine, a feature, an X block or the
+icon list, run `pnpm regen` to rebuild the generated files and commit them.
+`pnpm regen:check` tells you if any of them are out of date.
+
+### Continuous integration
+
+Every pull request runs `.github/workflows/ci.yml`. It has four jobs:
+
+- `lint-type`: the type check, the plain-English check and `pnpm regen:check`
+- `unit`: the test suite on Linux, in three parts
+- `windows-arm64-tests`: the test suite and the Rust checks on Windows ARM64
+- `security`: the dependency audits and a secret scan
+
+CI must pass before a pull request is merged. The repository owner turns on
+branch protection for `main` so that `lint-type` and `unit` are required.
+
 ## Rules the test suite enforces
 
 1. **Hooks go above every early `return` of a component.** A hook placed after

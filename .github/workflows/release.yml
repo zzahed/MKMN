@@ -78,7 +78,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: MKMN-Windows-ARM64-unsigned
-          path: |
-            desktop/MKMN-App/dist/MKMN-*-arm64-Setup.exe
-            dist/MKMN-*-arm64-Setup.exe
+          path: dist/MKMN-*-arm64-Setup.exe
           if-no-files-found: error
