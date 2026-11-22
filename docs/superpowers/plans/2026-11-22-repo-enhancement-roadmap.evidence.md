@@ -63,6 +63,8 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 
 - Task 10 (after CI run 45067081101): Ruling: `proveNetworkDenied` and `proveNetworkDeniedSync` live in `src/sidecar/isolation.ts`, not `src/core/isolate.ts` as the plan's interface names. Core's module reaches the window's bundle through `src/core/construct/sandbox.ts`, and its `child_process` import broke `vite build` on the Windows job (`"execFile" is not exported by "__vite-browser-external"`). I had checked only for direct imports from `src/renderer` and an old `dist` build, and the local gate does not run `vite build`. `IsolationUnsafeError` stays in core (no Node API). A new test fails if `src/core/isolate.ts` imports a Node built-in; `pnpm run build:renderer` passes again. Cost if wrong: none for behaviour; only the module named in the plan differs.
 
+- Task 11: CodeQL's first run (45067390598, on 12db7e4) passed with 1 alert, high: `js/incomplete-sanitization` in `tests/rust-version.test.ts:27`, a regular expression built from the toolchain version with only the dots escaped. Not exploitable (the input is the repository's own `rust-toolchain.toml`, already required to be an exact x.y.z), but fixed: every special character is escaped. The test still passes and still fails when `rust-toolchain.toml` names another version (checked by hand).
+
 ## Follow-ups (owner decides)
 
 | found in task | item | decision |

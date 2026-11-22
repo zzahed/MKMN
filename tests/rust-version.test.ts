@@ -24,7 +24,8 @@ describe("one Rust version everywhere", () => {
       return lines.flatMap((line, i) => (/uses:\s*dtolnay\/rust-toolchain@/.test(line) ? [{ f, next: lines.slice(i + 1, i + 3).join("\n") }] : []));
     });
     expect(steps.length).toBeGreaterThan(0);
-    for (const s of steps) expect(s.next, s.f).toMatch(new RegExp(`toolchain:\\s*${channel()!.replace(/\./g, "\\.")}\\b`));
+    const version = channel()!.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // every special character, not only the dots
+    for (const s of steps) expect(s.next, s.f).toMatch(new RegExp(`toolchain:\\s*${version}\\b`));
   });
 
   it("the README names the pinned version, not an open range", () => {
