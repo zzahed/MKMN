@@ -95,3 +95,7 @@ Finding: `check-artifact-shared`, `isolation` and `pdf-lifecycle` fail on both L
 | windows-arm64-tests | fail | `ocr.test.ts` "an older store is rebuilt": `old.rebuilt` false at line 145. It failed in both Windows CI runs, so on that runner it is not intermittent |
 
 Node 26 cleared `isolation`, `check-artifact-shared` (Task 6), `pdf-lifecycle` ×3 and `computerUsePanel`; the CRLF fix cleared `state-machines`.
+
+## CI run 45064583668 (PR 6, commit 976cf6b, Node 26.13.1, Rust 1.100.0)
+
+All six jobs pass: `lint-type`, `unit` (1–3), `windows-arm64-tests` (2849 JavaScript tests, clippy `-D warnings`, 264 + 10 Rust tests) and `security` (`pnpm audit`, `cargo audit`, gitleaks). Tasks 5 and 6, deferred to this job, are resolved: Task 5 by the bench test fix (6c1cc8f), Task 6 by requiring Node 26 (5017dc2). Task 9 is complete; its owner gate (repo policy and CI) is open.
