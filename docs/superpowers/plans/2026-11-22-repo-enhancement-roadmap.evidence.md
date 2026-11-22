@@ -47,6 +47,8 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 
 - Task 9 (after CI run 45059603059): Ruling: `windows-arm64-tests` failed in `cargo clippy -- -D warnings`, the first clippy run on this code. Two causes: `tauri::generate_context!` needs `dist/renderer`, which the job never built — `ci.yml` now runs `pnpm run build` first, as `release.yml` does; and four warnings — an unused `pid` (`src-tauri/src/supervisor.rs:2301`), two `map_or(true, …)` (`src-tauri/src/agent_wire.rs:275, 284`) and one `tick % 5 == 0` (`supervisor.rs:2747`), each replaced by the form clippy names, with no change in behaviour. Clippy and `cargo test` pass locally on Rust 1.99.1; CI uses 1.100.0, which may report more. Cost if wrong: another CI round for lints new in 1.100.
 
+- Task 9 (after CI run 45060658703): every test passed on both systems; clippy on Rust 1.100.0 raised `needless_bool` in `src-tauri/src/bin/agent-desktop.rs:633`, a lint Rust 1.99.1 (this host) does not raise. Replaced by the form clippy names, no change in behaviour.
+
 ## Follow-ups (owner decides)
 
 | found in task | item | decision |
@@ -56,6 +58,7 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 | 5 | The error branch of `BenchRunner.test` returns no `tokensEstimated`; an errored test has no usage, so it should say `true` | |
 | 9 | `pnpm regen` rewrites `src/core/page/icons.generated.ts` with different content although `lucide-static` is 1.68.0 in both the lockfile and `node_modules`: the committed file is stale. Left unchanged here (not a Task 9 file) | |
 | 7 | `src/core/knowledge/vectors.ts` keeps the same `size:mtimeMs` memo stamp, so a same-size rewrite in one tick is not seen there either | |
+| 9 | CI installs the newest stable Rust, so a new clippy lint can fail CI with no code change, and this host (1.99.1) cannot see it first. Pin one Rust version (a `rust-toolchain.toml`) for CI and local builds | |
 
 ## Owner waivers and deferrals
 
