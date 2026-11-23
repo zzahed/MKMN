@@ -37,7 +37,7 @@ export function parseOutline(reply: string): XOutline {
   const used = new Set<string>();
   for (const raw of reply.replace(/<think>[\s\S]*?<\/think>/g, " ").split("\n")) {
     const line = raw.replace(/^[\s>*#\-\d.)]+/, "").replace(/\*\*/g, "").trim();
-    const m = /^(style|look|state|states|art|section\s*\d*|screen\s*\d*)\s*[:\-]\s*(.*)$/i.exec(line);
+    const m = /^(style|look|state|states|art|section\s*\d*|screen\s*\d*)\s*[:-]\s*(.*)$/i.exec(line);
     if (!m) continue;
     const key = m[1].toLowerCase();
     if (key === "style" || key === "look") out.style = m[2].trim();

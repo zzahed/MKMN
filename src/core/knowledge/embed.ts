@@ -66,6 +66,7 @@ export class UnigramTokenizer {
   static normalize(text: string): string {
     return text
       .normalize("NFKC")
+      // eslint-disable-next-line no-control-regex -- control characters are dropped before the text is embedded
       .replace(/[\u0000-\u0008\u000B\u000E-\u001F\u007F-\u009F]/g, "")
       .replace(/\s+/g, " ")
       .trim();
@@ -165,7 +166,6 @@ interface OrtLike {
 export async function openOnnxEmbedder(dir: string, id: string, opts: { threads?: number; batch?: number } = {}): Promise<Embedder> {
   const { readFileSync } = await import("node:fs");
   const path = await import("node:path");
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const ort = (await import("onnxruntime-node" as string)) as unknown as OrtLike & { default?: OrtLike };
   const rt: OrtLike = (ort.InferenceSession ? ort : ort.default) as OrtLike;
   const tokenizer = new UnigramTokenizer(JSON.parse(readFileSync(path.join(dir, "tokenizer.json"), "utf8")) as TokenizerJson);

@@ -303,7 +303,7 @@ describe("working on a part of a file", () => {
     expect(prompts[1]).not.toMatch(/SPEED \+= 1/);       // nor does the editor see what it did not ask for
     const loop = [...evs].reverse().find((e) => e.type === "loop") as any;
     const kept = loop.loop.steps.find((s: any) => s.kind === "ok" && s.diff);
-    expect(kept.diff).toMatch(/-   ctx\.fillStyle = 'red';\n\+   ctx\.fillStyle = 'hotpink';/);
+    expect(kept.diff).toMatch(/- {3}ctx\.fillStyle = 'red';\n\+ {3}ctx\.fillStyle = 'hotpink';/);
     expect(artifactsIn((evs.find((e) => e.type === "replace") as any).text)[0].content).toMatch(/hotpink/);
   });
 });

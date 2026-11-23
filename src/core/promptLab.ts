@@ -214,7 +214,7 @@ export function runCheck(c: Check, answer: string, ran?: Ran): CheckResult {
     case "loads": return { check: "the code loads", ok: ran?.get(c) === null };
     case "run": { const r = ran?.get(c); return { check: `${c.call} gives ${c.expect}${r ? ` (${r})` : ""}`, ok: r === null }; }
     case "given": return { check: "given", ok: true };
-    case "json": { let ok = false; try { JSON.parse(unfence(answer)); ok = true; } catch { ok = false; } return { check: "is valid JSON", ok }; }
+    case "json": { let ok: boolean; try { JSON.parse(unfence(answer)); ok = true; } catch { ok = false; } return { check: "is valid JSON", ok }; }
   }
 }
 

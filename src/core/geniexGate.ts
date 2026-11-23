@@ -32,6 +32,7 @@ export interface GeniexGateStatus {
  */
 export function parseGeniexCliVersion(text: string | null | undefined): string | null {
   if (!text) return null;
+  // eslint-disable-next-line no-control-regex -- strips ANSI colour codes from the console output
   const clean = text.replace(/\u001b\[[0-9;]*[A-Za-z]/g, "");
   for (const line of clean.split(/\r?\n/)) {
     const m = line.match(/^\s*(?:geniex(?:\s+cli)?\s+version\s*:\s*)?v?(\d+)\.(\d+)\.(\d+)(?:[-+][\w.-]+)?(?:\s.*)?$/i);

@@ -53,7 +53,7 @@ function schemaOf(blocks: Block[], extra: Record<string, object>): object {
 }
 
 export const parseNumber = (v: unknown): number | null => {
-  const s = asText(v).replace(/[^\d,.\-]/g, "");
+  const s = asText(v).replace(/[^\d,.-]/g, "");
   if (!s) return null;
   const t = /,\d{1,2}$/.test(s) ? s.replace(/\./g, "").replace(",", ".") : s.replace(/,/g, "");
   const n = Number(t);

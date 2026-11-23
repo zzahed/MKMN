@@ -3,7 +3,8 @@
 //
 // DEBT lists the rules the code broke when linting began, many times over. They warn instead of
 // failing, so the lint gate can start at zero errors; each is a clean-up of its own (see the
-// roadmap's follow-ups). Every other recommended rule is an error.
+// roadmap's follow-ups). Every other recommended rule is an error, and a rule leaves DEBT once
+// the code no longer breaks it.
 import js from "@eslint/js";
 import globals from "globals";
 import tseslint from "typescript-eslint";
@@ -12,18 +13,6 @@ import reactHooks from "eslint-plugin-react-hooks";
 const DEBT = [
   "@typescript-eslint/no-explicit-any",
   "@typescript-eslint/no-unused-vars",
-  "@typescript-eslint/no-require-imports",
-  "@typescript-eslint/no-unused-expressions",
-  "@typescript-eslint/no-this-alias",
-  "no-useless-escape",
-  "no-useless-assignment",
-  "no-control-regex",
-  "no-empty",
-  "no-irregular-whitespace",
-  "no-regex-spaces",
-  "preserve-caught-error",
-  "prefer-const",
-  "require-yield",
 ];
 
 export default tseslint.config(
@@ -37,12 +26,40 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    linterOptions: { reportUnusedDisableDirectives: "error" },
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",
       globals: { ...globals.node, ...globals.browser },
     },
-    rules: Object.fromEntries(DEBT.map((rule) => [rule, "warn"])),
+    rules: {
+      ...Object.fromEntries(DEBT.map((rule) => [rule, "warn"])),
+      // ES5-style code (the X blocks) and async generator bodies reach `this` through `self`
+      "@typescript-eslint/no-this-alias": ["error", { allowedNames: ["self"] }],
+    },
+  },
+  {
+    // package.json has no "type": "module", so these scripts are CommonJS: require() is how they import
+    files: ["**/*.cjs", "scripts/**/*.js", "tests/**/*.js"],
+    languageOptions: { sourceType: "commonjs" },
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
+  {
+    // plain Node scripts: the browser-only globals (window, open, …) do not exist there
+    files: ["scripts/*.cjs", "scripts/**/*.js", "tests/**/*.js"],
+    languageOptions: {
+      globals: Object.fromEntries(Object.keys(globals.browser).filter((name) => !(name in globals.node)).map((name) => [name, "off"])),
+    },
+  },
+  {
+    // the X block smoke tests run their blocks in a page (jsdom); `open` is the harness's, not window.open
+    files: ["scripts/xblocks-smoke/**"],
+    languageOptions: { globals: { open: "off" } },
+  },
+  {
+    // stand-in model streams in tests fail or finish before their first chunk on purpose
+    files: ["tests/**"],
+    rules: { "require-yield": "off" },
   },
   {
     // X blocks run in the page after src/core/xblocks/core.js, which defines X.

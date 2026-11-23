@@ -7,7 +7,7 @@ void loadIcons();
 export const iconNames = (): string[] => Object.keys(iconPaths());
 const norm = (s: string) => s.toLowerCase().trim().replace(/^(?:lucide|icon)[:/ ]/, "").replace(/[_\s]+/g, "-");
 /** Text that is not plain ASCII is an emoji (or another symbol): it is shown as it is. */
-export const isEmoji = (v: string) => /[^\x00-\x7F]/.test(v);
+export const isEmoji = (v: string) => /[^\p{ASCII}]/u.test(v);
 
 /** The name of the icon that a word asks for: its exact name, else the best match among names and tags ("secure" finds shield-check). null when nothing is close. */
 export function iconFor(value: string): string | null {

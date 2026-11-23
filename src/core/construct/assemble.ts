@@ -117,7 +117,7 @@ function __run(f, e) { try { return f(e); } catch (err) { console.error(err); } 
 var __pics = {};
 function sprite(svg, palette) {
   if (!svg) return null;
-  var src = String(svg).replace(/var\(--([\w-]+),\s*([^)]+)\)/g, function (m, k, d) { return palette && palette[k] ? palette[k] : d; });
+  var src = String(svg).replace(/var(--([w-]+),s*([^)]+))/g, function (m, k, d) { return palette && palette[k] ? palette[k] : d; });
   var im = __pics[src];
   if (!im) { im = new Image(); im.onload = function () { __last = ""; __go(); }; im.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(src); __pics[src] = im; }
   return im.complete && im.naturalWidth ? im : null;

@@ -88,7 +88,8 @@ export function skillToMarkdown(s: Skill): string {
 export function skillFromMarkdown(text: string, id?: string): Skill | string {
   const src = text.replace(/\r\n/g, "\n").trim();
   if (!src) return "the file is empty";
-  let meta: Record<string, string> = {}, body = src;
+  const meta: Record<string, string> = {};
+  let body = src;
   const m = src.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
   if (m) {
     body = m[2];

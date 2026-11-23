@@ -157,7 +157,7 @@ export function registerHumain(dispatcher: SidecarDispatcher, configDir: string,
       const url = annotation?.url_citation?.url ?? annotation?.url;
       if (typeof url === "string" && /^https?:\/\/[^\s<>()[\]]+$/.test(url)) {
         const title = annotation?.url_citation?.title ?? annotation?.title;
-        sources.set(url, typeof title === "string" ? title.replace(/[\[\]\r\n]/g, " ").trim() : "");
+        sources.set(url, typeof title === "string" ? title.replace(/[[\]\r\n]/g, " ").trim() : "");
       }
     }
     let promptTokens: number | undefined;
@@ -401,7 +401,7 @@ export async function fuseSearchContext(o: { key: string; model: string; query: 
       const url = a?.url_citation?.url ?? a?.url;
       if (typeof url === "string" && /^https?:\/\/[^\s<>()[\]]+$/.test(url) && !links.get(url)) {
         const title = a?.url_citation?.title ?? a?.title;
-        links.set(url, typeof title === "string" ? title.replace(/[\[\]\r\n]/g, " ").trim() : "");
+        links.set(url, typeof title === "string" ? title.replace(/[[\]\r\n]/g, " ").trim() : "");
       }
     }
   }

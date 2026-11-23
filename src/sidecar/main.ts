@@ -813,7 +813,7 @@ async function foundryHost(): Promise<FoundryHost | null> {
   const exe = findFoundry(process.env, (p) => { try { return fs.existsSync(p); } catch { return false; } });
   if (!exe) { foundryHostCache = { host: null as unknown as FoundryHost, available: false, checkedAt: Date.now() }; return null; }
   const host = new FoundryHost(cliRunner(exe), (l) => console.warn(`[foundry] ${l}`));
-  let available = false;
+  let available: boolean;
   try { available = await host.discover(); } catch { available = false; }
   foundryHostCache = { host, available, checkedAt: Date.now() };
   return available ? host : null;
@@ -1812,7 +1812,7 @@ function benchRunner(): BenchRunner {
       // Tri-state: a failed `geniex list` is an UNREADABLE inventory (null), never an
       // empty one — reading it as empty made the runner re-install cached models and
       // mis-own cleanup (it could uninstall a pre-existing model).
-      let listed: InstalledModel[] | null = null;
+      let listed: InstalledModel[] | null;
       try { listed = await listInstalled(geniexExe()); } catch { listed = null; }
       return installedState(e, listed, entryRef(e));
     },
@@ -2140,7 +2140,7 @@ function lab(): LabRunner {
       signal.addEventListener("abort", onAbort);
       const timer = setTimeout(() => ac.abort(), 10 * 60_000);
       const t0 = performance.now();
-      let text = "", tokens: number | null = null;
+      let text: string, tokens: number | null;
       try {
         // the gateway: identity on the system prompt, the 45 s stall window, usage charged per call
         const a = await new Gateway().ask({
@@ -2151,8 +2151,8 @@ function lab(): LabRunner {
         text = a.text;
         tokens = a.stats?.tokens ?? null;
       } catch (err) {
-        if (signal.aborted) throw new Error("stopped");
-        if (ac.signal.aborted) throw new Error("no answer after 10 minutes");
+        if (signal.aborted) throw new Error("stopped", { cause: err });
+        if (ac.signal.aborted) throw new Error("no answer after 10 minutes", { cause: err });
         throw err;
       } finally { clearTimeout(timer); signal.removeEventListener("abort", onAbort); }
       return { answer: text.replace(new RegExp("<" + "think[\\s\\S]*?(?:<[/]think>|$)", "g"), "").trim(), seconds: Math.round(((performance.now() - t0) / 1000) * 10) / 10, tokens };
@@ -2307,7 +2307,7 @@ function startRun(runId: string, language: string, code: string): void {
   fs.writeFileSync(file, code);
   let stopped = false;
   let child: import("child_process").ChildProcess | null = null;
-  let timer: NodeJS.Timeout | undefined;
+  let timer: NodeJS.Timeout | undefined = undefined;
   const finish = (exit: Extract<RunEvent, { type: "exit" }>) => {
     if (timer) clearTimeout(timer);
     releaseRun(runId, handle);

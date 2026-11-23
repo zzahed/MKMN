@@ -133,7 +133,7 @@ export async function* xcall(host: XHost, counter: { n: number; act?: "skip" | "
     const messages: ChatMessage[] = [{ role: "system", content: system }, { role: "user", content }];
     yield { type: "note", text: i ? `${label} (again)` : label };
     const gen = host.ask(`${label}:${counter.n}`, messages, label, schema);
-    let reply = "";
+    let reply: string;
     try {
       for (;;) {
         const r = await gen.next();

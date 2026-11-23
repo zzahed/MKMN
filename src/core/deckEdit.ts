@@ -236,7 +236,7 @@ async function* changeDeckSteps(o: DeckOptions): AsyncGenerator<ChatEvent, DeckC
     const outline = state.parts.map((t, i) => `${i + 1}. ${titleOfText(t)}${/^layout\s*:\s*(\w+)/im.exec(t) ? ` (${/^layout\s*:\s*(\w+)/im.exec(t)![1]})` : ""}`).join("\n");
     let raw: unknown = null;
     try {
-      const reply = yield* stream(`${o.id}:deckops`, [{ role: "system", content: PLANNER }, { role: "user", content: `The slides:\n${outline}\n\nThe person asks:\n${asked.slice(0, 1500)}${picks.length ? `\n\nThe person pointed at these slides in the preview, in this order (\"the first\", \"the second\" mean them):\n${picks.map((p, i) => `${i + 1}. slide ${p.n} (${p.title})`).join("\n")}` : ""}\n\nWrite the JSON now.` }], OPS_SCHEMA as unknown as object);
+      const reply = yield* stream(`${o.id}:deckops`, [{ role: "system", content: PLANNER }, { role: "user", content: `The slides:\n${outline}\n\nThe person asks:\n${asked.slice(0, 1500)}${picks.length ? `\n\nThe person pointed at these slides in the preview, in this order ("the first", "the second" mean them):\n${picks.map((p, i) => `${i + 1}. slide ${p.n} (${p.title})`).join("\n")}` : ""}\n\nWrite the JSON now.` }], OPS_SCHEMA as unknown as object);
       raw = firstJson(reply);
     } catch (e) { if (o.signal?.aborted) throw e; }
     ops = raw ? pointsToEdit(opsFrom(raw, count), asked, count, picks) : null;

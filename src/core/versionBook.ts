@@ -67,7 +67,7 @@ export class VersionBook {
     const h = key ? this.histories.get(key) : undefined;
     if (!key || !h) return { ok: false, error: "This file has no versions yet.", list: null };
     const fail = (error: string): VersionResult => ({ ok: false, error, list: this.listOf(key) });
-    let next: History | null = null;
+    let next: History | null;
     if (action.type === "use") next = useVersion(h, action.id);
     else if (action.type === "restore") next = restore(h, action.id, now)?.history ?? null;
     else if (action.type === "rename") next = rename(h, action.id, action.title);

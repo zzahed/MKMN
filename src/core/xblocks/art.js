@@ -23,6 +23,7 @@
   /* ---------- cleaning: the only way a drawing reaches the page ---------- */
   var DROP = { script: 1, foreignobject: 1, iframe: 1, object: 1, embed: 1, link: 1, meta: 1, base: 1, frame: 1, frameset: 1, handler: 1, listener: 1 };
   var TIMING = { animate: 1, set: 1, animatemotion: 1, animatetransform: 1 };
+  // eslint-disable-next-line no-control-regex -- browsers ignore control characters in a URL scheme, so this check does too
   function bad(v) { return /^(javascript|vbscript|data):/i.test(String(v).replace(/[\s\u0000-\u001f]/g, "")); }
   /* url(...) that points outside the drawing becomes none; url(#id) stays */
   function unurl(v) {
@@ -53,7 +54,7 @@
   function cleanSvg(text) {
     var s = String(text == null ? "" : text);
     if (s.length > MAX_SVG || /<!DOCTYPE|<!ENTITY/i.test(s)) return "";
-    var a = s.search(/<svg[\s>\/]/i), b = s.toLowerCase().lastIndexOf("</svg>");
+    var a = s.search(/<svg[\s>/]/i), b = s.toLowerCase().lastIndexOf("</svg>");
     if (a < 0 || b < a) return "";
     s = s.slice(a, b + 6);
     var head = /^<svg\b[^>]*>/i.exec(s)[0], fixed = head;

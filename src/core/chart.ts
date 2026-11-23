@@ -143,10 +143,10 @@ export function repairJson(raw: string): string | null {
   if (parses(t)) return t;
   const steps: ((x: string) => string)[] = [
     // a formula written with the placeholder marks and no quotes: "y":[[=P*(1+r/100)^t]]
-    (x) => x.replace(/([:,]\s*)\[\[?=\s*([^\[\]"]+?)\s*\]\]?(?=\s*[,}\]])/g, '$1"$2"'),
+    (x) => x.replace(/([:,]\s*)\[\[?=\s*([^[\]"]+?)\s*\]\]?(?=\s*[,}\]])/g, '$1"$2"'),
     // a quote that slipped in front of an object or a list: [{...},"{"label":...}]
-    (x) => x.replace(/([,\[:]\s*)"(?=\s*[{\[])/g, "$1"),
-    (x) => x.replace(/([{,]\s*)"([A-Za-z_]\w*):\s*(?=[-\d\[{"tfn])/g, '$1"$2":'),
+    (x) => x.replace(/([,[:]\s*)"(?=\s*[{[])/g, "$1"),
+    (x) => x.replace(/([{,]\s*)"([A-Za-z_]\w*):\s*(?=[-\d[{"tfn])/g, '$1"$2":'),
     (x) => x.replace(/([{,]\s*)([A-Za-z_]\w*)\s*:/g, '$1"$2":'),
     (x) => (x.includes('"') ? x : x.replace(/'/g, '"')),
     (x) => x.replace(/,\s*([}\]])/g, "$1"),
@@ -196,7 +196,7 @@ export async function healChartText(raw: string, ask?: (system: string, user: st
   if (fixed0 && chartFlaw(fixed0) === null) return { text: fixed0, how: "repaired" };
   let reason = flaw ?? "it is not valid JSON";
   for (let k = 0; ask && k < tries; k++) {
-    let reply = "";
+    let reply: string;
     try { reply = await ask(CHART_FIX_INSTRUCTIONS, `The chart:\n${raw.trim().slice(0, 2500)}\n\nWhy it cannot be drawn: ${reason}\n\nSend the corrected JSON.`, raw, reason); } catch { break; }
     const candidate = repairJson(reply) ?? reply.trim().replace(/^```\w*\n?|```$/g, "");
     const check = chartFlaw(candidate);
@@ -378,7 +378,7 @@ export function fmt(v: number): string {
   const a = Math.abs(v);
   if (a >= 1e9) return `${+(v / 1e9).toPrecision(3)} G`;
   if (a >= 1e6) return `${+(v / 1e6).toPrecision(3)} M`;
-  if (a >= 1e4) return Math.round(v).toLocaleString("fr-FR").replace(/ | /g, " ");
+  if (a >= 1e4) return Math.round(v).toLocaleString("fr-FR").replace(/\u202F|\u00A0/g, " ");
   if (a >= 100) return String(+v.toFixed(0));
   if (a >= 1) return String(+v.toFixed(2));
   return a === 0 ? "0" : String(+v.toPrecision(2));
@@ -448,7 +448,7 @@ export function mendLeakedFormulas(text: string): { text: string; mended: boolea
       for (; j < s.length; j++) { if (s[j] === "(") depth++; else if (s[j] === ")" && --depth === 0) break; }
       if (j >= s.length) { out += s.slice(i); break; }
       const inner = s.slice(i + 1, j);
-      out += texIn(inner) ? `($${inner.replace(/\\\\(?=[A-Za-z])/g, "\\").replace(/ /g, "\\,")}$)` : `(${wrap(inner)})`;
+      out += texIn(inner) ? `($${inner.replace(/\\\\(?=[A-Za-z])/g, "\\").replace(/\u00A0/g, "\\,")}$)` : `(${wrap(inner)})`;
       i = j + 1;
     }
     return out;

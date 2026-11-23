@@ -148,6 +148,7 @@ function checkOp(op: DocEditOp): void {
   if (/[\n\r]/.test(op.find)) throw new DocEditFault(`the find text ${q} has a line break in it; quote the text of a single paragraph line.`);
   if (typeof op.replace !== "string") throw new DocEditFault(`the replacement for ${q} is missing.`);
   if (/[\n\r]/.test(op.replace)) throw new DocEditFault(`the replacement for ${q} has a line break in it; Edit a copy changes text inside one paragraph at a time.`);
+  // eslint-disable-next-line no-control-regex -- a replacement must not carry a control character
   if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(op.replace)) throw new DocEditFault(`the replacement for ${q} has a control character in it.`);
 }
 

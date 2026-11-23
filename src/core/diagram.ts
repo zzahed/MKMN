@@ -40,9 +40,9 @@ export function mendDiagram(raw: string): string {
       if (i === 0 || /^\s*(?:subgraph|end|classDef|class|style|linkStyle|click|direction)\b/.test(line)) return line;
       let l = line.replace(/\s*(?:→|⟶|➔|➜)\s*/g, " --> ");
       // A[Text (detail)] -> A["Text (detail)"]; shapes such as A[(db)], A[[sub]], A[/x/] keep their form
-      l = l.replace(/(\b[\w-]+)\[(?![(\["\\/])([^\]\n"]*[(),:;&%#@|<>'][^\]\n"]*)\]/g, (_m, id: string, label: string) => `${id}["${label.replace(/"/g, "'")}"]`);
-      l = l.replace(/(\b[\w-]+)\{(?![{"])([^}\n"]*[(),:;&%#@|<>'\[\]][^}\n"]*)\}/g, (_m, id: string, label: string) => `${id}{"${label.replace(/"/g, "'")}"}`);
-      l = l.replace(/(\b[\w-]+)\((?![(\["\/])([^)\n"]*[,:;&%#@|<>'\[\]][^)\n"]*)\)/g, (_m, id: string, label: string) => `${id}("${label.replace(/"/g, "'")}")`);
+      l = l.replace(/(\b[\w-]+)\[(?![(["\\/])([^\]\n"]*[(),:;&%#@|<>'][^\]\n"]*)\]/g, (_m, id: string, label: string) => `${id}["${label.replace(/"/g, "'")}"]`);
+      l = l.replace(/(\b[\w-]+)\{(?![{"])([^}\n"]*[(),:;&%#@|<>'[\]][^}\n"]*)\}/g, (_m, id: string, label: string) => `${id}{"${label.replace(/"/g, "'")}"}`);
+      l = l.replace(/(\b[\w-]+)\((?![(["/])([^)\n"]*[,:;&%#@|<>'[\]][^)\n"]*)\)/g, (_m, id: string, label: string) => `${id}("${label.replace(/"/g, "'")}")`);
       return wrapLabels(l);
     }).join("\n");
   }
@@ -104,9 +104,9 @@ const STYLE_LINE = /^\s*(?:style|classDef|class|linkStyle|click|accTitle|accDesc
 const quoteAll = (t: string): string => t.split("\n").map((line, i) => {
   if (i === 0 || /^\s*(?:subgraph|end|direction|classDef|class|style|linkStyle|click)\b/.test(line)) return line;
   return line
-    .replace(/(\b[\w-]+)\[(?![(\["\\/])([^\]\n"]+)\]/g, (_m, id: string, l: string) => `${id}["${l.replace(/"/g, "'")}"]`)
+    .replace(/(\b[\w-]+)\[(?![(["\\/])([^\]\n"]+)\]/g, (_m, id: string, l: string) => `${id}["${l.replace(/"/g, "'")}"]`)
     .replace(/(\b[\w-]+)\{(?![{"])([^}\n"]+)\}/g, (_m, id: string, l: string) => `${id}{"${l.replace(/"/g, "'")}"}`)
-    .replace(/(\b[\w-]+)\((?![(\["\/])([^)\n"]+)\)/g, (_m, id: string, l: string) => `${id}("${l.replace(/"/g, "'")}")`);
+    .replace(/(\b[\w-]+)\((?![(["/])([^)\n"]+)\)/g, (_m, id: string, l: string) => `${id}("${l.replace(/"/g, "'")}")`);
 }).join("\n");
 
 export type Healed = { text: string; how: "none" | "mended" | "model" | "trimmed" } | { error: string };
@@ -134,7 +134,7 @@ async function healCore(text: string, check: (t: string) => Promise<string | nul
   }
   if (ask) {
     for (let k = 0; k < 2; k++) {
-      let reply: string | null = null;
+      let reply: string | null;
       try { reply = await ask(text, why); } catch { break; }
       if (!reply) break;
       const ok = await attempt(mendDiagram(reply));
