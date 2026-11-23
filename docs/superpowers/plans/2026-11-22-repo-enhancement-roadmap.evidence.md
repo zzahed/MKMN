@@ -99,6 +99,8 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 | 6 | deferred to the Linux CI job (Task 9) | fails only on Linux; two hypotheses tested and ruled out on Windows | 2026-11-22 |
 | 9 | owner gate accepted (CI workflow, Node 26, Rust 1.100.0, CONTRIBUTING rule) after review of PR 6 | repo policy and CI (C4) | 2026-11-22 |
 | 10 | owner gate accepted (network probe, refusal of generated code, probe moved into the sidecar) | security (C4) | 2026-11-22 |
+| 12 | owner gate accepted (deleting a project removes its knowledge index, vectors and offloaded text) after CI run 45071081599 | privacy (C4) | 2026-11-23 |
+| 13 | owner gate accepted (privacy.retentionDays, default null, prunes journals and payloads at sidecar start) after CI run 45071081599 | privacy, saved data (C4) | 2026-11-23 |
 
 ## CI run 45056310505 (PR 6, commit 36a4040, Node 24.22.3)
 
@@ -128,3 +130,7 @@ Node 26 cleared `isolation`, `check-artifact-shared` (Task 6), `pdf-lifecycle` �
 ## CI run 45064583668 (PR 6, commit 976cf6b, Node 26.13.1, Rust 1.100.0)
 
 All six jobs pass: `lint-type`, `unit` (1–3), `windows-arm64-tests` (2849 JavaScript tests, clippy `-D warnings`, 264 + 10 Rust tests) and `security` (`pnpm audit`, `cargo audit`, gitleaks). Tasks 5 and 6, deferred to this job, are resolved: Task 5 by the bench test fix (6c1cc8f), Task 6 by requiring Node 26 (5017dc2). Task 9 is complete; its owner gate (repo policy and CI) is open.
+
+## CI run 45071081599 (PR 6, commit 5f6e8f2, Node 26.13.1, Rust 1.100.0)
+
+All seven jobs pass: `lint-type`, `unit` (1–3), `windows-arm64-tests` (2866 JavaScript tests passed, 1 skipped; clippy `-D warnings`; 264 + 10 Rust tests), `security`, and CodeQL `analyze` (run 45071081730, 0 open alerts). This run covers Tasks 12 and 13; the run for f5cb620 was cancelled by the 5f6e8f2 push. Their owner gates (privacy, saved data) are open.
