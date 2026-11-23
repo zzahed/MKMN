@@ -111,6 +111,30 @@ export interface HardwareConfigFile {
   [key: string]: unknown;
 }
 
+/** What starting the model server may ask for; anything left out comes from the settings. */
+export interface PreloadRequest {
+  model?: string;
+  nctx?: number;
+  compute?: import("../core/npuLoad").LoadSetting["compute"];
+  vit_compute?: string;
+  timeout_sec?: number;
+  keepalive_sec?: number;
+  strategy?: string;
+  power_mode?: string;
+  kv_type?: string;
+  kv_in_ram?: boolean;
+  ngl?: number;
+  spec_type?: string;
+  draft_model?: string;
+  draft_tokens?: number;
+  draft_min?: number;
+  draft_p_min?: number;
+  log_level?: string;
+  port?: number;
+  exe?: string;
+  qairt_lib?: string;
+  skip_update?: boolean;
+}
 /** What the Files & projects page shows of the multilingual search model. */
 export interface VectorModelStatusView {
   installed: boolean;
@@ -261,7 +285,7 @@ export interface MkmnApi {
   /** A native picker for a model folder (directory: true) or an AI Hub .zip file. */
   geniexPickLocal(kind: "folder" | "zip"): Promise<string | null>;
   selectModel(id: string, explicit?: boolean, opts?: { signal?: AbortSignal }): Promise<void>;
-  preloadModel(req?: any): Promise<ServerStatus>;
+  preloadModel(req?: PreloadRequest): Promise<ServerStatus>;
   server(): Promise<ServerStatus>;
   stopServer(): Promise<void>;
   serverLog(): Promise<string[]>;
@@ -329,7 +353,7 @@ export interface MkmnApi {
   /** What the adaptive compute selector last decided (engine · device · evidence · why), and the goals it offers. */
   adaptiveStatus(): Promise<AdaptiveStatusView>;
   hardwareConfig(): Promise<HardwareConfigFile>;
-  saveHardwareConfig(patch: any): Promise<any>;
+  saveHardwareConfig(patch: Partial<HardwareConfigFile>): Promise<HardwareConfigFile>;
   inhibitSleep(enable: boolean): Promise<void>;
   getQoSStatus(pid?: number): Promise<import("./types").QoSSummary>;
   setQoSTier(tier: string, pid?: number): Promise<import("./types").QoSSummary>;
@@ -371,8 +395,9 @@ export interface MkmnApi {
   onVoiceDownload(cb: (p: VoiceDownloadProgress) => void): () => void;
   onVoiceAudio(cb: (c: SpeakChunk) => void): () => void;
   onVoiceStatus(cb: (s: VoiceStatus) => void): () => void;
-  conversations(): Promise<any[]>;
-  saveConversations(c: any[]): Promise<any[]>;
+  /** The chats as this window last saved them (saveConversations); the host keeps them as JSON. */
+  conversations(): Promise<unknown[]>;
+  saveConversations(c: unknown[]): Promise<unknown[]>;
   /** Forgets the old `mkmn.conversations` copy — called only once a save has landed under the kept key (see conversationSaver's onResult). */
   markLegacyMigrated(): void;
   /** The host's coordinated shutdown event (Tauri build): registered callbacks flush the pending chat saves. Returns the unsubscribe. */

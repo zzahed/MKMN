@@ -59,9 +59,10 @@ export default tseslint.config(
     languageOptions: { globals: { open: "off" } },
   },
   {
-    // stand-in model streams in tests fail or finish before their first chunk on purpose
+    // stand-in model streams in tests fail or finish before their first chunk on purpose;
+    // mocks and partial stand-ins are typed `any` where spelling out the whole type adds nothing
     files: ["tests/**"],
-    rules: { "require-yield": "off" },
+    rules: { "require-yield": "off", "@typescript-eslint/no-explicit-any": "off" },
   },
   {
     // X blocks run in the page after src/core/xblocks/core.js, which defines X.
