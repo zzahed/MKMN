@@ -22,6 +22,7 @@ describe("native starts enter the sidecar's engine admission boundary", () => {
     const sidecar = read("src/sidecar/main.ts");
     expect(sidecar).toMatch(/npuOwner\.run\("geniex", async \(\) => \{[\s\S]{0,500}"startChatServer"/);
     expect(sidecar).toContain('npuOwner.run("foundry", () => f.load(');
-    expect(sidecar).toContain('npuOwner.run("foundry", () => f.loadModel(');
+    // the Developer settings' Foundry load (src/sidecar/register/foundry.ts) takes the same gate
+    expect(read("src/sidecar/register/foundry.ts")).toContain('npuOwner.run("foundry", () => f.loadModel(');
   });
 });
