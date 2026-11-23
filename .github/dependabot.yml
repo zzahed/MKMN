@@ -1,6 +1,9 @@
 # Weekly update pull requests for the JavaScript packages, the Rust crates and the
 # workflow actions. Each one runs CI like any other pull request; nothing merges on its own.
 version: 2
+# The pnpm version comes from "packageManager" in package.json, which Dependabot also
+# reads. Without it Dependabot uses pnpm 11, which ignores the "pnpm" field in
+# package.json and so drops the overrides block from the lockfiles it regenerates.
 updates:
   - package-ecosystem: npm
     directory: /
