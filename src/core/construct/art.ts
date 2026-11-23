@@ -45,15 +45,19 @@ export function normalizeSvg(svg: string, art: { stroke: number; palette: Record
   let body = stripActive(m[0], ["script", "text", "image", "foreignObject", "style"]);
   const inner = /<svg\b[^>]*>([\s\S]*)<\/svg>/i.exec(body)?.[1] ?? "";
   if (!/<(rect|circle|ellipse|path|polygon|polyline|line|g)\b/i.test(inner)) return null;
+  // the values are written between single quotes: a quote, an angle bracket or an ampersand in one cannot end the attribute
+  const attr = (v: string) => v.replace(/&/g, "&amp;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const num = (v: unknown, d: number) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : d);
   // colours: the nearest palette colour, written so that a new palette restyles it
   const snap = (v: string) => {
     if (/^var\(/i.test(v) || /^(none|transparent|currentColor)$/i.test(v)) return v;
     const n = nearest(v.trim(), art.palette);
     return n ? `var(--${n[0]}, ${n[1]})` : v;
   };
-  body = body.replace(/\b(fill|stroke)\s*=\s*("([^"]*)"|'([^']*)')/gi, (_m, k: string, _q: string, d: string | undefined, s: string | undefined) => `${k}='${snap(d ?? s ?? "")}'`);
-  body = body.replace(/\bstroke-width\s*=\s*("[^"]*"|'[^']*')/gi, `stroke-width='${art.stroke}'`);
-  const [w, h] = size;
+  body = body.replace(/\b(fill|stroke)\s*=\s*("([^"]*)"|'([^']*)')/gi, (_m, k: string, _q: string, d: string | undefined, s: string | undefined) => `${k}='${attr(snap(d ?? s ?? ""))}'`);
+  body = body.replace(/\bstroke-width\s*=\s*("[^"]*"|'[^']*')/gi, `stroke-width='${num(art.stroke, 2)}'`);
+  const [w, h] = [num(size[0], 0), num(size[1], 0)];
+  if (!w || !h) return null;
   const head = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${w} ${h}' width='${w}' height='${h}'>`;
   return `${head}${/<svg\b[^>]*>([\s\S]*)<\/svg>/i.exec(body)![1]}</svg>`;
 }
