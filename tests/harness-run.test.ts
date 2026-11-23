@@ -284,6 +284,46 @@ describe("the harness run and its journal", () => {
     expect(interrupted).toMatchObject({ seq: 1, id: "write" });
   });
 
+  it("refuses to replay an incompatible checkpoint after the execution plan changed", async () => {
+    const jf = file("r-mismatched-plan.jsonl");
+    const original: StepDef<unknown, unknown>[] = [
+      { id: "old-plan", kind: "transform", input: 1, schema: sNumber(), exec: () => ({ output: 1 }) },
+      { id: "write", kind: "transform", input: 2, schema: sNumber(), exec: () => ({ output: 2 }) },
+    ];
+    const first = createRun(original, { runId: "r-mismatched", pipeline: "test", journalFile: jf });
+    await first.next();
+    await first.next();
+    await first.next();
+    expect(first.state).toBe("done");
+
+    let executed = 0;
+    const revised: StepDef<unknown, unknown>[] = [
+      { id: "new-plan", kind: "transform", input: 1, schema: sNumber(), exec: () => { executed++; return { output: 1 }; } },
+      { id: "write", kind: "transform", input: 2, schema: sNumber(), exec: () => { executed++; return { output: 2 }; } },
+    ];
+    const resumed = createRun(revised, { runId: "r-mismatched", pipeline: "test", journalFile: jf });
+    await expect(resumed.next()).rejects.toThrow(/checkpoint step 0.*does not match/);
+    expect(executed).toBe(0);
+  });
+
+  it("refuses a noncontiguous journal checkpoint rather than skipping missing steps", async () => {
+    const jf = file("r-noncontiguous.jsonl");
+    appendEntry(jf, {
+      type: "step", runId: "r-gap", seq: 1, id: "second", kind: "transform",
+      status: "ok", startedAt: "", endedAt: "", seconds: 0, attempts: 1,
+      outputRetriesUsed: 0, transportRetriesUsed: 0, validations: [],
+      tokens: { prompt: 0, output: 0, measured: false },
+    });
+    let executed = 0;
+    const defs: StepDef<unknown, unknown>[] = [
+      { id: "first", kind: "transform", input: 0, schema: sNumber(), exec: () => { executed++; return { output: 0 }; } },
+      { id: "second", kind: "transform", input: 1, schema: sNumber(), exec: () => { executed++; return { output: 1 }; } },
+    ];
+    const resumed = createRun(defs, { runId: "r-gap", pipeline: "test", journalFile: jf });
+    await expect(resumed.next()).rejects.toThrow(/checkpoint step 1.*does not match/);
+    expect(executed).toBe(0);
+  });
+
   it("runs without a journal when the caller asks for it", async () => {
     const defs: StepDef<unknown, unknown>[] = [
       { id: "a", kind: "transform", input: 1, schema: sNumber(), exec: () => ({ output: 2 }) },
