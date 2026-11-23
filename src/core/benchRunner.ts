@@ -9,7 +9,7 @@ import type { CatalogEntry, ChatStats } from "../shared/types";
 import type { RunsOn } from "./placement";
 import { buildExport, buildLaunchReport } from "./benchExport";
 import { CANDIDATE_TAGS } from "./benchCandidates";
-import { coverage, runFingerprint, SpeedRep, SpeedTrack, BENCH_SECTIONS, BenchMode, BenchSection, BenchTarget, BenchTest, LaunchStats, ModelResult, TestResult, buildModelReport, buildReport, buildSectionReport, classifyFailure, estimateRun, slug, summarize, testCosts, testsFor } from "./bench";
+import { runFingerprint, SpeedRep, SpeedTrack, BENCH_SECTIONS, BenchMode, BenchSection, BenchTarget, BenchTest, LaunchStats, ModelResult, TestResult, buildModelReport, buildReport, buildSectionReport, classifyFailure, estimateRun, slug, summarize, testCosts, testsFor } from "./bench";
 import { Check } from "./benchChecks";
 import { ref as entryRef } from "./catalog";
 import { Gateway } from "./harness/gateway";
@@ -548,7 +548,6 @@ export class BenchRunner {
     for (const t of targets) {
       i++;
       if (signal.aborted) break;
-      const file = path.join(runDir, `${slug(t.key)}.json`);
       // B04: Resume skips only work this run actually COMPLETED under the SAME
       // fingerprint — suite version, requested mode, artifact (repo + precision) and
       // engine. A failed model (an error is recorded) must be retried; a finished
