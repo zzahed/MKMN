@@ -14,7 +14,7 @@ import { CATEGORY_INFO, isDynamicId, installedOf, mergedPack, pickModel, sortReq
 import { DYNAMIC_DATA } from "./dynamic-data";
 import { scoreEntry } from "./fit";
 import { scoreOf } from "./scores";
-import { routerWanted, withRouter, PRODUCE_VOTES, Q, readSearchQuery, searchQueryPrompt, settled, parseYesNo, yesNoPrompt, type Asked } from "./router";
+import { routerWanted, withRouter, Q, parseYesNo, yesNoPrompt, type Asked } from "./router";
 /** What one router sort came back with (local to the orchestrator in the desktop build; kept identical). */
 type RouterResult = { kind: TaskCategory | null; asked: Asked[]; ms: number };
 import { withAnswer, cleanTitle, ServerLostError } from "./chat";
@@ -44,7 +44,7 @@ import { artifactsIn, stripPromptLeak } from "./artifacts";
 import { mergeFiles } from "./bundle";
 import { routeVisual } from "./visualRoute";
 import { templateChart } from "./chartTemplates";
-import { CHART_FIX_INSTRUCTIONS, settleCharts, mendLeakedFormulas, chartBlocks, chartFlaw } from "./chart";
+import { settleCharts, mendLeakedFormulas, chartBlocks, chartFlaw } from "./chart";
 import { settleBlocks } from "./blocks";
 import { diagramFixInstructions } from "./diagram";
 import { prepareTurn } from "./chatPrepare";
