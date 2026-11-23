@@ -453,7 +453,7 @@ fn warmup_build(model: &str) -> String {
         let metadata = serde_json::from_slice::<serde_json::Value>(bytes).unwrap_or_default();
         let toolchain = metadata.pointer("/tool_versions/qairt").and_then(|v| v.as_str()).unwrap_or("unknown");
         let chipset = metadata.pointer("/chipset_attributes/marketing_name").and_then(|v| v.as_str()).unwrap_or("unknown");
-        format!(", declared QAIRT toolchain {toolchain}, target {chipset}, metadata SHA-256 {:x}", Sha256::digest(bytes))
+        format!(", declared QAIRT toolchain {toolchain}, target {chipset}, metadata SHA-256 {}", Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect::<String>())
     }).unwrap_or_default();
     format!("{label} (cache build {imprint:016x} at {}{metadata_description})", dir.display())
 }

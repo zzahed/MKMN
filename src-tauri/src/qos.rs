@@ -760,7 +760,7 @@ pub fn compute_sha256_eco_verified(path: &Path) -> Result<(String, bool), String
     }
 
     let hash_bytes = hasher.finalize();
-    Ok((format!("{:x}", hash_bytes), ecoqos_verified))
+    Ok((hash_bytes.iter().map(|b| format!("{b:02x}")).collect(), ecoqos_verified))
 }
 
 /// Document parser / text chunker executed strictly under EcoQoS governance.
