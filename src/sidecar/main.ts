@@ -57,7 +57,7 @@ import { GENIEX_INSTALLER_URL } from "../core/setup";
 import { GENIEX_INDEX_URL, geniexReleaseNewer, parseGeniexIndex, resolveGeniexRelease } from "../core/geniexRelease";
 import { Updater } from "../core/updater";
 import { BenchRunner, type BenchConfig, type BenchLive, type BenchState } from "../core/benchRunner";
-import { TEST_COUNT, buildRoster, standardBenchEntries, testCosts } from "../core/bench";
+import { buildRoster, standardBenchEntries } from "../core/bench";
 import { parseLabFile } from "../core/promptLab";
 import { LabRunner, type LabModel } from "../core/labRunner";
 import { runLoadTest, type LoadAttempt } from "../core/npuTest";
@@ -92,6 +92,7 @@ import { registerKnowledge } from "./register/knowledge";
 import { registerTasks } from "./register/tasks";
 import { registerAgent } from "./register/agent";
 import { registerFoundry } from "./register/foundry";
+import { registerBench } from "./register/bench";
 import { CLOUD_CHAT_ID, fuseEntry, fuseServed } from "../core/cloudChat";
 import { installedOnlyEntries, parseInstalledJson } from "../core/installedEntries";
 import { checkOutcome, clearLoadFailure, failuresOfThisGeniex, verdictOf, withLoadFailure } from "../core/loadFailures";
@@ -2171,58 +2172,8 @@ async function startBench(cfg: BenchConfig): Promise<{ ok: boolean; error?: stri
   return { ok: true };
 }
 
-dispatcher.register("benchRoster", async () => {
-  // Precision-aware inventory: a repository that only declares Q4_0 does not make a
-  // Q8_0 target "installed". A failed list is an unknown state, not an empty cache.
-  let listed: InstalledModel[] | null = null;
-  try { listed = await listInstalled(geniexExe()); } catch { listed = null; }
-  const entries = allEntries();
-  // A Foundry model is installed when FOUNDRY's cache holds it, never the GenieX cache:
-  // a Foundry entry read against `geniex list` would always show "not installed".
-  let foundryCached: Set<string> | null | false = false; // false: not applicable · null: the cache could not be read
-  if (entries.some((e) => isFoundryEntry(e))) {
-    const f = await foundryHost();
-    if (!f) foundryCached = null;
-    else {
-      const list = await f.cached().catch(() => null);
-      foundryCached = list === null ? null : new Set(list.map((v) => v.alias.toLowerCase()));
-    }
-  }
-  const tested = benchRunner().testedKeys();
-  return {
-    inventoryKnown: listed !== null,
-    targets: (await benchRosterAll()).map((t) => {
-      const e = entries.find((x) => (t.entryId && x.id === t.entryId) || (t.bundleRef && x.dynamicRef === t.bundleRef));
-      const state = !e ? false
-        : isFoundryEntry(e) ? (foundryCached === null ? null : foundryCached instanceof Set && foundryCached.has(String(e.repo).toLowerCase()))
-        : installedState(e, listed, entryRef(e));
-      return { ...t, tested: tested.has(t.key), installed: state === true, installedUnknown: state === null };
-    }),
-    tests: TEST_COUNT,
-    costs: { launch: testCosts("launch"), express: testCosts("express"), quick: testCosts("quick"), full: testCosts("full") },
-    freeGB: freeDiskGB(modelsDir()),
-    folder: benchRoot()
-  };
-});
+registerBench(dispatcher, { benchRunner, currentBench: () => bench, startBench, benchRoot, benchRosterAll, foundryHost, allEntries, isFoundryEntry, geniexExe, write });
 
-dispatcher.register("benchState", () => benchRunner().state());
-// The finished models of the run, without the long texts, for the charts and the table.
-dispatcher.register("benchResults", () => benchRunner().results().map((r) => ({ ...r, tests: r.tests.map((t) => ({ ...t, answer: "", thinking: "" })) })));
-// The report to publish, written next to the results; the bridge shows it in the file manager.
-dispatcher.register("benchExport", async () => {
-  const r = await benchRunner().exportReport();
-  if (!r) return { ok: false, error: "No finished model yet: there is nothing to export." };
-  // The exact file list travels too: the renderer announces only what exists
-  // (a launch-only export has no HTML report or charts to point at).
-  return { ok: true, dir: r.dir, report: r.report, html: r.html, files: r.files };
-});
-dispatcher.register("benchReveal", async (file: string | null) => {
-  // null means "the results folder": the latest run directory (or the bench root when
-  // nothing has run yet) — the button was wired to a call that could only answer false.
-  const target = typeof file === "string" && file ? file
-    : benchRunner().state().runDir ?? benchRoot();
-  try { await dispatcher.callHost((m) => { void write(m); }, "revealPath", [target]); return true; } catch { return false; }
-});
 // Open the edited copy of an Edit-a-copy run with its default app (the
 // "Open edited copy" button). The person just saw the path in the interface;
 // the sidecar has no shell, so the host starts the app.
@@ -2230,10 +2181,6 @@ dispatcher.register("openEditedCopy", async (target: string) => {
   if (typeof target !== "string" || !target) return false;
   try { await dispatcher.callHost((m) => { void write(m); }, "openEditedCopy", [target], 15_000); return true; } catch { return false; }
 });
-dispatcher.register("benchStart", (cfg: BenchConfig) => startBench(cfg));
-dispatcher.register("benchStop", () => { bench?.stop(); });
-// a completed run's measurements, written to the profiles the Models list reads (they were never shown there before)
-dispatcher.register("benchImportResults", () => benchRunner().importMeasured());
 
 // ---- adaptive compute status (what the last request selected, and why)
 
