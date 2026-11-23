@@ -11,6 +11,7 @@
 
 import * as http from "node:http";
 import * as https from "node:https";
+import type { LookupAddress, LookupOptions } from "node:dns";
 import { isIP, type LookupFunction } from "node:net";
 
 export type Lookup = (host: string) => Promise<Array<{ address: string; family?: number }>>;
@@ -88,8 +89,9 @@ function urlProblem(url: URL, allowHttp: boolean): string | null {
 /** The lookup the connection itself uses: every address the name answers is checked, and only
  *  those checked addresses are handed to the socket. One private answer refuses the name. */
 export function checkedLookup(lookup: Lookup): LookupFunction {
-  return ((hostname: string, options: any, callback: any) => {
-    const cb = typeof options === "function" ? options : callback;
+  type Done = (err: NodeJS.ErrnoException | null, address?: string | LookupAddress[], family?: number) => void;
+  return ((hostname: string, options: LookupOptions | Done, callback?: Done) => {
+    const cb = (typeof options === "function" ? options : callback) as Done;
     const all = typeof options === "object" && options?.all === true;
     lookup(hostname).then((answers) => {
       if (!answers.length) return cb(Object.assign(new Error(`the address of ${hostname} could not be found`), { code: "ENOTFOUND" }));
@@ -97,7 +99,7 @@ export function checkedLookup(lookup: Lookup): LookupFunction {
       const list = answers.map((a) => ({ address: a.address, family: a.family ?? isIP(a.address) }));
       if (all) cb(null, list);
       else cb(null, list[0].address, list[0].family);
-    }, (e) => cb(e));
+    }, (e: NodeJS.ErrnoException) => cb(e));
   }) as LookupFunction;
 }
 

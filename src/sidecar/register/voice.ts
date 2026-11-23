@@ -3,13 +3,13 @@
 // it was; main.ts owns the VoiceService and the voice settings and passes them in.
 import type { VoiceService } from "../../core/voiceService";
 import { clampVoice, defaultVoiceModel, voiceModel } from "../../core/voiceModels";
-import type { VoiceKind, VoiceNeed, VoiceSettings, VoiceStatus } from "../../shared/types";
+import type { Settings, VoiceKind, VoiceNeed, VoiceSettings, VoiceStatus } from "../../shared/types";
 import type { SidecarDispatcher } from "../protocol";
 
 export interface VoiceDeps {
   voice: VoiceService;
   voiceSettings: () => VoiceSettings;
-  saveSettings: (patch: Record<string, unknown>) => any;
+  saveSettings: (patch: Record<string, unknown>) => Settings;
   /** Loads the chosen speech models once; concurrent callers share the same load. */
   ensureVoice: () => Promise<void>;
 }
@@ -96,12 +96,12 @@ export function registerVoice(dispatcher: SidecarDispatcher, { voice, voiceSetti
 
   dispatcher.register("cancelSpeak", (id: string) => voice.cancelSpeak(String(id)));
 
-  dispatcher.register("saveVoice", async (patch: Partial<VoiceSettings>): Promise<any> => {
+  dispatcher.register("saveVoice", async (patch: Partial<VoiceSettings>): Promise<Settings> => {
     const before = voiceSettings();
-    const clamped: any = { ...patch };
+    const clamped: Partial<VoiceSettings> = { ...patch };
     for (const k of ["minLevel", "minSpeechMs", "endSilenceMs", "waitMs", "interruptLevel", "interruptMs"] as const) if (k in clamped) clamped[k] = clampVoice(k, clamped[k] as number);
     const merged = saveSettings({ voice: { ...before, ...clamped } });
-    const reload = ["sttModelId", "ttsModelId", "sttCompute", "ttsCompute", "sttLanguage"].some((k) => k in (patch as any) && (patch as any)[k] !== (before as any)[k]);
+    const reload = (["sttModelId", "ttsModelId", "sttCompute", "ttsCompute", "sttLanguage"] as const).some((k) => k in patch && patch[k] !== before[k]);
     if (reload) void ensureVoice().catch(() => undefined);
     return merged;
   });

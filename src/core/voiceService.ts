@@ -5,6 +5,7 @@ import * as https from "https";
 import * as path from "path";
 import { FriendlyError, SpeakChunk, VoiceDownloadProgress, VoiceModel, VoiceModelView, VoiceSettings, VoiceStatus } from "../shared/types";
 import { installVoiceArchive } from "./voiceInstall";
+import type { Out as WorkerOut } from "../voice/worker";
 import { VOICE_MODELS, sttConfig, ttsConfig, voiceModel, voiceModelUrl, FileList } from "../core/voiceModels";
 
 export function listTree(dir: string, out: FileList = []): FileList {
@@ -30,7 +31,8 @@ export class VoiceService extends EventEmitter {
   private child: ChildProcess | null = null;
   private workerEpoch = 0;
   private applyLock: Promise<void> = Promise.resolve();
-  private pending = new Map<string, { resolve: (v: any) => void; reject: (e: Error) => void }>();
+  /** Transcriptions (resolved with text) and speech (resolved when done) waiting on the worker. */
+  private pending = new Map<string, { resolve(v: unknown): void; reject(e: Error): void }>();
   /** Previews of speech in progress that are still running: a new one is not sent while one is, and the final decode is never held back by them. */
   private previewing = false;
   private loadWaiters = new Map<string, Array<{ resolve: () => void; reject: (e: Error) => void }>>();
@@ -65,7 +67,7 @@ export class VoiceService extends EventEmitter {
     c.stderr?.on("data", (b) => { tail = (tail + b.toString()).slice(-1500); });
     // fenced by the child's identity: a worker that stop() already replaced must not patch the status of the
     // replacement or resolve its waiters with a message that arrives late
-    c.on("message", (m: any) => { if (this.child !== c) return; this.onMessage(m); });
+    c.on("message", (m) => { if (this.child !== c) return; this.onMessage(m as WorkerOut); });
     c.on("exit", (code, signal) => {
       if (this.child !== c) return;
       this.child = null;
@@ -82,7 +84,7 @@ export class VoiceService extends EventEmitter {
     return c;
   }
 
-  private onMessage(m: any) {
+  private onMessage(m: WorkerOut) {
     switch (m.t) {
       case "ready": this.patch({ worker: "ready" }); break;
       case "fatal": this.patch({ worker: "failed", error: fe("voice-runtime", "The speech runtime could not start", "Reinstall MKMN (the speech library is part of the ARM64 build).", m.message) }); break;
@@ -141,7 +143,7 @@ export class VoiceService extends EventEmitter {
       const loadedId = this.st[kind];
       const loadedProv = kind === "stt" ? this.st.sttProvider : this.st.ttsProvider;
       if (!m || !this.isInstalled(m)) {
-        if (loadedId) { this.ensureWorker().send({ t: "unload", kind }); this.patch({ [kind]: null, ...(kind === "stt" ? { sttProvider: null, sttLang: null } : { ttsProvider: null }) } as any); }
+        if (loadedId) { this.ensureWorker().send({ t: "unload", kind }); this.patch(kind === "stt" ? { stt: null, sttProvider: null, sttLang: null } : { tts: null, ttsProvider: null }); }
         continue;
       }
       if (loadedId === m.id && (loadedProv === compute || (loadedProv === "cpu" && compute === "npu" && this.st.notice))) {
@@ -180,7 +182,7 @@ export class VoiceService extends EventEmitter {
           reloadLost = true;
         }
         if (stopped()) return;
-        this.patch({ [kind]: m.id, ...(kind === "stt" ? { sttLang: v.sttLanguage || "" } : {}) } as any);
+        this.patch(kind === "stt" ? { stt: m.id, sttLang: v.sttLanguage || "" } : { tts: m.id });
       } catch (e) {
         if (stopped()) throw e; // the status was already reset by stop(): no error of a cancelled apply may be patched
         this.patch({ error: fe("voice-load", `Could not load ${m.name}`, "Delete the model and download it again, or choose another one in Settings.", (e as Error).message) });

@@ -43,19 +43,19 @@ export const TitlebarMetrics: React.FC = () => {
 
     // Fetch initial state
     void invoke<SystemMetricsPayload>("get_system_metrics")
-      .then((data: any) => {
+      .then((data) => {
         if (data && data.processes && data.processes.length > 0) {
           setMetrics(data);
         }
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         console.warn("[TitlebarMetrics] get_system_metrics failed:", err);
       });
 
     // Subscribe to live push updates. With the flyout closed only the pills matter:
     // an unchanged reading (idle RAM/CPU round to the same numbers) is skipped, so a
     // quiet machine does not re-render the titlebar twice a second.
-    const unlistenPromise = listen<SystemMetricsPayload>("metrics_update", (event: any) => {
+    const unlistenPromise = listen<SystemMetricsPayload>("metrics_update", (event) => {
       if (!event.payload) return;
       setMetrics((cur) => {
         if (!flyoutOpenRef.current && cur.timestamp !== 0) {
@@ -78,7 +78,7 @@ export const TitlebarMetrics: React.FC = () => {
     });
 
     return () => {
-      void unlistenPromise.then((unlisten: any) => unlisten()).catch(() => {});
+      void unlistenPromise.then((unlisten) => unlisten()).catch(() => {});
     };
   }, []);
 
@@ -94,7 +94,7 @@ export const TitlebarMetrics: React.FC = () => {
         ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
       if (hasTauri) {
         void invoke<SystemMetricsPayload>("get_system_metrics")
-          .then((data: any) => {
+          .then((data) => {
             if (data && data.processes) setMetrics(data);
           })
           .catch(() => {});

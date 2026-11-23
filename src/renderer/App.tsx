@@ -409,7 +409,7 @@ export function App() {
       op: async () => {
         // the window may already have chats from its own storage (and a newer copy of some): keep both, newest wins
         const stored = await api().conversations();
-        if (Array.isArray(stored) && stored.length > 0) return hydrate(stored);
+        if (Array.isArray(stored) && stored.length > 0) return hydrate(stored as Conversation[]); // written by this window: saveConversations
         return null;
       },
       apply: (v) => { if (v) setConvs((cur) => mergeConversations(cur, v as Conversation[])); },

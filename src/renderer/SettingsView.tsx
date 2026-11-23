@@ -681,9 +681,9 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
       // the successful run just wrote new measurements into hardware.json: the model
       // list re-reads them, so its local-measurement chips show this result too
       onBenchSaved?.();
-    } catch (err: any) {
+    } catch (err) {
       // a failed (or cancelled) run persisted nothing — the existing measurements stand
-      setBenchMsg(`Benchmark failed: ${err.message || String(err)}`);
+      setBenchMsg(`Benchmark failed: ${(err instanceof Error && err.message) || String(err)}`);
     } finally {
       setBenchRunning(false);
     }

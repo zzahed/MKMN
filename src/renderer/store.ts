@@ -50,17 +50,18 @@ export interface Conversation {
 
 const KEY = "opennpu.conversations";
 
-const isObj = (v: unknown): v is Record<string, any> => typeof v === "object" && v !== null && !Array.isArray(v);
-const list = (v: unknown) => (Array.isArray(v) ? v.filter(isObj) : []);
+const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+/** The objects of a saved list (anything else in it is dropped), as the type the field holds. */
+const list = <T extends object = Record<string, unknown>>(v: unknown): T[] => (Array.isArray(v) ? v.filter((x): x is T => isObj(x)) : []);
 
 /** Saved chats are read back as found: anything malformed is repaired or dropped so one bad value can never stop the app from drawing. */
-function cleanTurn(t: Record<string, any>): Turn {
+function cleanTurn(t: Record<string, unknown>): Turn {
   const turn: Turn = { ...t, role: t.role === "user" ? "user" : "assistant", content: typeof t.content === "string" ? t.content : "", pending: false } as Turn;
   if (t.thinking !== undefined && typeof t.thinking !== "string") delete turn.thinking;
-  if (t.attachments !== undefined) turn.attachments = list(t.attachments) as any;
-  if (t.agents !== undefined) turn.agents = list(t.agents) as any;
+  if (t.attachments !== undefined) turn.attachments = list(t.attachments);
+  if (t.agents !== undefined) turn.agents = list(t.agents);
   if (t.notices !== undefined) turn.notices = Array.isArray(t.notices) ? t.notices.filter((n: unknown) => typeof n === "string") : undefined;
-  if (t.build !== undefined) turn.build = isObj(t.build) && Array.isArray(t.build.steps) ? { status: t.build.status === "unresolved" ? "unresolved" : "done", steps: list(t.build.steps) as any, spec: typeof t.build.spec === "string" ? t.build.spec : undefined, start: Array.isArray(t.build.start) ? list(t.build.start) as any : undefined, verify: Array.isArray(t.build.verify) ? list(t.build.verify) as any : undefined } : undefined;
+  if (t.build !== undefined) turn.build = isObj(t.build) && Array.isArray(t.build.steps) ? { status: t.build.status === "unresolved" ? "unresolved" : "done", steps: list(t.build.steps), spec: typeof t.build.spec === "string" ? t.build.spec : undefined, start: Array.isArray(t.build.start) ? list(t.build.start) : undefined, verify: Array.isArray(t.build.verify) ? list(t.build.verify) : undefined } : undefined;
   for (const k of ["review", "loop"] as const) {
     if (t[k] !== undefined && !(isObj(t[k]) && Array.isArray(t[k].steps))) delete turn[k];
   }

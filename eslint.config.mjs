@@ -1,18 +1,12 @@
 // ESLint flat config: the recommended JavaScript and typescript-eslint rules, and the two React
 // hooks rules for the window. Errors fail `pnpm lint`; warnings do not.
 //
-// DEBT lists the rules the code broke when linting began, many times over. They warn instead of
-// failing, so the lint gate can start at zero errors; each is a clean-up of its own (see the
-// roadmap's follow-ups). Every other recommended rule is an error, and a rule leaves DEBT once
-// the code no longer breaks it.
+// Every recommended rule is an error. The 14 rules the code broke when linting began were cleared
+// one by one and are errors again; where a rule bends below, the comment says why.
 import js from "@eslint/js";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 import reactHooks from "eslint-plugin-react-hooks";
-
-const DEBT = [
-  "@typescript-eslint/no-explicit-any",
-];
 
 export default tseslint.config(
   {
@@ -32,7 +26,6 @@ export default tseslint.config(
       globals: { ...globals.node, ...globals.browser },
     },
     rules: {
-      ...Object.fromEntries(DEBT.map((rule) => [rule, "warn"])),
       // ES5-style code (the X blocks) and async generator bodies reach `this` through `self`
       "@typescript-eslint/no-this-alias": ["error", { allowedNames: ["self"] }],
       // a name kept on purpose starts with _ (a parameter a signature needs, `for (const _ of …)`);
@@ -59,20 +52,15 @@ export default tseslint.config(
     languageOptions: { globals: { open: "off" } },
   },
   {
-    // stand-in model streams in tests fail or finish before their first chunk on purpose
+    // stand-in model streams in tests fail or finish before their first chunk on purpose;
+    // mocks and partial stand-ins are typed `any` where spelling out the whole type adds nothing
     files: ["tests/**"],
-    rules: { "require-yield": "off" },
+    rules: { "require-yield": "off", "@typescript-eslint/no-explicit-any": "off" },
   },
   {
     // X blocks run in the page after src/core/xblocks/core.js, which defines X.
     files: ["src/core/xblocks/**/*.js"],
     languageOptions: { globals: { X: "readonly" } },
-  },
-  {
-    // Node scripts written as CommonJS (package.json sets no "type", so scripts/*.js are CJS too):
-    // require() is their import, not a style lapse.
-    files: ["**/*.cjs", "scripts/**/*.js"],
-    rules: { "@typescript-eslint/no-require-imports": "off" },
   },
   {
     files: ["src/renderer/public/capture-worklet.js"],

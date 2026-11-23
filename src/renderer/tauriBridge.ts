@@ -65,21 +65,23 @@ const shutdownListeners = new Set<() => void>();
 const serverListeners = new Set<(s: ServerStatus) => void>();
 const artifactListeners = new Set<() => void>();
 const taskListeners = new Set<(t: ScheduledTask) => void>();
-const voiceAudioListeners = new Set<(c: any) => void>();
+/** The value an `on…` subscription of the API hands its callback: one type for the API, the listeners and the events. */
+type EventOf<K extends keyof MkmnApi> = MkmnApi[K] extends (cb: (value: infer V) => void) => unknown ? V : never;
+const voiceAudioListeners = new Set<(c: EventOf<"onVoiceAudio">) => void>();
 const voiceStatusListeners = new Set<(s: VoiceStatus) => void>();
-const voiceDownloadListeners = new Set<(p: any) => void>();
+const voiceDownloadListeners = new Set<(p: EventOf<"onVoiceDownload">) => void>();
 const setupListeners = new Set<(st: SetupState) => void>();
 const updateListeners = new Set<(st: UpdateState) => void>();
-const benchListeners = new Set<(s: any) => void>();
-const benchLiveListeners = new Set<(l: any) => void>();
-const npuTestListeners = new Set<(s: any) => void>();
-const modelCheckListeners = new Set<(e: any) => void>();
-const benchMeasuredListeners = new Set<(e: any) => void>();
-const labListeners = new Set<(s: any) => void>();
+const benchListeners = new Set<(s: EventOf<"onBench">) => void>();
+const benchLiveListeners = new Set<(l: EventOf<"onBenchLive">) => void>();
+const npuTestListeners = new Set<(s: EventOf<"onNpuTest">) => void>();
+const modelCheckListeners = new Set<(e: EventOf<"onModelCheck">) => void>();
+const benchMeasuredListeners = new Set<(e: EventOf<"onBenchMeasured">) => void>();
+const labListeners = new Set<(s: EventOf<"onLab">) => void>();
 const runListeners = new Set<(e: RunEvent) => void>();
 const agentRunListeners = new Set<(e: AgentRunEvent) => void>();
-const installListeners = new Set<(p: any) => void>();
-const dynamicInstallListeners = new Set<(p: any) => void>();
+const installListeners = new Set<(p: EventOf<"onInstall">) => void>();
+const dynamicInstallListeners = new Set<(p: EventOf<"onDynamicInstall">) => void>();
 /** Set inside createTauriApi (which owns the artifact store): files a task's artifacts. */
 let onArtifactsEvent: ((payload: unknown) => void) | null = null;
 
@@ -150,29 +152,35 @@ let sidecarEventsWired = false;
 /** What the sidecar is doing besides chats, read from its own events, so a dead
  *  sidecar's work can be settled (see sidecarExited below): installs not yet done,
  *  the last state of each long job, the code runs still open. */
-const inFlight = {
-  installs: new Map<string, any>(),
-  jobs: { npuTest: null as any, bench: null as any, lab: null as any },
+/** What the sidecar's foundryStatus answers (src/sidecar/register/foundry.ts); the page's view is built from it. */
+type SidecarFoundryStatus = { installed: boolean; version: string | null; loaded: unknown; cached: number | null; note: string | null };
+type Jobs = { npuTest: EventOf<"onNpuTest"> | null; bench: EventOf<"onBench"> | null; lab: EventOf<"onLab"> | null };
+const inFlight: { installs: Map<string, EventOf<"onInstall">>; jobs: Jobs; runs: Set<string> } = {
+  installs: new Map(),
+  jobs: { npuTest: null, bench: null, lab: null },
   runs: new Set<string>(),
 };
 const STOPPED_LINE = "Stopped: the MKMN engine stopped unexpectedly. Start it again.";
-function trackInstall(p: any): void {
+function trackInstall(p: EventOf<"onInstall"> | null | undefined): void {
   if (!p || typeof p.ref !== "string") return;
   if (p.phase === "done" || p.phase === "error" || p.phase === "cancelled") inFlight.installs.delete(p.ref);
   else inFlight.installs.set(p.ref, p);
 }
-function trackJob(kind: "npuTest" | "bench" | "lab", s: any): void {
+function trackJob<K extends keyof Jobs>(kind: K, s: Jobs[K]): void {
   if (s && typeof s === "object") inFlight.jobs[kind] = s.running ? s : null;
 }
+/** A list a job state carries (its lines, its log), or none. */
+const listIn = (s: object, key: string): unknown[] => { const v = (s as Record<string, unknown>)[key]; return Array.isArray(v) ? v : []; };
 
 function wireSidecarEvents(): void {
   if (sidecarEventsWired || !isTauri()) return;
   sidecarEventsWired = true;
-  listen<{ name: string; payload: any }>("sidecar-event", (e) => {
+  // the payload is whatever the sidecar sent: each event below takes it as that event's type
+  listen<{ name: string; payload: unknown }>("sidecar-event", (e) => {
     const name = e.payload?.name;
     const payload = e.payload?.payload;
-    if (name === "install") { trackInstall(payload); for (const l of installListeners) l(payload); }
-    else if (name === "dynamicInstall") { for (const l of dynamicInstallListeners) l(payload); }
+    if (name === "install") { const p = payload as EventOf<"onInstall">; trackInstall(p); for (const l of installListeners) l(p); }
+    else if (name === "dynamicInstall") { for (const l of dynamicInstallListeners) l(payload as EventOf<"onDynamicInstall">); }
     else if (name === "chat") {
       // the orchestrator in the sidecar streams the whole turn: agents, notices, the answer's
       // words, the reviewer's steps, and the terminal done or error. A terminal event releases
@@ -198,7 +206,7 @@ function wireSidecarEvents(): void {
         const ev: ChatEvent = {
           id,
           type: "error",
-          error: { id: "sidecar-exited", title: "The chat was interrupted", fix: "The chat engine stopped unexpectedly. Send the message again to continue.", raw: String(payload?.generation ?? "") }
+          error: { id: "sidecar-exited", title: "The chat was interrupted", fix: "The chat engine stopped unexpectedly. Send the message again to continue.", raw: String((payload as { generation?: unknown } | null)?.generation ?? "") }
         };
         for (const l of chatListeners) l(ev);
         void releaseChatInhibit(id);
@@ -206,11 +214,11 @@ function wireSidecarEvents(): void {
       // ... and every other job it held: an install ends in an error, each long job
       // stops with a line saying why (what it showed is kept), each open run exits.
       for (const p of inFlight.installs.values()) {
-        const ended = { ...p, phase: "error", percent: null, error: { id: "sidecar-exited", title: "The download was interrupted", fix: "The MKMN engine stopped unexpectedly. Start the install again.", raw: "" } };
+        const ended: EventOf<"onInstall"> = { ...p, phase: "error", percent: null, error: { id: "sidecar-exited", title: "The download was interrupted", fix: "The MKMN engine stopped unexpectedly. Start the install again.", raw: "" } };
         for (const l of installListeners) l(ended);
       }
       inFlight.installs.clear();
-      const stop = (s: any) => ({ ...s, running: false, lines: [...(Array.isArray(s.lines) ? s.lines : []), STOPPED_LINE], log: [...(Array.isArray(s.log) ? s.log : []), STOPPED_LINE] });
+      const stop = <S extends object>(s: S): S => ({ ...s, running: false, lines: [...listIn(s, "lines"), STOPPED_LINE], log: [...listIn(s, "log"), STOPPED_LINE] });
       if (inFlight.jobs.npuTest) { const s = stop(inFlight.jobs.npuTest); for (const l of npuTestListeners) l(s); }
       if (inFlight.jobs.bench) { const s = stop(inFlight.jobs.bench); for (const l of benchListeners) l(s); }
       if (inFlight.jobs.lab) { const s = stop(inFlight.jobs.lab); for (const l of labListeners) l(s); }
@@ -221,33 +229,35 @@ function wireSidecarEvents(): void {
       }
       inFlight.runs.clear();
     }
-    else if (name === "agentRun") { if (payload && typeof payload === "object" && typeof payload.runId === "string") { for (const l of agentRunListeners) l(payload as AgentRunEvent); } }
-    else if (name === "setup") { for (const l of setupListeners) l(payload); }
-    else if (name === "update") { for (const l of updateListeners) l(payload); }
-    else if (name === "bench") { trackJob("bench", payload); for (const l of benchListeners) l(payload); }
-    else if (name === "benchLive") { for (const l of benchLiveListeners) l(payload); }
-    else if (name === "npuTest") { trackJob("npuTest", payload); for (const l of npuTestListeners) l(payload); }
-    else if (name === "modelCheck") { for (const l of modelCheckListeners) l(payload); }
-    else if (name === "benchMeasured") { for (const l of benchMeasuredListeners) l(payload); }
-    else if (name === "lab") { trackJob("lab", payload); for (const l of labListeners) l(payload); }
+    else if (name === "agentRun") { const p = payload as AgentRunEvent | null; if (p && typeof p === "object" && typeof p.runId === "string") { for (const l of agentRunListeners) l(p); } }
+    else if (name === "setup") { for (const l of setupListeners) l(payload as SetupState); }
+    else if (name === "update") { for (const l of updateListeners) l(payload as UpdateState); }
+    else if (name === "bench") { const s = payload as EventOf<"onBench">; trackJob("bench", s); for (const l of benchListeners) l(s); }
+    else if (name === "benchLive") { for (const l of benchLiveListeners) l(payload as EventOf<"onBenchLive">); }
+    else if (name === "npuTest") { const s = payload as EventOf<"onNpuTest">; trackJob("npuTest", s); for (const l of npuTestListeners) l(s); }
+    else if (name === "modelCheck") { for (const l of modelCheckListeners) l(payload as EventOf<"onModelCheck">); }
+    else if (name === "benchMeasured") { for (const l of benchMeasuredListeners) l(payload as EventOf<"onBenchMeasured">); }
+    else if (name === "lab") { const s = payload as EventOf<"onLab">; trackJob("lab", s); for (const l of labListeners) l(s); }
     else if (name === "run") {
-      if (payload && typeof payload === "object" && typeof payload.runId === "string") {
-        if (payload.type === "exit") inFlight.runs.delete(payload.runId); else inFlight.runs.add(payload.runId);
-        for (const l of runListeners) l(payload);
+      const p = payload as RunEvent | null;
+      if (p && typeof p === "object" && typeof p.runId === "string") {
+        if (p.type === "exit") inFlight.runs.delete(p.runId); else inFlight.runs.add(p.runId);
+        for (const l of runListeners) l(p);
       }
     }
-    else if (name === "tasks") { if (payload && typeof payload === "object") { for (const l of taskListeners) l(payload); } }
+    else if (name === "tasks") { if (payload && typeof payload === "object") { for (const l of taskListeners) l(payload as ScheduledTask); } }
     else if (name === "artifacts") {
       // a scheduled task's artifacts, filed by the bridge (the artifact store lives in the
       // webview; the hook is set inside createTauriApi, which owns the store)
       onArtifactsEvent?.(payload);
     }
-    else if (name === "voiceStatus") { for (const l of voiceStatusListeners) l(payload); }
-    else if (name === "voiceDownload") { for (const l of voiceDownloadListeners) l(payload); }
+    else if (name === "voiceStatus") { for (const l of voiceStatusListeners) l(payload as VoiceStatus); }
+    else if (name === "voiceDownload") { for (const l of voiceDownloadListeners) l(payload as EventOf<"onVoiceDownload">); }
     else if (name === "voiceAudio") {
       // JSON has no typed arrays: the samples arrive as a plain array, the player needs a Float32Array
-      const chunk = payload && typeof payload === "object" ? { ...payload, samples: payload.samples instanceof Float32Array ? payload.samples : Float32Array.from(payload.samples ?? []) } : payload;
-      for (const l of voiceAudioListeners) l(chunk);
+      const raw = payload as (Omit<EventOf<"onVoiceAudio">, "samples"> & { samples?: Float32Array | number[] }) | null;
+      const chunk = raw && typeof raw === "object" ? { ...raw, samples: raw.samples instanceof Float32Array ? raw.samples : Float32Array.from(raw.samples ?? []) } : raw;
+      for (const l of voiceAudioListeners) l(chunk as EventOf<"onVoiceAudio">);
     }
   }).catch(() => { sidecarEventsWired = false; });
 }
@@ -401,7 +411,7 @@ export function createTauriApi(): MkmnApi {
   // snapshot like a hand-saved one, and the pages told to refresh
   onArtifactsEvent = (payload) => {
     if (!Array.isArray(payload)) return;
-    const list = getLocalJson<any[]>("mkmn.artifacts", []);
+    const list = getLocalJson<Artifact[]>("mkmn.artifacts", []);
     for (const a of payload) {
       if (!a || typeof a.id !== "string") continue;
       const idx = list.findIndex((x) => x.id === a.id);
@@ -423,7 +433,7 @@ export function createTauriApi(): MkmnApi {
     async catalog(): Promise<CatalogItem[]> {
       const [hw, settings, installedList, customEntries, foundryEntries, compiled] = await Promise.all([
         invoke<HardwareProfile>("get_hardware_cmd").catch(() => unknownHardware()),
-        invoke<any>("get_settings").catch(() => null),
+        invoke<Settings>("get_settings").catch(() => null),
         invoke<InstalledModel[]>("get_installed_models_cmd").catch(() => []),
         sidecarCall<CatalogEntry[]>("customEntries").catch(() => []),
         // Foundry Local models this machine could serve (cached builds, exact device badge):
@@ -434,7 +444,7 @@ export function createTauriApi(): MkmnApi {
         sidecarCall<Record<string, number>>("compiledContexts").catch(() => ({})),
       ]);
 
-      const installedNames = new Set(installedList.map((m: any) => m.name.toLowerCase()));
+      const installedNames = new Set(installedList.map((m) => m.name.toLowerCase()));
       const customIds = new Set(customEntries.map((e) => e.id));
       // Foundry's own cache decides which of its catalog entries are installed (the GenieX
       // inventory never holds them); the rest are offered with an Install button.
@@ -448,7 +458,7 @@ export function createTauriApi(): MkmnApi {
           installedNames.has(entry.repo.toLowerCase()) ||
           installedNames.has(entry.id.toLowerCase());
 
-        const pref = (entry as any).preferredCompute;
+        const pref = (entry as CatalogEntry & { preferredCompute?: string }).preferredCompute;
         // Where a model runs is a MEASUREMENT (settings.placements, written by the load
         // test and the benchmark), not a default: a fresh entry must not wear an "NPU"
         // badge it was never seen to earn. Only an explicit shipped hybrid/CPU
@@ -506,10 +516,10 @@ export function createTauriApi(): MkmnApi {
       return sidecarCall<Record<string, number>>("speedsById").catch(() => ({}));
     },
 
-    async dynamicInfo(): Promise<any> {
+    async dynamicInfo() {
       const [hw, settings, installedList] = await Promise.all([
         invoke<HardwareProfile>("get_hardware_cmd").catch(() => null),
-        invoke<any>("get_settings").catch(() => null),
+        invoke<Settings>("get_settings").catch(() => null),
         invoke<InstalledModel[]>("get_installed_models_cmd").catch(() => []),
       ]);const ramGB = hw?.ramGB ?? 0;
       // The profile the user picked (settings.dynamic.profile) wins; null gives the
@@ -520,7 +530,7 @@ export function createTauriApi(): MkmnApi {
       // by the pack model's concrete refs, never by synthetic catalog ids).
       const dynEntries = Object.values(DYNAMIC_DATA.packs).flatMap((p) => packParts(mergedPack(DYNAMIC_DATA, p.id, settings?.dynamic) ?? p));
       const installed = installedList
-        .map((m: any) => dynEntries.find((e) => String(m.ref ?? m.name ?? "").toLowerCase() === String(e.ref ?? "").toLowerCase() || String(m.name ?? "").toLowerCase() === String(e.repo ?? "").toLowerCase()))
+        .map((m) => dynEntries.find((e) => String(m.ref ?? m.name ?? "").toLowerCase() === String(e.ref ?? "").toLowerCase() || String(m.name ?? "").toLowerCase() === String(e.repo ?? "").toLowerCase()))
         .filter((e): e is NonNullable<typeof e> => !!e) as unknown as CatalogEntry[];
       const packs = Object.fromEntries(
         Object.keys(DYNAMIC_DATA.packs).map((id) => [id, mergedPack(DYNAMIC_DATA, id, settings?.dynamic) ?? DYNAMIC_DATA.packs[id]])
@@ -539,11 +549,11 @@ export function createTauriApi(): MkmnApi {
         runsOn: Object.fromEntries(Object.values(DYNAMIC_DATA.packs).flatMap((p) => p.models.flatMap((m) => {
           const e = installedOf(m, installed);
           const b = e ? badgeOf(settings?.placements?.[entryRef(e)]) : null;
-          return b ? [[m.ref, b] as [string, string]] : [];
+          return b ? [[m.ref, b] as const] : [];
         }))),
         engines: Object.fromEntries(Object.values(DYNAMIC_DATA.packs).flatMap((p) => p.models.flatMap((m) => {
           const e = installedOf(m, installed);
-          return e ? [[m.ref, "geniex"] as [string, string]] : [];
+          return e ? [[m.ref, "geniex"] as const] : [];
         }))),
         missing: Object.fromEntries(Object.values(DYNAMIC_DATA.packs).map((p) => [p.id, missingInPack(p, installed).map((m) => m.ref)]))
       };
@@ -551,7 +561,7 @@ export function createTauriApi(): MkmnApi {
 
     async setDynamicProfile(id: string): Promise<void> {
       // settings merge at the top level, so the whole dynamic object is sent back with the profile in it
-      const s = await invoke<any>("get_settings").catch(() => ({}));
+      const s = await invoke<Partial<Settings>>("get_settings").catch((): Partial<Settings> => ({}));
       await invoke("save_settings_cmd", { patch: { dynamic: { ...(s?.dynamic ?? {}), profile: id } } });
     },
     async installDynamic(tier: string): Promise<void> {
@@ -570,27 +580,27 @@ export function createTauriApi(): MkmnApi {
       if (gate === "stop") await invoke("stop_server").catch(() => {});
       return sidecarCall("uninstallDynamic", tier);
     },
-    onDynamicInstall(cb: (p: any) => void): () => void {
+    onDynamicInstall(cb): () => void {
       dynamicInstallListeners.add(cb);
       return () => dynamicInstallListeners.delete(cb);
     },
 
-    async benchRoster(): Promise<any> {
+    async benchRoster() {
       return sidecarCall("benchRoster");
     },
-    async benchState(): Promise<any> {
+    async benchState() {
       return sidecarCall("benchState");
     },
-    async benchStart(cfg: any): Promise<{ ok: boolean; error?: string }> {
+    async benchStart(cfg): Promise<{ ok: boolean; error?: string }> {
       return sidecarCall("benchStart", cfg);
     },
     async benchStop(): Promise<void> {
       await sidecarCall("benchStop").catch(() => {});
     },
-    async npuTestRoster(): Promise<any> {
+    async npuTestRoster() {
       return sidecarCall("npuTestRoster");
     },
-    async npuTestState(): Promise<any> {
+    async npuTestState() {
       return sidecarCall("npuTestState");
     },
     async npuTestStart(ids: string[], all: boolean, hybrid: boolean): Promise<{ ok: boolean; error?: string }> {
@@ -603,14 +613,14 @@ export function createTauriApi(): MkmnApi {
       // the sidecar stops the server through the host, then runs the UAC-prompted device restart
       return sidecarCall("npuReset");
     },
-    onNpuClean(_cb: any): () => void {
+    onNpuClean(_cb): () => void {
       return () => {};
     },
-    async foundryStatus(): Promise<any> {
+    async foundryStatus() {
       // The sidecar owns the foundry daemon/CLI lifecycle: it discovers the exe,
       // checks the version, and reads the cached models. Mapped into the comparison
       // page's shape; the pairwise comparison flow itself is not wired in this build.
-      const f = await sidecarCall<any>("foundryStatus").catch(() => null);
+      const f = await sidecarCall<SidecarFoundryStatus>("foundryStatus").catch(() => null);
       if (!f) return { installed: false, version: null, source: "known", models: 0, pairs: [], foundryOnly: 0, log: [] };
       return {
         installed: !!f.installed,
@@ -624,49 +634,49 @@ export function createTauriApi(): MkmnApi {
         note: f.note ?? null,
       };
     },
-    async foundryAdmin(): Promise<any> {
+    async foundryAdmin() {
       return sidecarCall("foundryAdmin");
     },
-    async foundryConfigSet(key: string, value: string): Promise<any> {
+    async foundryConfigSet(key: string, value: string) {
       return sidecarCall("foundryConfigSet", key, value);
     },
-    async foundryConfigReset(key?: string): Promise<any> {
+    async foundryConfigReset(key?: string) {
       return sidecarCall("foundryConfigReset", key);
     },
-    async foundryCacheSet(path: string): Promise<any> {
+    async foundryCacheSet(path: string) {
       return sidecarCall("foundryCacheSet", path);
     },
-    async foundryCacheRemove(alias?: string): Promise<any> {
+    async foundryCacheRemove(alias?: string) {
       return sidecarCall("foundryCacheRemove", alias);
     },
-    async foundryServer(action: "start" | "stop" | "restart", opts?: { port?: number | null; idleTimeoutMinutes?: number | null }): Promise<any> {
+    async foundryServer(action: "start" | "stop" | "restart", opts?: { port?: number | null; idleTimeoutMinutes?: number | null }) {
       return sidecarCall("foundryServer", action, opts);
     },
     async foundryLogs(lines?: number): Promise<string> {
       return sidecarCall<string>("foundryLogs", lines).catch(() => "");
     },
-    async foundryModelInfo(alias: string): Promise<any> {
+    async foundryModelInfo(alias: string) {
       return sidecarCall("foundryModelInfo", alias);
     },
-    async foundryModelRegister(input: any): Promise<any> {
+    async foundryModelRegister(input) {
       return sidecarCall("foundryModelRegister", input);
     },
-    async foundryModelUnregister(alias: string): Promise<any> {
+    async foundryModelUnregister(alias: string) {
       return sidecarCall("foundryModelUnregister", alias);
     },
-    async foundryModelLoad(alias: string, device?: string | null): Promise<any> {
+    async foundryModelLoad(alias: string, device?: string | null) {
       return sidecarCall("foundryModelLoad", alias, device);
     },
-    async foundryModelUnload(alias: string): Promise<any> {
+    async foundryModelUnload(alias: string) {
       return sidecarCall("foundryModelUnload", alias);
     },
-    async foundryTranscribe(input: { file: string; model?: string; language?: string }): Promise<any> {
+    async foundryTranscribe(input: { file: string; model?: string; language?: string }) {
       return sidecarCall("foundryTranscribe", input);
     },
     async foundryReport(): Promise<{ ok: boolean; message: string }> {
       return sidecarCall("foundryReport");
     },
-    async requirements(): Promise<any> {
+    async requirements() {
       return sidecarCall("requirements");
     },
     async installRequirement(id: string): Promise<{ ok: boolean; message: string }> {
@@ -706,10 +716,10 @@ export function createTauriApi(): MkmnApi {
       });
       return typeof picked === "string" ? picked : null;
     },
-    async batteryRead(): Promise<any> {
+    async batteryRead() {
       return sidecarCall("batteryRead");
     },
-    async engineCompareStart(_o: any): Promise<{ ok: boolean; error?: string }> {
+    async engineCompareStart(_o): Promise<{ ok: boolean; error?: string }> {
       return { ok: false, error: "The engine comparison is not available in this build yet." };
     },
     async labStart(o: { md: string; modelIds: string[] }): Promise<{ ok: boolean; error?: string }> {
@@ -718,19 +728,19 @@ export function createTauriApi(): MkmnApi {
     async labStop(): Promise<boolean> {
       return sidecarCall<boolean>("labStop").catch(() => false);
     },
-    async labState(): Promise<any> {
+    async labState() {
       return sidecarCall("labState");
     },
-    onLab(cb: (s: any) => void): () => void {
+    onLab(cb): () => void {
       labListeners.add(cb);
       return () => labListeners.delete(cb);
     },
-    async engineCompareState(): Promise<any> {
+    async engineCompareState() {
       // Said up front, so the screen disables the one-click comparison instead of
       // refusing it after the click; running ticked pairs with the benchmark works.
       return { running: false, steps: [], unavailable: "The one-click comparison is not in this build yet. Tick the pairs below and run them with the benchmark instead." };
     },
-    onEngineCompare(_cb: any): () => void {
+    onEngineCompare(_cb): () => void {
       return () => {};
     },
     async npuResetStatus(): Promise<{ ready: boolean; auto: boolean }> {
@@ -742,49 +752,49 @@ export function createTauriApi(): MkmnApi {
       const app = await invoke<AppInfo>("get_app_info_cmd").catch(() => null);
       return JSON.stringify({ hw, app }, null, 2);
     },
-    onBenchMeasured(cb: (e: any) => void): () => void {
+    onBenchMeasured(cb): () => void {
       benchMeasuredListeners.add(cb);
       return () => benchMeasuredListeners.delete(cb);
     },
     async benchImportResults(): Promise<number> {
       return sidecarCall("benchImportResults");
     },
-    onModelCheck(cb: (e: any) => void): () => void {
+    onModelCheck(cb): () => void {
       modelCheckListeners.add(cb);
       return () => modelCheckListeners.delete(cb);
     },
-    onNpuTest(cb: (s: any) => void): () => void {
+    onNpuTest(cb): () => void {
       npuTestListeners.add(cb);
       return () => npuTestListeners.delete(cb);
     },
-    async benchResults(): Promise<any> {
+    async benchResults() {
       return sidecarCall("benchResults");
     },
-    async benchExport(): Promise<any> {
+    async benchExport() {
       // the report is written by the sidecar next to the run's results; the caller reveals it
       return sidecarCall("benchExport");
     },
     async benchReveal(file: string | null): Promise<boolean> {
       return sidecarCall<boolean>("benchReveal", file).catch(() => false);
     },
-    onBench(cb: (s: any) => void): () => void {
+    onBench(cb): () => void {
       benchListeners.add(cb);
       return () => benchListeners.delete(cb);
     },
-    onBenchLive(cb: (l: any) => void): () => void {
+    onBenchLive(cb): () => void {
       benchLiveListeners.add(cb);
       return () => benchLiveListeners.delete(cb);
     },
-    async hfSearch(query: string): Promise<any> {
+    async hfSearch(query: string) {
       return sidecarCall("hfSearch", query);
     },
-    async resolveModel(input: string): Promise<any> {
+    async resolveModel(input: string) {
       return sidecarCall("resolveModel", input);
     },
-    async browse(q: any): Promise<any> {
+    async browse(q) {
       return sidecarCall("browse", q);
     },
-    async dockerVariants(name: string): Promise<any> {
+    async dockerVariants(name: string) {
       return sidecarCall("dockerVariants", name);
     },
     async install(entry: CatalogEntry): Promise<void> {
@@ -820,7 +830,7 @@ export function createTauriApi(): MkmnApi {
         return;
       }
       const refStr = await resolveServeRef(id);
-      const settings = await invoke<any>("get_settings");
+      const settings = await invoke<Settings>("get_settings");
       const port = 18181;
       const timeoutSec = readNum(settings, "startupTimeoutSec");
       const strategy = readSetting(settings, "loadingStrategy");
@@ -888,8 +898,8 @@ export function createTauriApi(): MkmnApi {
       for (const l of serverListeners) l(srv);
     },
 
-    async preloadModel(req?: any): Promise<ServerStatus> {
-      const settings = await invoke<any>("get_settings").catch(() => ({}));
+    async preloadModel(req): Promise<ServerStatus> {
+      const settings = await invoke<Partial<Settings>>("get_settings").catch((): Partial<Settings> => ({}));
       const modelId = req?.model || settings?.selectedModelId || "qwen3-4b-thinking-2507";
       const refStr = await resolveServeRef(modelId);
       const timeoutSec = req?.timeout_sec || readNum(settings, "startupTimeoutSec");
@@ -1001,20 +1011,20 @@ export function createTauriApi(): MkmnApi {
       try {
         await start;
         // answered at once; the turn itself arrives as events
-      } catch (err: any) {
+      } catch (err) {
         if (!activeChats.delete(id)) return; // the sidecar exit already settled it
         await releaseChatInhibit(id);
         for (const l of chatListeners) {
           l({
             id,
             type: "error",
-            error: { id: "chat-init-error", title: "Chat initialization failed", fix: err?.message || "The chat could not start.", raw: String(err) }
+            error: { id: "chat-init-error", title: "Chat initialization failed", fix: (err instanceof Error && err.message) || "The chat could not start.", raw: String(err) }
           });
         }
       } finally { chatStarts.delete(id); }
     },
 
-    async compactChat(id: string, modelId: string, messages: ChatMessage[], memoTurns: number, convId?: string): Promise<any> {
+    async compactChat(id: string, modelId: string, messages: ChatMessage[], memoTurns: number, convId?: string) {
       // the summary is built in the sidecar, under the open turn's lease when one is answering
       return sidecarCall("compactChat", id, modelId, messages, memoTurns, ...(convId ? [convId] : []));
     },
@@ -1035,7 +1045,7 @@ export function createTauriApi(): MkmnApi {
       await sidecarCall("skipStep", id, !!back).catch(() => {});
     },
 
-    async routerStatus(): Promise<any> {
+    async routerStatus() {
       // the router now runs in the Tauri build too (a small model on the processor,
       // sidecar-owned): the truth comes from the sidecar, with the honest stub only
       // as the fallback when the call itself fails
@@ -1054,20 +1064,20 @@ export function createTauriApi(): MkmnApi {
         };
       }
     },
-    async routerInstall(): Promise<any> {
+    async routerInstall() {
       return sidecarCall("routerInstall");
     },
-    async routerCandidates(): Promise<any> {
+    async routerCandidates() {
       try {
         return await sidecarCall("routerCandidates");
       } catch {
         return { chosen: null, candidates: [] };
       }
     },
-    async routerBench(): Promise<any> {
+    async routerBench() {
       return sidecarCall("routerBench");
     },
-    async routerTest(text: string): Promise<any> {
+    async routerTest(text: string) {
       return sidecarCall("routerTest", text);
     },
     async routerFileKind(text: string): Promise<string | null | undefined> {
@@ -1076,14 +1086,14 @@ export function createTauriApi(): MkmnApi {
       return sidecarCall("routerFileKind", text);
     },
 
-    async convertLegacyDoc(name: string, bytes: Uint8Array): Promise<any> {
+    async convertLegacyDoc(name: string, bytes: Uint8Array) {
       return sidecarCall("convertLegacyDoc", name, Array.from(bytes));
     },
     async fixBlock(kind: string, raw: string, reason: string): Promise<string | null> {
       // the mended diagram/chart JSON comes from the sidecar's chat model (the one already loaded)
       return sidecarCall<string | null>("fixBlock", kind, raw, reason);
     },
-    async fetchLibrary(url: string): Promise<any> {
+    async fetchLibrary(url: string) {
       return sidecarCall("fetchLibrary", url);
     },
 
@@ -1155,8 +1165,8 @@ export function createTauriApi(): MkmnApi {
       // here contradicted the same page's hardware panel on every other PC.
       const [hw, settings, appInfo] = await Promise.all([
         invoke<HardwareProfile>("get_hardware_cmd").catch(() => unknownHardware()),
-        invoke<any>("get_settings").catch(() => null),
-        invoke<any>("get_app_info_cmd").catch(() => null),
+        invoke<Settings>("get_settings").catch(() => null),
+        invoke<AppInfo>("get_app_info_cmd").catch(() => null),
       ]);
       const geniex = !!appInfo?.geniexPath || !!(settings?.geniexPath);
       return {
@@ -1169,7 +1179,7 @@ export function createTauriApi(): MkmnApi {
         cpuThreads: hw.cpuThreads ?? 0,
         ramGB: hw.ramGB ?? 0,
         gpus: hw.gpus ?? [],
-        problems: (hw as any).problems ?? []
+        problems: (hw as HardwareProfile & { problems?: string[] }).problems ?? []
       };
     },
 
@@ -1217,8 +1227,8 @@ export function createTauriApi(): MkmnApi {
       return invoke<HardwareConfigFile>("get_hardware_config_cmd");
     },
 
-    async saveHardwareConfig(patch: any): Promise<any> {
-      return invoke<any>("save_hardware_config_cmd", { patch });
+    async saveHardwareConfig(patch) {
+      return invoke<HardwareConfigFile>("save_hardware_config_cmd", { patch });
     },
 
     async inhibitSleep(enable: boolean): Promise<void> {
@@ -1237,7 +1247,7 @@ export function createTauriApi(): MkmnApi {
       return invoke<Sha256VerificationResult>("verify_sha256_cmd", { path, expectedSha256 });
     },
 
-    async npuDiagnostics(): Promise<any> {
+    async npuDiagnostics() {
       return invoke("npu_diagnostics_cmd");
     },
 
@@ -1322,15 +1332,15 @@ export function createTauriApi(): MkmnApi {
       // the sidecar clamps the thresholds, merges, and reloads the models when the choice changed
       return sidecarCall<Settings>("saveVoice", patch);
     },
-    onVoiceDownload(cb: any): () => void {
+    onVoiceDownload(cb): () => void {
       voiceDownloadListeners.add(cb);
       return () => voiceDownloadListeners.delete(cb);
     },
-    onVoiceAudio(cb: any): () => void {
+    onVoiceAudio(cb): () => void {
       voiceAudioListeners.add(cb);
       return () => voiceAudioListeners.delete(cb);
     },
-    onVoiceStatus(cb: any): () => void {
+    onVoiceStatus(cb): () => void {
       voiceStatusListeners.add(cb);
       return () => voiceStatusListeners.delete(cb);
     },
@@ -1382,13 +1392,13 @@ export function createTauriApi(): MkmnApi {
       for (const l of artifactListeners) l();
       return list;
     },
-    async artifactVersions(id: string): Promise<any> {
+    async artifactVersions(id: string) {
       return versionBook.versions(id);
     },
     async artifactVersionText(id: string, versionId: string): Promise<string | null> {
       return versionBook.text(id, versionId);
     },
-    async artifactVersionAction(id: string, action: any): Promise<any> {
+    async artifactVersionAction(id: string, action) {
       return versionBook.act(id, action);
     },
     async saveOffice(kind: OfficeKind, source: string, name: string): Promise<string | null> {
@@ -1451,13 +1461,13 @@ export function createTauriApi(): MkmnApi {
     async runCode(runId: string, language: string, code: string): Promise<void> {
       await sidecarCall("runCode", runId, language, code);
     },
-    async launchSite(files: any[], entry: any): Promise<any> {
+    async launchSite(files, entry) {
       return sidecarCall("launchSite", files, entry);
     },
-    onSiteNav(_cb: any): () => void {
+    onSiteNav(_cb): () => void {
       return () => {};
     },
-    onFigureRequest(_cb: any): () => void {
+    onFigureRequest(_cb): () => void {
       return () => {};
     },
     async figureResult(_id: string, _dataUrl: string | null): Promise<void> {},
@@ -1470,7 +1480,7 @@ export function createTauriApi(): MkmnApi {
     async stopRun(runId: string): Promise<void> {
       await sidecarCall("stopRun", runId).catch(() => {});
     },
-    onRun(cb: any): () => void {
+    onRun(cb): () => void {
       wireSidecarEvents();
       runListeners.add(cb);
       return () => runListeners.delete(cb);
@@ -1554,18 +1564,18 @@ export function createTauriApi(): MkmnApi {
     async runTask(id: string): Promise<void> {
       await sidecarCall("runTask", id);
     },
-    onTasks(cb: any): () => void {
+    onTasks(cb): () => void {
       wireSidecarEvents();
       taskListeners.add(cb);
       return () => taskListeners.delete(cb);
     },
-    onArtifacts(cb: any): () => void {
+    onArtifacts(cb): () => void {
       artifactListeners.add(cb);
       return () => artifactListeners.delete(cb);
     },
 
     // Global Events
-    onInstall(cb: any): () => void {
+    onInstall(cb): () => void {
       installListeners.add(cb);
       return () => installListeners.delete(cb);
     },
@@ -1581,16 +1591,16 @@ export function createTauriApi(): MkmnApi {
       shutdownListeners.add(cb);
       return () => shutdownListeners.delete(cb);
     },
-    async conversations(): Promise<any[]> {
+    async conversations() {
       // The chats live under the key the window reads at start (store.ts loadConversations).
       // The old second key is read at most once, and only when the kept key holds nothing
       // (a profile saved by an older build that never wrote the kept key). While the kept
       // key is still empty the old copy stays in place: it is the only copy until a save
       // lands under the kept key (markLegacyMigrated), so it is not removed on this read.
-      const kept = getLocalJson<any[]>(CONVERSATIONS_KEY, []);
+      const kept = getLocalJson<unknown[]>(CONVERSATIONS_KEY, []);
       const hasKept = Array.isArray(kept) && kept.length > 0;
-      let legacy: any[] = [];
-      if (!hasKept && !legacyChatKeyRead) legacy = getLocalJson<any[]>("mkmn.conversations", []);
+      let legacy: unknown[] = [];
+      if (!hasKept && !legacyChatKeyRead) legacy = getLocalJson<unknown[]>("mkmn.conversations", []);
       legacyChatKeyRead = true;
       if (hasKept) forgetLegacyConversations();
       if (hasKept) return kept;
@@ -1602,7 +1612,7 @@ export function createTauriApi(): MkmnApi {
     markLegacyMigrated(): void {
       forgetLegacyConversations();
     },
-    async saveConversations(c: any[]): Promise<any[]> {
+    async saveConversations(c) {
       // No host copy in this build: the renderer's own save (one key, once per flush)
       // is the stored copy, and the window reads it back at start. Writing a second
       // key meant stringifying the whole history twice on every streamed token.

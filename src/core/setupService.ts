@@ -81,7 +81,7 @@ export const realGeniexDeps = (): GeniexInstallDeps => ({
   run: (exe) => new Promise((resolve) => {
     // Deliberate: the Qualcomm installer window is visible so the person can see the install happen.
     execFile(exe, [], { windowsHide: false, timeout: 15 * 60 * 1000, maxBuffer: 8 * 1024 * 1024 }, (err, stdout, stderr) => {
-      resolve({ code: err ? (typeof (err as any).code === "number" ? (err as any).code : 1) : 0, output: `${stdout}${stderr}` });
+      resolve({ code: err ? (typeof err.code === "number" ? err.code : 1) : 0, output: `${stdout}${stderr}` });
     });
   }),
   exists: fs.existsSync,

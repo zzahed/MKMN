@@ -335,7 +335,7 @@ interface VoiceModelOptions { auto: string; made: { id: string; name: string }[]
 /** The input bar while a voice conversation runs: what is heard or the state, the model, the microphone and mute, end. It glows with the sound. */
 function VoiceBar({ text, onText, onSend, voice, onSaveVoice, options, modelSetting, onModel, micId, onMic, state, level, live, error, muted, onMute, onEnd }: { text: string; onText: (v: string) => void; onSend: () => void; voice: VoiceSettings; onSaveVoice: (p: Partial<VoiceSettings>) => Promise<void>; options: VoiceModelOptions; modelSetting: string; onModel: (id: string) => void; micId: string; onMic: (id: string) => void; state: VoiceState; level: number; live: LiveText | null; error: string | null; muted: boolean; onMute: () => void; onEnd: () => void }) {
   return (
-    <div className={`composer voicebar ${muted ? "muted" : state}`} style={{ ["--lvl" as any]: String(muted ? 0 : Math.min(1, level * 1.6)) }}>
+    <div className={`composer voicebar ${muted ? "muted" : state}`} style={{ "--lvl": String(muted ? 0 : Math.min(1, level * 1.6)) }}>
       {error && <div className="error-box">{error}</div>}
       <div className="vb-row">
         <div className="vb-text">
@@ -1528,7 +1528,7 @@ export function Chat(props: {
         ))}
       </div>
     ) : voiceOn ? <VoiceBar text={input} onText={setDraft} onSend={sendTyped} voice={voiceSettings} onSaveVoice={(p) => api().saveVoice(p).then(() => onSettings({}))} options={{ auto: fastVoiceModel(items, sizeOfChatModel(selected))?.entry.name.replace(/\s*\(Foundry Local\)/i, "") ?? "", made: voiceMenuItems(items).map((i) => ({ id: i.entry.id, name: i.entry.name.replace(/\s*\(Foundry Local\)/i, "") })), others: otherVoiceItems(items).map((i) => ({ id: i.entry.id, name: i.entry.name })) }} modelSetting={voiceSettings.voiceModelId} onModel={(id) => { void api().saveVoice({ voiceModelId: id }).then(() => onSettings({})); }} micId={voiceSettings.micDeviceId} onMic={(id) => { void vc.switchMic(id).catch((e) => setVoiceErr((e as Error).message)); void api().saveVoice({ micDeviceId: id }).then(() => onSettings({})); }} state={vstate} level={level} live={live} error={voiceErr} muted={micMuted} onMute={() => { vc.setMuted(!vc.muted); setMicMuted(vc.muted); }} onEnd={endVoice} /> : <form
-      className={`composer ${dropping ? "drop" : ""} ${dictating ? "dictating" : ""}`} style={dictating ? { ["--lvl" as any]: String(Math.min(1, level * 1.6)) } : undefined} onSubmit={(e) => { e.preventDefault(); if (cu.mode && !cloud) { cu.runOrPick(input, selected.entry.id); } else if (dictating) endDictation(); else void send(input); }}
+      className={`composer ${dropping ? "drop" : ""} ${dictating ? "dictating" : ""}`} style={dictating ? { "--lvl": String(Math.min(1, level * 1.6)) } : undefined} onSubmit={(e) => { e.preventDefault(); if (cu.mode && !cloud) { cu.runOrPick(input, selected.entry.id); } else if (dictating) endDictation(); else void send(input); }}
       onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDropping(true); } }}
       onDragLeave={() => setDropping(false)}
       onDrop={(e) => { setDropping(false); if (e.dataTransfer.files.length) { e.preventDefault(); void addFiles(e.dataTransfer.files); } }}

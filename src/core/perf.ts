@@ -127,10 +127,10 @@ const parsePath = (p: string) => /^(?:\\\\[^\\]+)?\\([^(\\]+)(?:\(([^)]*)\))?\\(
 
 export function parseNpuCounters(stdout: string): NpuReading {
   const none: NpuReading = { util: null, memBytes: null, pidUtil: {}, pidMem: {}, sets: [], samples: 0 };
-  let o: any;
+  let o: { sets?: unknown; samples?: unknown; adapter?: unknown; adapters?: unknown };
   try { o = JSON.parse(stdout.slice(stdout.indexOf("{"))); } catch { return none; }
   const sets: string[] = Array.isArray(o.sets) ? o.sets.map(String) : typeof o.sets === "string" ? [o.sets] : [];
-  const raw: { p: string; v: number }[] = (Array.isArray(o.samples) ? o.samples : o.samples ? [o.samples] : []).filter((x: any) => x && typeof x.p === "string" && typeof x.v === "number" && isFinite(x.v));
+  const raw: { p: string; v: number }[] = (Array.isArray(o.samples) ? o.samples : o.samples ? [o.samples] : []).filter((x: { p?: unknown; v?: unknown } | null): x is { p: string; v: number } => !!x && typeof x.p === "string" && typeof x.v === "number" && isFinite(x.v));
   const pidUtil: Record<number, number> = {}, pidMem: Record<number, number> = {};
   // like Task Manager: the load of the NPU is that of its busiest engine, each engine's load being the sum over the processes using it
   const engines = new Map<string, number>();

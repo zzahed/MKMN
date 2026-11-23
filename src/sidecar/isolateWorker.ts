@@ -11,7 +11,7 @@ import { runCasesHere } from "../core/benchChecks";
 import type { IsolatedOp, IsolatedReply } from "../core/isolate";
 import type { Check } from "../core/promptLab";
 
-const OPS: Record<IsolatedOp, (...args: any[]) => unknown> = {
+const OPS: Record<IsolatedOp, (...args: never[]) => unknown> = {
   runExamples: runExamplesHere,
   smokeRun: smokeRunHere,
   playPageRun: playPageRunHere,
@@ -34,7 +34,8 @@ process.stdin.on("end", () => {
       const { op, args } = JSON.parse(input) as { op: IsolatedOp; args: unknown[] };
       const fn = OPS[op];
       if (!fn) return reply({ ok: false, error: `unknown isolated operation ${op}` });
-      reply({ ok: true, value: await fn(...args) });
+      // the arguments are what the parent sent as JSON for this operation
+      reply({ ok: true, value: await (fn as (...a: unknown[]) => unknown)(...args) });
     } catch (e) {
       reply({ ok: false, error: (e as Error).message.split("\n")[0].slice(0, 300) });
     }
