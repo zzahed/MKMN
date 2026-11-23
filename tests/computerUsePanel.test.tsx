@@ -71,6 +71,17 @@ async function openChat(): Promise<HTMLTextAreaElement> {
   return (await waitFor(() => document.querySelector("textarea[aria-label='Message']"))) as HTMLTextAreaElement;
 }
 
+// The picker takes focus in an effect that runs AFTER the list is in the DOM:
+// `findByRole` can return between the commit and that effect, so focus is only
+// ever asserted with waitFor, never read synchronously.
+async function openedPicker(): Promise<HTMLElement> {
+  const listbox = await screen.findByRole("listbox", { name: "Windows" });
+  await waitFor(() => expect(document.activeElement).toBe(listbox));
+  return listbox;
+}
+
+const focusIsOnTask = () => waitFor(() => expect(document.activeElement).toBe(document.querySelector("textarea")));
+
 function agentMocks() {
   const beginCalls: number[] = [];
   const runs: { id: string; hwnd: number; task: string; modelId: string }[] = [];
@@ -154,11 +165,9 @@ describe("Computer Use in the composer", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Computer Use" }));
     fireEvent.change(ta, { target: { value: "Prepare a draft" } });
     fireEvent.keyDown(ta, { key: "Enter" });
-    const listbox = await screen.findByRole("listbox", { name: "Windows" });
-    expect(listbox).toBeTruthy();
     // the keyboard contract: the opened picker HAS the focus, so Down/Enter/Escape
     // operate it without a Tab walk
-    expect(document.activeElement).toBe(listbox);
+    await openedPicker();
     await waitFor(() => expect((document.querySelector("textarea") as HTMLTextAreaElement).value).toBe("Prepare a draft"));
   });
 
@@ -194,19 +203,20 @@ describe("Computer Use in the composer", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Computer Use" }));
     fireEvent.change(ta, { target: { value: "task" } });
     fireEvent.keyDown(ta, { key: "Enter" });
-    let listbox = await screen.findByRole("listbox", { name: "Windows" });
+    // keys go to the picker only once it holds the focus, as they would for a person
+    let listbox = await openedPicker();
     fireEvent.keyDown(listbox, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("listbox", { name: "Windows" })).toBeNull());
     // Escape returns the keyboard to the task draft
-    expect(document.activeElement).toBe(document.querySelector("textarea"));
+    await focusIsOnTask();
     // reopen (the draft is kept), then pick by keyboard
     fireEvent.keyDown(ta, { key: "Enter" });
-    listbox = await screen.findByRole("listbox", { name: "Windows" });
+    listbox = await openedPicker();
     fireEvent.keyDown(listbox, { key: "ArrowDown" });
     fireEvent.keyDown(listbox, { key: "Enter" });
     await waitFor(() => expect(screen.queryByRole("listbox", { name: "Windows" })).toBeNull());
     // focus returns after the pick, too; the run control's tooltip carries the FULL title
-    expect(document.activeElement).toBe(document.querySelector("textarea"));
+    await focusIsOnTask();
     const run = await screen.findByRole("button", { name: "Run task" });
     expect(run.getAttribute("title")).toContain('*Meeting notes - October review - Notepad');
     // the target row names the app and the window
