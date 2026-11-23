@@ -198,15 +198,22 @@ export function createRun(defs: StepDef<unknown, unknown>[], opts: RunOptions): 
           reason: "the run was interrupted before this step settled",
         });
       }
-      for (const rec of replayed) {
-        const def = defs[rec.seq];
-        if (def && def.id === rec.id) {
-          const copy: SettledStep = { ...rec, input: def.input, replayed: true };
-          settled.push(copy);
-          yield copy;
+      // A resumed run must match the original plan's contiguous settled prefix.
+      // Otherwise a changed graph or corrupted journal could silently skip a step,
+      // then claim an incompatible checkpoint completed successfully.
+      for (let i = 0; i < replayed.length; i++) {
+        const rec = replayed[i];
+        if (rec.seq !== i || defs[i]?.id !== rec.id) {
+          throw new Error(`Cannot resume run ${runId}: checkpoint step ${rec.seq} (${rec.id}) does not match the current execution plan at position ${i}.`);
         }
       }
-      firstIndex = replayed.length ? replayed[replayed.length - 1].seq + 1 : 0;
+      for (const rec of replayed) {
+        const def = defs[rec.seq];
+        const copy: SettledStep = { ...rec, input: def.input, replayed: true };
+        settled.push(copy);
+        yield copy;
+      }
+      firstIndex = replayed.length;
       if (firstIndex >= defs.length) {
         ensureRunning();
         finishRun();
