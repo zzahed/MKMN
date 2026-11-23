@@ -10,7 +10,6 @@ const OUT = "docs/MKMN_FEATURE_TEST_MATRIX_0.0.2.md";
 
 const cell = (value) => String(value).replace(/\|/g, "\\|");
 const row = (id, name, area, evidence, result) => `| ${id} | ${cell(name)} | ${cell(area)} | ${cell(evidence)} | ${result} |`;
-const acceptanceRow = (id, check, how, result) => `| ${id} | ${cell(check)} | ${cell(how)} | ${cell(result)} |`;
 const table = (head, lines) => [`| ${head.join(" | ")} |`, `|${head.map(() => "---").join("|")}|`, ...lines].join("\n");
 
 const ids = { REL: 0, UI: 0, HST: 0, SID: 0, STB: 0, SSC: 0, SRW: 0, SMF: 0, SCP: 0 };
@@ -193,10 +192,10 @@ const SCRIPT_PURPOSE = {
   "scripts/lib/BuildResult.ps1": "write the one build result and its exit code",
   "scripts/lib/NativeCommand.ps1": "run one native command with a UTF-8 log and a real exit code",
   "scripts/lib/lifecycle-scan.mjs": "find every lifecycle in the source for the state-machine inventory",
-  "scripts/licenses.cjs": "collect third-party licence texts",
+  "scripts/licenses.mjs": "collect third-party licence texts",
   "scripts/nsis_extract.py": "extract the NSIS installer for inspection",
   "scripts/setup-arm64-libs.ps1": "place the ARM64 native libraries",
-  "scripts/smoke-sidecar-chat.js": "smoke the sidecar chat path",
+  "scripts/smoke-sidecar-chat.mjs": "smoke the sidecar chat path",
   "scripts/smoke-sidecar-devtools.js": "smoke the sidecar developer tools",
   "scripts/smoke-sidecar-sandbox.js": "smoke the sandboxed code runner",
   "scripts/smoke-sidecar-setup.js": "smoke the sidecar setup state",
@@ -238,10 +237,10 @@ const SCRIPT_EVIDENCE = {
   "scripts/lib/BuildResult.ps1": "tests/powershell-native.test.ts",
   "scripts/lib/NativeCommand.ps1": "tests/powershell-native.test.ts",
   "scripts/lib/lifecycle-scan.mjs": "tests/state-machines.test.ts",
-  "scripts/licenses.cjs": "tests/brandAssets.test.ts",
+  "scripts/licenses.mjs": "tests/brandAssets.test.ts",
   "scripts/nsis_extract.py": "release Installer check",
   "scripts/setup-arm64-libs.ps1": "manual check (native library setup)",
-  "scripts/smoke-sidecar-chat.js": "ran live (test profile: chat with qwen3-1.7b-native on the NPU); PASS",
+  "scripts/smoke-sidecar-chat.mjs": "ran live (test profile: chat with qwen3-1.7b-native on the NPU); PASS",
   "scripts/smoke-sidecar-devtools.js": "needs an NPU and the app host; BLOCKED",
   "scripts/smoke-sidecar-sandbox.js": "ran live (test profile: runTask/runCode/runCommand/media/launchSite); PASS",
   "scripts/smoke-sidecar-setup.js": "ran live (test profile); PASS",
@@ -267,7 +266,6 @@ const SCRIPT_EVIDENCE = {
 export function matrixText(root = process.cwd()) {
   const inv = featureInventory(root);
   ids.REL = ids.UI = ids.HST = ids.SID = ids.STB = ids.SSC = ids.SRW = ids.SMF = ids.CLD = ids.SCP = 0;
-  const sv = readFileSync(`${root}/src/renderer/SettingsView.tsx`, "utf8");
   const ss = readFileSync(`${root}/src/renderer/settingsSearch.ts`, "utf8");
 
   const tabMeta = [...ss.matchAll(/^\s*\{ id: "([^"]+)", label: "([^"]+)", hint: "([^"]+)"/gm)]
