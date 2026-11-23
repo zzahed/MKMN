@@ -46,7 +46,11 @@ export function readReply(stdout: string, stderr: string, status: number | null)
   const line = stdout.trim().split(/\r?\n/).pop() ?? "";
   let r: IsolatedReply;
   try { r = JSON.parse(line) as IsolatedReply; }
-  catch { throw new Error(`the isolated check stopped${status !== null ? ` (exit ${status})` : ""}: ${(stderr || stdout).trim().split("\n").pop()?.slice(0, 200) ?? "no output"}`); }
+  catch {
+    // the last line of what the process said (stderr first); "" when it said nothing at all
+    const last = (stderr.trim() || stdout.trim()).split("\n").pop()!.slice(0, 200);
+    throw new Error(`the isolated check stopped${status !== null ? ` (exit ${status})` : ""}: ${last || "no output"}`);
+  }
   if (!r.ok) throw new Error(r.error ?? "the isolated check failed");
   return r.value;
 }

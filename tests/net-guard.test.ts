@@ -33,7 +33,38 @@ describe("isPrivateAddress", () => {
   });
 
   it("refuses what it cannot read as an address", () => {
-    expect(isPrivateAddress("not-an-ip")).toBe(true);
+    for (const ip of ["not-an-ip", "", "256.1.1.1", "1.2.3", "::g", "[]"]) expect(isPrivateAddress(ip), ip).toBe(true);
+  });
+
+  it("knows each reserved IPv4 range, and where it ends", () => {
+    const priv = ["0.1.2.3", "10.255.255.255", "127.255.0.1", "169.254.0.1", "172.16.0.0", "172.31.255.255", "192.168.255.255",
+      "192.0.0.8", "198.18.0.1", "198.19.255.255", "100.64.0.0", "100.127.255.255", "224.0.0.1", "239.255.255.250", "240.0.0.1", "255.255.255.255", " 10.0.0.1 "];
+    for (const ip of priv) expect(isPrivateAddress(ip), ip).toBe(true);
+    const pub = ["1.0.0.1", "9.255.255.255", "11.0.0.1", "126.255.255.255", "128.0.0.1", "169.253.0.1", "169.255.0.1", "172.15.255.255",
+      "192.167.0.1", "192.169.0.1", "192.0.1.1", "192.1.0.1", "198.17.0.1", "198.20.0.1", "100.63.255.255", "100.128.0.0", "223.255.255.255"];
+    for (const ip of pub) expect(isPrivateAddress(ip), ip).toBe(false);
+  });
+
+  it("reads every way of writing an IPv6 address", () => {
+    expect(isPrivateAddress("FE80::1")).toBe(true); // upper case
+    expect(isPrivateAddress("fe80::")).toBe(true); // nothing after ::
+    expect(isPrivateAddress("febf::1")).toBe(true); // the end of fe80::/10
+    expect(isPrivateAddress("fec0::1")).toBe(false); // site-local (deprecated), past fe80::/10
+    expect(isPrivateAddress("fc00::1")).toBe(true);
+    expect(isPrivateAddress("fe00::1")).toBe(false);
+    expect(isPrivateAddress("0:0:0:0:0:0:0:1")).toBe(true); // written out, no ::
+    expect(isPrivateAddress("2606:4700:0:0:0:0:0:1111")).toBe(false);
+    expect(isPrivateAddress("2001:db8::1")).toBe(true); // documentation
+    expect(isPrivateAddress("2001:db9::1")).toBe(false);
+    expect(isPrivateAddress("2001:0:db8::1")).toBe(false);
+    expect(isPrivateAddress("::ffff:8.8.8.8")).toBe(false); // mapped, public
+    expect(isPrivateAddress("::ffff:192.168.1.1")).toBe(true);
+    expect(isPrivateAddress("::8.8.8.8")).toBe(false); // compatible, public
+    expect(isPrivateAddress("::ffff:0:7f00:1")).toBe(false); // SIIT-translated form is not ::ffff:a.b.c.d
+    expect(isPrivateAddress("64:ff9b::8.8.8.8")).toBe(false);
+    expect(isPrivateAddress("64:ff9a::7f00:1")).toBe(false); // not the NAT64 prefix
+    expect(isPrivateAddress("2002:0a00:0001::")).toBe(true); // 6to4 of 10.0.0.1
+    expect(isPrivateAddress("[fe80::1%eth0]")).toBe(true);
   });
 });
 
@@ -52,6 +83,26 @@ describe("checkedLookup: the connection's own lookup", () => {
   it("refuses a name when ANY of its answers is private", async () => {
     const r = await call(async () => [{ address: "93.184.216.34" }, { address: "10.0.0.5" }], true);
     expect(String(r.err?.message)).toMatch(/local network/);
+  });
+
+  it("answers through a callback given in place of the options", async () => {
+    const r = await new Promise<any[]>((resolve) => (checkedLookup(async () => [{ address: "8.8.8.8" }]) as any)("host.test", (...a: any[]) => resolve(a)));
+    expect(r).toEqual([null, "8.8.8.8", 4]);
+  });
+
+  it("works out the family of an answer that does not give one", async () => {
+    expect((await call(async () => [{ address: "2606:4700::1111" }], true)).a).toEqual([{ address: "2606:4700::1111", family: 6 }]);
+  });
+
+  it("says a name with no answer was not found, with the code a socket expects", async () => {
+    const r = await call(async () => [], false);
+    expect(r.err).toMatchObject({ code: "ENOTFOUND", message: "the address of host.test could not be found" });
+  });
+
+  it("marks a private answer EPRIVATE, and passes a failed lookup on", async () => {
+    expect((await call(async () => [{ address: "::1" }], false)).err).toMatchObject({ code: "EPRIVATE" });
+    const boom = new Error("lookup failed");
+    expect((await call(async () => { throw boom; }, true)).err).toBe(boom);
   });
 
   it("judges every connection on its own answer: a name that turns private is refused", async () => {

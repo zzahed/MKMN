@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { HostSettingsWriter } from "../src/core/settingsWriter";
 
 /**
@@ -103,5 +103,86 @@ describe("the sidecar's settings writer", () => {
     expect(src).not.toMatch(/writeJson\(settingsFile\(\)/);
     expect(src).not.toMatch(/fallbackSettingsWrite/);
     expect(src).not.toMatch(/fall back to a direct write/);
+  });
+});
+
+describe("the settings writer's own defaults and reports", () => {
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("retries on its own timer after 2 s by default, and says one failed attempt in the singular", async () => {
+    vi.useFakeTimers();
+    const log: string[] = [];
+    const saved: unknown[] = [];
+    let calls = 0;
+    const w = new HostSettingsWriter({
+      save: async (p) => { calls++; if (calls === 1) throw new Error("host busy"); return { merged: p }; },
+      onSaved: (m) => saved.push(m),
+      log: (l) => log.push(l),
+    });
+    w.submit({ theme: "dark" });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(w.state()).toBe("pending");
+    expect(log).toEqual(["[settings] not saved yet (theme): the host refused or did not answer (host busy); retry in 2 s"]);
+    const settled = w.whenSettled();
+    await vi.advanceTimersByTimeAsync(1_999);
+    expect(calls).toBe(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await settled;
+    expect(calls).toBe(2);
+    expect(saved).toEqual([{ merged: { theme: "dark" } }]);
+    expect(log[1]).toBe("[settings] saved by the host after 1 failed attempt");
+    expect(w.state()).toBe("idle");
+  });
+
+  it("reports a rejection that is not an Error by its value", async () => {
+    const log: string[] = [];
+    const w = new HostSettingsWriter({ save: () => Promise.reject("IPC closed"), log: (l) => log.push(l), delays: [] });
+    w.submit({ a: 1 });
+    await w.whenSettled();
+    expect(log).toEqual(["[settings] NOT SAVED (a): the host refused 1 times (IPC closed); kept in memory until the next change is saved"]);
+    expect(w.unsaved()).toEqual({ a: 1 });
+  });
+
+  it("says it is saving while the host has the patch, and settles only when the host answers", async () => {
+    let release!: () => void;
+    const w = new HostSettingsWriter({ save: () => new Promise<void>((r) => { release = r; }) });
+    w.submit({ a: 1 });
+    expect(w.state()).toBe("saving");
+    expect(w.unsaved()).toEqual({}); // handed over: no longer only in memory
+    let settled = false;
+    const done = w.whenSettled().then(() => { settled = true; });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(settled).toBe(false);
+    release();
+    await done;
+    expect(w.state()).toBe("idle");
+  });
+
+  it("does not settle while a retry is scheduled", async () => {
+    const timers: Array<() => void> = [];
+    let ok = false;
+    const w = new HostSettingsWriter({
+      save: async () => { if (!ok) throw new Error("no"); },
+      delays: [10],
+      schedule: (fn) => { timers.push(fn); return { cancel: () => undefined }; },
+    });
+    w.submit({ a: 1 });
+    await new Promise((r) => setTimeout(r, 0));
+    let settled = false;
+    const done = w.whenSettled().then(() => { settled = true; });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(settled).toBe(false);
+    ok = true;
+    timers[0]();
+    await done;
+    expect(w.unsaved()).toEqual({});
+  });
+});
+
+describe("a settings writer with nothing to save", () => {
+  it("is idle and settled at once", async () => {
+    const w = new HostSettingsWriter({ save: async () => { throw new Error("never called"); } });
+    expect(w.state()).toBe("idle");
+    await expect(w.whenSettled()).resolves.toBeUndefined();
   });
 });
