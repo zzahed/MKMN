@@ -39,7 +39,7 @@ export function fakeBackend(): VoiceBackend {
       if (JSON.stringify(config).includes('"provider":"qnn"') && process.env.MKMN_FAKE_QNN_FAIL) throw new Error("QNN provider not available");
       // Echo the configured recognizer language so tests can see that a changed
       // sttLanguage really rebuilt the model (and that "" stays byte-identical).
-      const lang = (config as any)?.modelConfig?.whisper?.language ?? "";
+      const lang = (config as { modelConfig?: { whisper?: { language?: string } } } | null | undefined)?.modelConfig?.whisper?.language ?? "";
       return { decode: async (s) => (lang ? `heard ${s.length} samples (${lang})` : `heard ${s.length} samples`) };
     },
     async createTts(config): Promise<TtsHandle> {

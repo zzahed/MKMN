@@ -47,7 +47,28 @@ export async function humainRequest(
   return response;
 }
 
-export async function* humainEvents(response: Response): AsyncGenerator<{ event: string; data: any }> {
+/** A part of a Responses output item, or of a Messages reply. */
+type HumainPart = { type?: string; text?: unknown; annotations?: unknown[] };
+type HumainItem = { type?: string; status?: string; content?: HumainPart[] };
+export type HumainUsage = { completion_tokens?: number; output_tokens?: number; prompt_tokens?: number; input_tokens?: number };
+/** One HUMAIN event or reply, in any of the three APIs it speaks (Responses, Messages, Chat Completions). Text and links are checked before use. */
+export type HumainData = {
+  type?: string;
+  error?: unknown;
+  /** text in the Responses API, an object (text, thinking, stop_reason) in Messages */
+  delta?: unknown;
+  annotation?: unknown;
+  response?: { usage?: HumainUsage; output?: HumainItem[]; incomplete_details?: { reason?: string } };
+  usage?: HumainUsage;
+  message?: { usage?: HumainUsage };
+  choices?: { delta?: { content?: unknown; reasoning_content?: unknown }; finish_reason?: string | null; message?: { content?: unknown; reasoning_content?: unknown } }[];
+  output?: HumainItem[];
+  content?: HumainPart[];
+  /** why a whole Messages reply ended */
+  stop_reason?: string;
+};
+
+export async function* humainEvents(response: Response): AsyncGenerator<{ event: string; data: HumainData }> {
   if (!response.body) throw new Error("HUMAIN returned an empty stream.");
   const reader = response.body.getReader();
   const decoder = new TextDecoder();

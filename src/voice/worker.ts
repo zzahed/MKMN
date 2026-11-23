@@ -15,7 +15,17 @@ type In =
   | { t: "cancel"; id: string }
   | { t: "exit" };
 
-const send = (m: unknown) => {
+/** What the worker sends back to VoiceService (src/core/voiceService.ts). */
+export type Out =
+  | { t: "ready" }
+  | { t: "fatal"; message: string }
+  | { t: "loaded"; kind: "stt" | "tts"; provider: "cpu" | "npu"; notice: string | null; sampleRate: number | null }
+  | { t: "unloaded"; kind: "stt" | "tts" }
+  | { t: "text"; id: string; text: string | null }
+  | { t: "audio"; id: string; samples: Float32Array; sampleRate: number; done: boolean }
+  | { t: "error"; id?: string | null; kind?: "stt" | "tts" | null; message: string };
+
+const send = (m: Out) => {
   if (process.send) {
     process.send(m);
   } else {
@@ -67,7 +77,7 @@ function handleMessage(raw: In) {
         case "exit": process.exit(0);
       }
     } catch (e) {
-      send({ t: "error", id: (raw as any).id ?? null, kind: (raw as any).kind ?? null, message: (e as Error).message });
+      send({ t: "error", id: "id" in raw ? raw.id : null, kind: "kind" in raw ? raw.kind : null, message: (e as Error).message });
     }
   })();
 }

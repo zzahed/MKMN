@@ -1,18 +1,12 @@
 // ESLint flat config: the recommended JavaScript and typescript-eslint rules, and the two React
 // hooks rules for the window. Errors fail `pnpm lint`; warnings do not.
 //
-// DEBT lists the rules the code broke when linting began, many times over. They warn instead of
-// failing, so the lint gate can start at zero errors; each is a clean-up of its own (see the
-// roadmap's follow-ups). Every other recommended rule is an error, and a rule leaves DEBT once
-// the code no longer breaks it.
+// Every recommended rule is an error. The 14 rules the code broke when linting began were cleared
+// one by one and are errors again; where a rule bends below, the comment says why.
 import js from "@eslint/js";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 import reactHooks from "eslint-plugin-react-hooks";
-
-const DEBT = [
-  "@typescript-eslint/no-explicit-any",
-];
 
 export default tseslint.config(
   {
@@ -32,7 +26,6 @@ export default tseslint.config(
       globals: { ...globals.node, ...globals.browser },
     },
     rules: {
-      ...Object.fromEntries(DEBT.map((rule) => [rule, "warn"])),
       // ES5-style code (the X blocks) and async generator bodies reach `this` through `self`
       "@typescript-eslint/no-this-alias": ["error", { allowedNames: ["self"] }],
       // a name kept on purpose starts with _ (a parameter a signature needs, `for (const _ of …)`);

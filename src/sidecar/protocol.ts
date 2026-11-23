@@ -50,7 +50,8 @@ export function decodeLine(line: string): SidecarMessage | null {
   }
 }
 
-export type SidecarHandler = (...args: any[]) => Promise<unknown> | unknown;
+/** A registered method: each one declares its own parameters (never[] accepts any of them). */
+export type SidecarHandler = (...args: never[]) => Promise<unknown> | unknown;
 export type HostCaller = (method: string, args: unknown[]) => Promise<unknown>;
 
 let hostCallCounter = 0;
@@ -107,7 +108,8 @@ export class SidecarDispatcher {
     }
     try {
       const args = Array.isArray(m.args) ? m.args : [];
-      return { t: "res", id: m.id, ok: true, result: await handler(...args) };
+      // the arguments are what the caller sent as JSON: each method checks the ones it relies on
+      return { t: "res", id: m.id, ok: true, result: await (handler as (...a: unknown[]) => unknown)(...args) };
     } catch (e) {
       return { t: "res", id: m.id, ok: false, error: e instanceof Error ? e.message : String(e) };
     }

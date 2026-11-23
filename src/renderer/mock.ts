@@ -1,6 +1,6 @@
 // Browser-only stand-in for the desktop bridge, used by `npm run dev:renderer` and screenshots.
 import { DYNAMIC_DATA } from "../core/dynamic-data";
-import type { MkmnApi, CatalogItem } from "../shared/api";
+import type { MkmnApi, CatalogItem, HardwareConfigFile } from "../shared/api";
 import { CATALOG, ref } from "../core/catalog";
 import { scoreEntry } from "../core/fit";
 import { buildProfile } from "../core/hardware";
@@ -41,7 +41,7 @@ export function installMockIfNeeded() {
   const tkl: ((t: ScheduledTask) => void)[] = [];
   /** Local benchmark measurements, mirroring hardware.json's calibratedProfiles: kept
    *  in localStorage so a preview reload exercises the restart/reload path. */
-  const benchProfiles: Record<string, any> = (() => {
+  const benchProfiles: NonNullable<HardwareConfigFile["calibratedProfiles"]> = (() => {
     try { return JSON.parse(localStorage.getItem("mkmn.mock.benchProfiles") ?? "{}") ?? {}; } catch { return {}; }
   })();
   const persistBenchProfiles = () => { try { localStorage.setItem("mkmn.mock.benchProfiles", JSON.stringify(benchProfiles)); } catch { /* preview only */ } };
@@ -87,7 +87,7 @@ export function installMockIfNeeded() {
     cancelInstall: async () => undefined,
     uninstall: async (e) => { installed.delete(e.id); return { ok: true, message: "" }; },
     selectModel: async (id) => { settings = { ...settings, selectedModelId: id }; },
-    preloadModel: async (req?: any) => {
+    preloadModel: async (req) => {
       // Report the precise ref (repo:quant) the real runtime announces, falling back
       // to the selected entry's ref — matching supervisor.rs `current_model`.
       const entry = CATALOG.find((e) => e.id === (req?.model || settings.selectedModelId));
@@ -464,7 +464,7 @@ export function installMockIfNeeded() {
     }),
     setQoSTier: async (tier, pid) => ({
       pid: pid ?? 1234,
-      tier: tier as any,
+      tier: tier === "inference_critical" ? "InferenceCritical" : tier === "background_eco" ? "BackgroundEco" : "Interactive",
       priorityClass: tier === "inference_critical" ? "ABOVE_NORMAL_PRIORITY_CLASS" : (tier === "background_eco" ? "BELOW_NORMAL_PRIORITY_CLASS" : "NORMAL_PRIORITY_CLASS"),
       ecoqosActive: tier === "background_eco",
       timerCoalescingActive: tier === "background_eco",

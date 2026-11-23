@@ -1,7 +1,7 @@
 import WebSocket from "ws";
 import type { ChatEvent, ChatMessage, Settings } from "../shared/types";
 import { cloudProviderOf, featureEnabled, modelServices, FUSE_EFFORTS, HUMAIN_LABEL, type HumainFeature, type HumainModel, type HumainProvider } from "../shared/humain";
-import { HUMAIN_ORIGINS, humainEvents, HumainError, humainRequest } from "../core/humain";
+import { HUMAIN_ORIGINS, humainEvents, HumainError, humainRequest, type HumainData, type HumainUsage } from "../core/humain";
 import { humainVault } from "./humainVault";
 import type { SidecarDispatcher } from "./protocol";
 
@@ -153,7 +153,8 @@ export function registerHumain(dispatcher: SidecarDispatcher, configDir: string,
     let outputTokens: number | undefined;
     let estimatedUsd: number | undefined;
     const sources = new Map<string, string>();
-    function cite(annotation: any) {
+    function cite(raw: unknown) {
+      const annotation = raw as { url?: unknown; title?: unknown; url_citation?: { url?: unknown; title?: unknown } } | null | undefined;
       const url = annotation?.url_citation?.url ?? annotation?.url;
       if (typeof url === "string" && /^https?:\/\/[^\s<>()[\]]+$/.test(url)) {
         const title = annotation?.url_citation?.title ?? annotation?.title;
@@ -221,10 +222,10 @@ export function registerHumain(dispatcher: SidecarDispatcher, configDir: string,
         send({ id, type: "notice", text: `Fuse thinking effort: ${appliedEffort}` });
       }
       send({ id, type: "notice", text: `${HUMAIN_LABEL[provider]} · ${model}` });
-      const usage = (u: any) => {
+      const usage = (u: HumainUsage | undefined) => {
         if (!u) return;
         const output = u.completion_tokens ?? u.output_tokens;
-        if (Number.isSafeInteger(output) && output >= 0) tokens = outputTokens = output;
+        if (typeof output === "number" && Number.isSafeInteger(output) && output >= 0) tokens = outputTokens = output;
         promptTokens = u.prompt_tokens ?? u.input_tokens ?? promptTokens;
       };
       if (response.headers.get("content-type")?.includes("text/event-stream")) {
@@ -244,10 +245,11 @@ export function registerHumain(dispatcher: SidecarDispatcher, configDir: string,
               finish = data.type === "response.completed" ? "stop" : data.response?.incomplete_details?.reason === "max_output_tokens" ? "length" : null;
             }
           } else if (api === "messages") {
-            emit("answer", data.delta?.text);
-            emit("thinking", data.delta?.thinking);
+            const delta = data.delta as { text?: unknown; thinking?: unknown; stop_reason?: string } | undefined;
+            emit("answer", delta?.text);
+            emit("thinking", delta?.thinking);
             usage(data.usage ?? data.message?.usage);
-            if (data.delta?.stop_reason) finish = data.delta.stop_reason === "max_tokens" ? "length" : "stop";
+            if (delta?.stop_reason) finish = delta.stop_reason === "max_tokens" ? "length" : "stop";
           } else {
             const choice = data.choices?.[0];
             emit("thinking", choice?.delta?.reasoning_content);
@@ -257,7 +259,7 @@ export function registerHumain(dispatcher: SidecarDispatcher, configDir: string,
           }
         }
       } else {
-        const data = await response.json();
+        const data = (await response.json()) as HumainData;
         if (data.error) throw new Error("HUMAIN reported an error during generation.");
         usage(data.usage);
         if (api === "responses") {

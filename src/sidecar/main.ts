@@ -81,7 +81,7 @@ import { mergedPack, pickModel, tierOf } from "../core/dynamic";
 import { spawn, spawnSync } from "child_process";
 import { createHash, randomUUID } from "crypto";
 import type { Artifact, ChatEvent, RunEvent, ScheduledTask } from "../shared/types";
-import type { CatalogEntry, ChatMessage, ChatOptions, FriendlyError, HardwareProfile, InstallProgress, InstalledModel, Settings, SpeakChunk, VoiceDownloadProgress, VoiceSettings, VoiceStatus } from "../shared/types";
+import type { CatalogEntry, ChatMessage, ChatOptions, ContentPart, FriendlyError, HardwareProfile, InstallProgress, InstalledModel, Settings, SpeakChunk, VoiceDownloadProgress, VoiceSettings, VoiceStatus } from "../shared/types";
 import type { HardwareConfigFile } from "../shared/api";
 import { registerHumain, fuseConnection, fuseSearchContext, sourcesBlock } from "./humain";
 import { registerVoice } from "./register/voice";
@@ -176,11 +176,12 @@ function settings(): Settings {
  * host: its changes live for that run only, and the log says so. */
 const settingsWriter = new HostSettingsWriter({
   save: (patch) => dispatcher.callHost((m) => { void write(m); }, "saveSettings", [patch], 30_000),
-  onSaved: (result) => {
+  onSaved: (saved) => {
+    const result = saved as Partial<Settings> | null;
     // the host returns the full merged settings: adopt them, so nothing this
     // process reads drifts from what the one writer actually stored
     // (with what was submitted while this call was in flight on top: it is not saved yet, but it is the newest value)
-    if (result && typeof result === "object") settingsCache = { mtime: settingsMtime(), value: { ...(result as Partial<Settings>), ...settingsWriter.unsaved() } as Settings };
+    if (result && typeof result === "object") settingsCache = { mtime: settingsMtime(), value: { ...result, ...settingsWriter.unsaved() } as Settings };
   },
   log: (line) => console.error(line),
 });
@@ -1407,7 +1408,7 @@ dispatcher.register("chat", (id: string, modelId: string, messages: ChatMessage[
         // Fuse's web search lives on its Responses API: asked first, its findings ride the turn as context
         const mode = featureEnabled(config.humainDisabledFeatures, "search") ? config.humainChatSearch : "off";
         const lastUser = [...list].reverse().find((m) => m.role === "user");
-        const query = typeof lastUser?.content === "string" ? lastUser.content : (lastUser?.content as any[] | undefined)?.map((p) => p?.text ?? "").join(" ") ?? "";
+        const query = typeof lastUser?.content === "string" ? lastUser.content : (lastUser?.content as ContentPart[] | undefined)?.map((p) => (p && "text" in p ? p.text : "")).join(" ") ?? "";
         if (mode && mode !== "off" && query.trim()) {
           try {
             sidecarHost.send({ id: String(id), type: "notice", text: "Searching the web with HUMAIN Fuse" } as ChatEvent);
