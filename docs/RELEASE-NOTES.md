@@ -2,7 +2,7 @@
 
 **Current release: v0.0.2**
 
-**Current candidate: v0.0.3-rc.1** (source candidate, pending verified installer artifact and publication)
+**Current candidate: v0.0.3-rc.1** (controlled pilot; availability confirmed on its [GitHub prerelease](https://github.com/zzahed/MKMN/releases/tag/v0.0.3-rc.1))
 
 ## 0.0.3-rc.1 — Engineering hardening candidate
 

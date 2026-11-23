@@ -2,7 +2,7 @@
 
 **Current release: v0.0.2** (Tauri v2 Rust host + Node sidecar, Windows 11 ARM64; Qualcomm GenieX v0.11.0 or newer for local inference).
 
-**Current candidate: v0.0.3-rc.1** (source candidate; pending packaging and publication). [Candidate notes](releases/RELEASE_NOTES_v0.0.3-rc.1.md).
+**Current candidate: v0.0.3-rc.1** (controlled pilot; check its [GitHub prerelease](https://github.com/zzahed/MKMN/releases/tag/v0.0.3-rc.1) for artifact availability). [Candidate notes](releases/RELEASE_NOTES_v0.0.3-rc.1.md).
 The version is set by hand in four files and checked by `tests/version.test.ts`.
 [CONTRIBUTING.md](../CONTRIBUTING.md) holds the rules for changes.
 

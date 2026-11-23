@@ -150,8 +150,9 @@ jobs:
           cd dist
           test -s MKMN-0.0.3-rc.1-arm64-Setup.exe
           sha256sum -c MKMN-0.0.3-rc.1-arm64-Setup.exe.sha256
-          grep -Fx "commit=$GITHUB_SHA" MKMN-0.0.3-rc.1-build.txt
-          grep -Fx "version=0.0.3-rc.1" MKMN-0.0.3-rc.1-build.txt
+          # PowerShell writes CRLF on Windows. Compare normalized lines without mutating the published asset.
+          sed 's/\r$//' MKMN-0.0.3-rc.1-build.txt | grep -Fx "commit=$GITHUB_SHA"
+          sed 's/\r$//' MKMN-0.0.3-rc.1-build.txt | grep -Fx "version=0.0.3-rc.1"
       - name: Publish GitHub prerelease (not Latest)
         env:
           GH_TOKEN: ${{ github.token }}

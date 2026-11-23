@@ -24,7 +24,7 @@ and they do not develop, sponsor or endorse it.
 
 Release status: v0.0.2 (latest published stable; [notes](docs/releases/RELEASE_NOTES_v0.0.2.md))
 
-Release candidate: v0.0.3-rc.1 ([candidate notes](docs/releases/RELEASE_NOTES_v0.0.3-rc.1.md)). Source preparation in progress; no candidate installer has been published yet. Continue using the v0.0.2 release for installations until a tested candidate asset is available.
+Release candidate: v0.0.3-rc.1 ([candidate notes](docs/releases/RELEASE_NOTES_v0.0.3-rc.1.md)). This is for controlled testing, not production. Check the [GitHub prerelease](https://github.com/zzahed/MKMN/releases/tag/v0.0.3-rc.1) for the verified candidate installer and checksum; if the prerelease is not yet listed, continue using the published stable v0.0.2 installer.
 
 MKMN AI is a personal AI workspace built to explore and demonstrate what
 HUMAIN's Snapdragon X2 Elite laptop can do. It runs AI models directly on the

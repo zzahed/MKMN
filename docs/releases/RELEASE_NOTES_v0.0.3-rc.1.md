@@ -1,6 +1,6 @@
 # MKMN AI 0.0.3-rc.1 — Engineering hardening candidate
 
-**Status:** Release candidate for controlled Windows 11 ARM64 / HUMAIN AI PC evaluation. This document does not assert that an installer has been built, published, installed or approved. The latest public stable release remains v0.0.2 until a later publication decision.
+**Status:** Controlled Windows 11 ARM64 / HUMAIN AI PC evaluation prerelease. Obtain the installer only from the [v0.0.3-rc.1 GitHub release](https://github.com/zzahed/MKMN/releases/tag/v0.0.3-rc.1) after checking its SHA-256 manifest. If that page or asset is unavailable, the candidate is not yet published. The public stable release remains v0.0.2.
 
 **Baseline:** All changes merged on `main` after `v0.0.2`, including 44 merged pull requests across the repository's history as of 24 November 2026. This is a summary of highlights, not a claim that each PR was introduced exclusively in this candidate.
 
