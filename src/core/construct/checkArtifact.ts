@@ -1,4 +1,4 @@
-import { checkArtifactWithoutWindow } from "./pagecheck";
+import { checkArtifactWithoutWindow, type SandboxPageReport } from "./pagecheck";
 import type { FileLike } from "../bundle";
 import { isJs, quickErrors } from "../codecheck";
 
@@ -16,7 +16,7 @@ import { isJs, quickErrors } from "../codecheck";
  * element checks) — those stay with the desktop build, and callers treat them as
  * unverified, not as passed.
  */
-export async function checkArtifact(a: unknown, all: unknown, o?: { scenarios?: unknown }): Promise<{ ran: "none" | "syntax" | "page"; errors: string[]; notes: string[]; wired?: number; scenarios?: unknown[] }> {
+export async function checkArtifact(a: unknown, all: unknown, o?: { scenarios?: unknown }): Promise<SandboxPageReport> {
   const f = a && typeof a === "object" ? (a as { content?: unknown; title?: string; kind?: string; language?: string }) : null;
   if (!f || typeof f.content !== "string") return { ran: "none", errors: [], notes: [] };
   const files: FileLike[] = Array.isArray(all)

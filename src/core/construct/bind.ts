@@ -5,6 +5,7 @@
  */
 import { parse } from "acorn";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- an acorn AST node: the walk reads whichever fields each node type has
 type Node = { type: string; start: number; end: number; [key: string]: any };
 interface Edit { start: number; end: number; text: string }
 

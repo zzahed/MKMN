@@ -46,7 +46,7 @@ import { routeVisual } from "./visualRoute";
 import { templateChart } from "./chartTemplates";
 import { settleCharts, mendLeakedFormulas, chartBlocks, chartFlaw } from "./chart";
 import { settleBlocks } from "./blocks";
-import { diagramFixInstructions } from "./diagram";
+import type { CheckReport } from "./codecheck";
 import { prepareTurn } from "./chatPrepare";
 import { chooseEffort } from "./chatRoute";
 import { readDocumentQuestion } from "./chatRetrieve";
@@ -117,7 +117,8 @@ export interface ChatHost {
   /** One slide's page drawn in a hidden window, with what is wrong in it. Absent when this host cannot draw slides: the deck build then judges every slide by the app's own layout measure only and says so, it never claims a render. */
   renderSlide?(html: string): Promise<RenderResult>;
   lookAtShot(id: string, shot: string, question: string, signal: AbortSignal): Promise<string | null>;
-  checkArtifact(a: any, all: any, o?: any): Promise<any>;
+  /** Runs a file (a page is played) and reports what went wrong; `probe` asks which controls changed nothing. */
+  checkArtifact(a: unknown, all: unknown, o?: { probe?: boolean; scenarios?: unknown }): Promise<CheckReport & { wired?: number }>;
   /** Keeps the PC awake during a long improve loop; returns the stopper. */
   keepAwake?(): () => void;
   notify?(title: string, body: string): void;
@@ -755,8 +756,6 @@ export async function runChatOrchestrator(host: ChatHost, id: string, entryId: s
     host.setLastLoaded(entry);
     ac.signal.throwIfAborted();
     if (team) host.send({ id, type: "notice", text: team.note });
-    const support = thinkingSupport(entry);
-    const level = effortNow ? effectiveEffort(effortNow, support) : null;
     let lean = compactHistory(messages); // older versions of a file only cost context
     // retrieve (src/core/chatRetrieve.ts): the question read off the conversation, and an answer quoted straight
     // from the documents when one passage settles it (an ownership stake, a reported figure), with no model call
@@ -1486,8 +1485,10 @@ export async function runChatOrchestrator(host: ChatHost, id: string, entryId: s
       let dropped = "";
       if (bad && settings.loadProfiles?.[bad]) {
         dropped = ` The setting kept for this model (${settings.loadProfiles[bad].label}) crashed and was removed.`;
-        const { [bad]: _gone, ...rest } = settings.loadProfiles;
-        const { [bad]: _b, ...badges } = readObj<Record<string, ComputeTarget>>(settings, "placements");
+        const rest = { ...settings.loadProfiles };
+        delete rest[bad];
+        const badges = { ...readObj<Record<string, ComputeTarget>>(settings, "placements") };
+        delete badges[bad];
         host.patchSettings({ loadProfiles: rest, placements: badges });
       }
       let err = last ?? (e instanceof ServerLostError
