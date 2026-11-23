@@ -1,7 +1,8 @@
 name: MKMN Windows ARM64 verification
 
-# Manual or restricted candidate-branch build. Uploads an unsigned installer + SHA-256 artifact;
-# never pushes tags or publishes a GitHub release automatically.
+# Restricted candidate-branch build: verify installer, CI and CodeQL on exact head,
+# then publish a GitHub prerelease (never Latest) with unsigned binary, SHA-256 and provenance.
+# The publishing job alone receives contents:write. Stable publication is out of scope.
 on:
   workflow_dispatch:
   push:
@@ -97,3 +98,74 @@ jobs:
             dist/MKMN-*-arm64-Setup.exe.sha256
             dist/MKMN-*-build.txt
           if-no-files-found: error
+
+  publish-prerelease:
+    name: Publish controlled pilot prerelease
+    needs: windows-arm64
+    if: github.event_name == 'push' && github.ref == 'refs/heads/release/v0.0.3-rc.1' && github.repository == 'zzahed/MKMN'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Verify this exact revision passed CI and CodeQL
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess, sys, time
+          repo, sha = os.environ["GITHUB_REPOSITORY"], os.environ["GITHUB_SHA"]
+          for attempt in range(60):
+              data = json.loads(subprocess.check_output(
+                  ["gh", "api", f"repos/{repo}/actions/runs?per_page=100"], text=True))
+              matches = {}
+              for run in data.get("workflow_runs", []):
+                  if run.get("head_sha") == sha and run.get("name") in ("ci", "codeql"):
+                      name = run["name"]
+                      if name not in matches or run["id"] > matches[name]["id"]:
+                          matches[name] = run
+              print(f"Gate {attempt + 1}: " + ", ".join(
+                  f"{name}={matches.get(name, {}).get('conclusion') or matches.get(name, {}).get('status', 'missing')}"
+                  for name in ("ci", "codeql")), flush=True)
+              if all(matches.get(n, {}).get("conclusion") == "success" for n in ("ci", "codeql")):
+                  print(f"Both required workflows passed at exact SHA {sha}", flush=True)
+                  break
+              if any(matches.get(n, {}).get("status") == "completed"
+                     and matches[n].get("conclusion") != "success" for n in ("ci", "codeql")):
+                  sys.exit("Refusing publication: CI or CodeQL did not succeed")
+              if attempt == 59:
+                  sys.exit("Timed out waiting for successful CI and CodeQL on this exact SHA")
+              time.sleep(30)
+          PY
+      - name: Download built installer and provenance from this run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name MKMN-Windows-ARM64-unsigned --dir dist
+      - name: Verify installer SHA-256 and build provenance
+        run: |
+          set -euo pipefail
+          test "$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')" = "0.0.3-rc.1"
+          cd dist
+          test -s MKMN-0.0.3-rc.1-arm64-Setup.exe
+          sha256sum -c MKMN-0.0.3-rc.1-arm64-Setup.exe.sha256
+          grep -Fx "commit=$GITHUB_SHA" MKMN-0.0.3-rc.1-build.txt
+          grep -Fx "version=0.0.3-rc.1" MKMN-0.0.3-rc.1-build.txt
+      - name: Publish GitHub prerelease (not Latest)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view v0.0.3-rc.1 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Refusing to overwrite an existing v0.0.3-rc.1 release"
+            exit 1
+          fi
+          gh release create v0.0.3-rc.1 \
+            dist/MKMN-0.0.3-rc.1-arm64-Setup.exe \
+            dist/MKMN-0.0.3-rc.1-arm64-Setup.exe.sha256 \
+            dist/MKMN-0.0.3-rc.1-build.txt \
+            --target "$GITHUB_SHA" \
+            --title "MKMN AI v0.0.3-rc.1 - Controlled HUMAIN pilot" \
+            --notes-file docs/releases/RELEASE_NOTES_v0.0.3-rc.1.md \
+            --prerelease --latest=false --repo "$GITHUB_REPOSITORY"
