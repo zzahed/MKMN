@@ -9,7 +9,7 @@ import { GGUF_CONTEXT_CEILING } from "./dynamic";
 export type FetchLike = (url: string, init?: { headers?: Record<string, string>; signal?: AbortSignal; redirect?: "manual" }) => Promise<{
   ok: boolean;
   status: number;
-  json(): Promise<any>;
+  json(): Promise<unknown>;
   arrayBuffer(): Promise<ArrayBuffer>;
   text?(): Promise<string>;
   headers?: { get(name: string): string | null };
@@ -31,7 +31,7 @@ export class HfClient {
     const url = `${HF}/api/models?search=${encodeURIComponent(query)}&filter=gguf&sort=downloads&direction=-1&limit=${limit}`;
     const r = await this.fetchFn(url, { headers: this.headers() });
     if (!r.ok) throw new Error(`Hugging Face search failed (${r.status})`);
-    const rows: any[] = await r.json();
+    const rows = (await r.json()) as { id: string; modelId?: string; downloads?: number; likes?: number; lastModified?: string }[];
     return rows.map((m) => ({
       repo: m.id ?? m.modelId,
       downloads: m.downloads ?? 0,
@@ -62,7 +62,7 @@ export class HfClient {
     const r = await this.fetchFn(`${HF}/api/models/${repo}/tree/main?recursive=true`, { headers: this.headers() });
     if (r.status === 404) throw new Error(`Repo "${repo}" was not found on Hugging Face.`);
     if (!r.ok) throw new Error(`Could not list files for ${repo} (${r.status})`);
-    const rows: any[] = await r.json();
+    const rows = (await r.json()) as { type?: string; path?: string; size?: number; lfs?: { size?: number } }[];
     return rows
       .filter((x) => x.type === "file")
       .map((x) => ({ path: x.path as string, sizeBytes: (x.lfs?.size ?? x.size ?? 0) as number }));

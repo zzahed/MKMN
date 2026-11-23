@@ -8,6 +8,7 @@ import { parse } from "acorn";
 import { closestName, type Edit } from "./mend";
 import { escapeRe } from "../escape";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- an acorn AST node: the walk reads whichever fields each node type has
 type Node = { type: string; start: number; end: number; [key: string]: any };
 const skip = new Set(["type", "start", "end", "loc", "range"]);
 const UNK = Symbol("unknown");

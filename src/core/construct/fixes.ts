@@ -553,7 +553,7 @@ export function argKindProblems(units: { name: string; code: string }[], planned
   for (const u of units) {
     const ast = parseIt(u.code);
     if (!ast || !want.has(u.name)) continue;
-    const fn = (ast.body ?? []).find((n: Node) => isFn(n) && (n as any).id?.name === u.name) as Node | undefined;
+    const fn = (ast.body ?? []).find((n: Node) => isFn(n) && n.id?.name === u.name) as Node | undefined;
     const params = (fn?.params ?? []) as Node[];
     if (!params.length) continue;
     for (const c of calls) {

@@ -852,7 +852,7 @@ export class FoundryHost {
       throw new Error(`Foundry Local did not load ${sel.alias}: ${reason || `no answer (exit ${r.code})`}`);
     }
     const lv = loadedVariant(r.out);
-    const ids = await this.fetchFn(`${base}/v1/models`).then((x) => x.json()).then((j: any) => (Array.isArray(j?.data) ? j.data.map((m: any) => String(m.id)).filter(Boolean) : []) as string[]).catch(() => [] as string[]);
+    const ids = await this.fetchFn(`${base}/v1/models`).then((x) => x.json()).then((j) => { const data = (j as { data?: unknown } | null)?.data; return Array.isArray(data) ? data.map((m: { id?: unknown }) => String(m.id)).filter(Boolean) : []; }).catch(() => [] as string[]);
     const wanted = (lv?.variant ?? sel.alias).toLowerCase();
     const modelId = ids.find((i) => i.toLowerCase() === wanted) ?? ids.find((i) => i.toLowerCase().startsWith(wanted)) ?? ids.find((i) => i.toLowerCase().includes(sel.alias.toLowerCase())) ?? lv?.variant ?? sel.alias;
     const device = lv?.device ?? sel.device;
