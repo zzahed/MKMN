@@ -1,0 +1,17 @@
+# cargo-audit configuration. cargo audit reads .cargo/audit.toml from the directory it
+# runs in, so this file sits at the repo root where CI runs
+# `cargo audit --file src-tauri/Cargo.lock`.
+
+[advisories]
+ignore = [
+    # RUSTSEC-2024-0429: glib < 0.20, unsound `VariantStrIter` Iterator impls.
+    # glib 0.18 comes in only through Tauri's Linux GTK3 stack (tauri, tao, wry, muda,
+    # tray-icon -> gtk 0.18 / webkit2gtk 2.0 -> glib 0.18), and only for Linux/BSD targets.
+    # It is not compiled into the Windows ARM64 app (`cargo tree -i glib --target
+    # aarch64-pc-windows-msvc` is empty), and MKMN code never uses glib.
+    # No upgrade path yet: as of 2026-11-23 the latest wry 0.57.3, tao 0.37.3, muda 0.21.2,
+    # tray-icon 0.26.1 and tauri 3.0.0-alpha.6 all still require gtk ^0.18, and gtk 0.18
+    # requires glib ^0.18. Patching glib alone would break the GTK stack.
+    # Remove this entry once Tauri moves to gtk-rs 0.19+ and `cargo update` lifts glib.
+    "RUSTSEC-2024-0429",
+]
