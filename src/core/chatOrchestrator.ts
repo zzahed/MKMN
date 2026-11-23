@@ -47,7 +47,7 @@ import { templateChart } from "./chartTemplates";
 import { CHART_FIX_INSTRUCTIONS, settleCharts, mendLeakedFormulas, chartBlocks, chartFlaw } from "./chart";
 import { settleBlocks } from "./blocks";
 import { diagramFixInstructions } from "./diagram";
-import { takeToolCommands, type ToolName } from "./toolCommands";
+import { prepareTurn } from "./chatPrepare";
 import { orchestrate } from "./orchestrate";
 import { makeDeck, wantsDeck } from "./deckBuild";
 import { changeDeck } from "./deckEdit";
@@ -716,33 +716,10 @@ export async function runChatOrchestrator(host: ChatHost, id: string, entryId: s
   let policyStop: string | undefined;
   try {
     const settings = host.settings();
-    // tools on command: the "/" words at the start of the message say which tools this message may use, and are not part of the request
-    const onCommand = readBool(settings, "toolsOnCommand");
-    const asked = new Set<ToolName>();
-    if (onCommand) {
-      const at = messages.map((m) => m.role).lastIndexOf("user");
-      const last = messages[at];
-      if (typeof last?.content === "string") {
-        const r = takeToolCommands(last.content);
-        r.used.forEach((t) => asked.add(t));
-        messages = messages.map((m, i) => (i === at ? { ...m, content: r.text } : m));
-      } else if (last) {
-        const parts = last.content.map((p) => {
-          if (p.type !== "text" || asked.size) return p;
-          const r = takeToolCommands(p.text);
-          r.used.forEach((t) => asked.add(t));
-          return { ...p, text: r.text };
-        });
-        messages = messages.map((m, i) => (i === at ? { ...m, content: parts } : m));
-      }
-    }
-    const may = (t: ToolName) => !onCommand || asked.has(t);
-    // The option alone does not put the delegation rules in the request: `agentsOptIn` only says the
-    // person allows them here, and the closed question below decides whether THIS request needs them.
-    const agentsOptIn = !!opts.subagents && may("agents");
-    const useLoop = settings.agentLoop && may("improve");
-    const useCheck = settings.autoCheck && may("check");
-    const useBuild = may("build"); // the steps that plan, write, test and fix files (decks, templates, pages, programs)
+    // prepare (src/core/chatPrepare.ts): the "/" tool words come off the message, and the turn's tools are decided
+    const prepared = prepareTurn(settings, messages, opts);
+    messages = prepared.messages;
+    const { onCommand, asked, agentsOptIn, useLoop, useCheck, useBuild } = prepared;
     // "Dynamic" is a team: this request is sorted into a kind of task and handed to the team's best installed model for it
     if (host.benchRunning()) throw new Error("A benchmark is using the NPU. Stop it in Settings, Developer settings, or wait for it to finish.");
     let team = isDynamicId(entryId) ? await dynamicTeam(host, entryId, messages, !onCommand) : null;
