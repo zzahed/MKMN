@@ -47,7 +47,7 @@ jobs:
       - run: pnpm rebuild esbuild
       # coverage is checked in windows-arm64-tests: its thresholds need the whole suite in one run
       - run: pnpm exec vitest run --shard=${{ matrix.shard }}/3 --reporter=default --reporter=junit --outputFile.junit=reports/junit-${{ matrix.shard }}.xml
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: unit-${{ matrix.shard }}
@@ -67,7 +67,7 @@ jobs:
       - run: pnpm rebuild esbuild
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm exec playwright test --trace off
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: e2e
@@ -97,7 +97,7 @@ jobs:
           pnpm test --coverage;                              if ($LASTEXITCODE) { exit $LASTEXITCODE }
           cargo clippy --manifest-path src-tauri/Cargo.toml --target aarch64-pc-windows-msvc -- -D warnings; if ($LASTEXITCODE) { exit $LASTEXITCODE }
           cargo test   --manifest-path src-tauri/Cargo.toml --target aarch64-pc-windows-msvc;              exit $LASTEXITCODE
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: coverage
