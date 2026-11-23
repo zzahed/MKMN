@@ -1,13 +1,13 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { execFile, execFileSync } from "node:child_process";
 import { createServer, type AddressInfo } from "node:net";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
 import { runExamples, smokeRun } from "../src/core/construct/sandbox";
 import { runCases } from "../src/core/benchChecks";
 import { codeChecks } from "../src/core/labCode";
-import { lockedNodeArgs, setIsolation } from "../src/core/isolate";
-import { codeDirs, lockedNodeRunner } from "../src/sidecar/isolation";
+import { IsolationUnsafeError, lockedNodeArgs, setIsolation } from "../src/core/isolate";
+import { codeDirs, lockedNodeRunner, probeVerdict, proveNetworkDenied, proveNetworkDeniedSync } from "../src/sidecar/isolation";
 
 /**
  * Code a model wrote was run with node:vm INSIDE the sidecar: Node says vm is not a
@@ -80,5 +80,96 @@ describe("generated code runs in a locked-down process", () => {
     setIsolation(lockedNodeRunner(process.execPath, worker, codeDirs(path.join(dist, "sidecar"))));
     const r = await runExamples([], "function spin() { while (true) {} }", [{ call: "spin()", expect: "1" }]);
     expect(r.ok).toBe(false);
+  }, 60_000);
+});
+
+/**
+ * QE-1.4: the locked flags only protect when THIS Node binary enforces them. Node 24's
+ * permission model let a locked process open a connection, so the sidecar now proves the
+ * runtime denies the network before it runs any generated code, and refuses when it cannot.
+ */
+describe("generated code runs only on a runtime that is proven to block the network", () => {
+  const dirs = () => codeDirs(path.join(dist, "sidecar"));
+  const NO_NODE = path.join(root, "no-such-node.exe"); // spawning it would fail with ENOENT, not the refusal
+
+  it("refuses with IsolationUnsafeError, and never starts the check, when the probe says the network is open", async () => {
+    let probes = 0;
+    const runner = lockedNodeRunner(NO_NODE, worker, dirs(), { probe: async () => { probes++; return false; }, probeSync: () => { probes++; return false; } });
+    const first = await runner.run("runExamples", []).catch((e: Error) => e);
+    expect(first).toBeInstanceOf(IsolationUnsafeError);
+    expect((first as Error).name).toBe("IsolationUnsafeError");
+    expect((first as Error).message).toBe("Generated code is turned off: this Node.js runtime cannot block network access.");
+    expect(() => runner.runSync("runExamples", [])).toThrow(IsolationUnsafeError);
+    await expect(runner.run("runExamples", [])).rejects.toThrow(IsolationUnsafeError);
+    expect(probes).toBe(1); // asked once, then remembered
+  });
+
+  it("runs the check when the probe proves the network is denied", async () => {
+    let probes = 0;
+    setIsolation(lockedNodeRunner(process.execPath, worker, dirs(), { probe: async () => { probes++; return true; }, probeSync: () => { probes++; return true; } }));
+    expect(await runExamples([], "function add(a, b) { return a + b; }", [{ call: "add(2, 3)", expect: "5" }])).toEqual({ ok: true, failures: [] });
+    expect(await runExamples([], "function add(a, b) { return a + b; }", [{ call: "add(1, 1)", expect: "2" }])).toEqual({ ok: true, failures: [] });
+    expect(probes).toBe(1);
+  }, 60_000);
+
+  it("on this runtime the probe gives the same answer as the connection test above", async () => {
+    expect(await proveNetworkDenied(process.execPath, dirs())).toBe(true);
+    expect(proveNetworkDeniedSync(process.execPath, dirs())).toBe(true);
+  }, 60_000);
+
+  it("the shared isolation module imports nothing that only Node has: the window bundles it", () => {
+    // src/core/construct/sandbox.ts reaches the window's bundle, and it imports src/core/isolate.ts;
+    // a Node built-in there breaks `vite build` ("execFile" is not exported by "__vite-browser-external")
+    const src = readFileSync(path.join(root, "src", "core", "isolate.ts"), "utf8");
+    expect(src).not.toMatch(/from\s+"(node:)?(child_process|fs|net|dgram|dns|os|path|http|https)"/);
+  });
+
+  it("fails closed: no answer from the probe is never taken as a denied network (it is 'could not tell')", async () => {
+    expect(await proveNetworkDenied(NO_NODE, dirs())).toBeNull();
+    expect(proveNetworkDeniedSync(NO_NODE, dirs())).toBeNull();
+  }, 60_000);
+
+  // The final review: one slow first start (an antivirus scan, a loaded PC) used to be kept as
+  // "unsafe" for the whole session, and the message blamed the runtime. Only a definite answer
+  // is remembered now; "could not tell" refuses that run and is asked again.
+  it("reads the probe's output: only ERR_ACCESS_DENIED proves the ban, a socket error code proves it open, anything else is 'could not tell'", () => {
+    expect(probeVerdict("ERR_ACCESS_DENIED\n")).toBe(true);
+    expect(probeVerdict("ECONNREFUSED")).toBe(false);
+    expect(probeVerdict("CONNECTED")).toBe(false);
+    expect(probeVerdict("EACCES")).toBe(false);
+    expect(probeVerdict("")).toBeNull();
+    expect(probeVerdict(undefined)).toBeNull();
+    expect(probeVerdict("node:internal/modules/cjs/loader:1\nError: boom")).toBeNull();
+  });
+
+  it("'could not tell' refuses this run with its own message, is not remembered, and a later proof lets the check run", async () => {
+    const answers: (boolean | null)[] = [null, true];
+    let probes = 0;
+    const next = (): boolean | null => (probes < answers.length ? answers[probes++] : (probes++, true));
+    const runner = lockedNodeRunner(process.execPath, worker, dirs(), { probe: async () => next(), probeSync: () => next() });
+    const first = await runner.run("runExamples", []).catch((e: Error) => e);
+    expect(first).toBeInstanceOf(IsolationUnsafeError);
+    expect((first as Error).message).toBe("Generated code is paused: MKMN could not confirm that this Node.js runtime blocks network access. It checks again on the next run.");
+    setIsolation(runner);
+    expect(await runExamples([], "function add(a, b) { return a + b; }", [{ call: "add(2, 3)", expect: "5" }])).toEqual({ ok: true, failures: [] });
+    expect(await runExamples([], "function add(a, b) { return a + b; }", [{ call: "add(1, 1)", expect: "2" }])).toEqual({ ok: true, failures: [] });
+    expect(probes).toBe(2); // asked again after "could not tell", then the proof is remembered
+  }, 60_000);
+
+  it("a probe that throws is 'could not tell' too, on the synchronous path as well", () => {
+    let probes = 0;
+    const runner = lockedNodeRunner(NO_NODE, worker, dirs(), { probe: async () => { throw new Error("spawn failed"); }, probeSync: () => { probes++; throw new Error("spawn failed"); } });
+    expect(() => runner.runSync("runExamples", [])).toThrow(/could not confirm/);
+    expect(() => runner.runSync("runExamples", [])).toThrow(/could not confirm/);
+    expect(probes).toBe(2);
+  });
+
+  it("a locked process cannot resolve a name, send UDP or fetch either", async () => {
+    const run = (code: string) => new Promise<string>((resolve) => {
+      execFile(process.execPath, [...lockedNodeArgs(dirs(), "-e"), code], { windowsHide: true, timeout: 20_000 }, (_e, stdout) => resolve(String(stdout).trim()));
+    });
+    expect(await run(`require("dns").lookup("localhost", (e) => console.log(e ? e.code : "RESOLVED"));`)).toBe("ERR_ACCESS_DENIED");
+    expect(await run(`const u = require("dgram").createSocket("udp4"); u.on("error", (e) => { console.log(e.code); u.close(); }); u.send("x", 9, "127.0.0.1", (e) => { if (!e) { console.log("SENT"); u.close(); } });`)).toBe("ERR_ACCESS_DENIED");
+    expect(await run(`fetch("http://127.0.0.1:59999/").then(() => console.log("FETCHED"), (e) => { let c = e; while (c.cause) c = c.cause; console.log(c.code || c.message); });`)).toBe("ERR_ACCESS_DENIED");
   }, 60_000);
 });

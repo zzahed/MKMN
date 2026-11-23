@@ -16,6 +16,52 @@ cargo check --manifest-path src-tauri\Cargo.toml   # when Rust changed
 
 All of them must pass. Pull requests target `main`.
 
+If you changed a settings key, a state machine, a feature, an X block or the
+icon list, run `pnpm regen` to rebuild the generated files and commit them.
+`pnpm regen:check` tells you if any of them are out of date.
+
+### Continuous integration
+
+Every pull request runs `.github/workflows/ci.yml`. It has five jobs:
+
+- `lint-type`: the type check, the plain-English check, `pnpm regen:check` and `pnpm lint` (0 errors; warnings are allowed)
+- `unit`: the test suite on Linux, in three parts
+- `e2e`: the main flows in a real Chromium against the browser preview (`tests/e2e`, `pnpm e2e`; on Windows without Playwright's Chromium, set `PLAYWRIGHT_CHANNEL=msedge` to use Edge)
+- `windows-arm64-tests`: the test suite with coverage and the Rust checks on Windows ARM64. Coverage must stay at or above the thresholds in `vitest.config.ts`; raise them when coverage rises (`pnpm test --coverage` shows the numbers)
+- `security`: the dependency audits and a secret scan
+
+CI must pass before a pull request is merged. The repository owner turns on
+branch protection for `main` so that `lint-type` and `unit` are required.
+
+## UI work without a Snapdragon laptop
+
+The window can run in any browser, on any PC, with made-up data:
+
+```powershell
+pnpm --ignore-workspace install --frozen-lockfile
+pnpm dev:renderer
+```
+
+Then open `http://localhost:5173/mock.html` (Vite prints the address). The page
+loads `src/renderer/mock-entry.ts`, which installs a stand-in for the desktop
+bridge (`src/renderer/mock.ts`) and then mounts the same `App` the real app
+mounts, under the same content security policy.
+
+The stand-in fakes everything the window would ask the host and the sidecar
+for: a Snapdragon X Plus with 16 GB and a Hexagon NPU, a model catalogue with
+three models installed, a model server that is ready, GenieX, settings, voice
+models, projects, files and their versions, scheduled tasks and the
+benchmark. Chat replies are canned text streamed in small pieces; a few words
+in a message (for example "spare key" or "sub-agent") start a scripted demo of
+that feature. Nothing runs on an NPU, no model is downloaded and nothing is
+saved outside the browser's local storage.
+
+Use it for layout, styles, copy and the flow between screens. Anything that
+needs the real host, the sidecar, GenieX or the NPU (model loading, speed,
+the meters' real values) still needs a Snapdragon X laptop. The production
+entry (`index.html`, `main.tsx`) never imports the stand-in;
+`tests/mkmn.test.ts` checks that.
+
 ## Rules the test suite enforces
 
 1. **Hooks go above every early `return` of a component.** A hook placed after

@@ -57,7 +57,7 @@ function boot(agentApi: Record<string, unknown>) {
     routerFileKind: async () => undefined,
     ...agentApi,
   };
-  (window as any).opennpu = new Proxy(api, {
+  (window as any).mkmn = new Proxy(api, {
     get: (t, p) => (p in t ? t[p as string] : (p as string).startsWith("on") ? () => () => {} : () => Promise.resolve(undefined)),
   });
   window.localStorage.setItem("opennpu.conversations", JSON.stringify([

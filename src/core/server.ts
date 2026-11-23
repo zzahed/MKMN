@@ -27,6 +27,8 @@ export interface ServerOptions {
   env?: NodeJS.ProcessEnv;
   /** How long a stop waits for the old process to confirm its exit (a wedged runtime can take more than the previous fixed 3 s to die after taskkill). */
   stopConfirmMs?: number;
+  /** The system whose kill policy applies (taskkill re-issued on "win32"); `process.platform` unless a test sets it. */
+  platform?: NodeJS.Platform;
   /**
    * Adopt a server already listening on the host instead of spawning a duplicate (the router of a second
    * app instance). The real runs on a machine with the installed app open: the second instance's own
@@ -306,9 +308,13 @@ export class ServerManager extends EventEmitter {
     }, Math.min(500 * 2 ** this.restarts, 8000));
   }
 
+  private platform(): NodeJS.Platform {
+    return this.o.platform ?? process.platform;
+  }
+
   /** On Windows kill() ends the process only: a child it started would keep the NPU. */
   private killTree(c: ChildProcess) {
-    if (process.platform === "win32" && c.pid) {
+    if (this.platform() === "win32" && c.pid) {
       try { spawn("taskkill", ["/F", "/T", "/PID", String(c.pid)], { windowsHide: true, stdio: "ignore" }); return; } catch { /* falls back below */ }
     }
     c.kill("SIGKILL");
@@ -339,7 +345,7 @@ export class ServerManager extends EventEmitter {
             reject(new Error("Could not confirm that the previous model server stopped"));
           }, limit);
           c.once("close", () => { clearTimeout(t); if (reissue) clearInterval(reissue); res(); });
-          if (process.platform === "win32") {
+          if (this.platform() === "win32") {
             this.killTree(c);
             // a wedged runtime may not act on the first taskkill: re-issue while we wait
             reissue = setInterval(() => { if (c.exitCode === null) this.killTree(c); }, 5000);

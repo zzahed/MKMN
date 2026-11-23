@@ -13,7 +13,7 @@
  *
  * Node only (it reads and writes the store): the renderer never imports it.
  */
-import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 
 /** The index is written to a temp file and renamed over the old one: a crash mid-write never leaves half a file. */
 function writeAtomic(file: string, text: string): void {
@@ -24,8 +24,13 @@ function writeAtomic(file: string, text: string): void {
 import * as path from "node:path";
 import { mkmnPaths } from "../../shared/paths";
 import { hashText } from "../memo";
-import { sectionsOf, tokenize, type KnowledgeFileLike } from "./index";
+import { filesHashOf, sectionsOf, tokenize, type KnowledgeFileLike } from "./index";
+import type { Embedder } from "./embed";
 import { nextState } from "../../shared/stateMachines";
+import { forgetCountOf, knowledgeOffloadName, markKnowledgeForgotten, safeIdOf } from "./ids";
+import { forgetVectorProject, openVectorIndex, type VectorIndex } from "./vectors";
+
+export { safeIdOf };
 import type { KnowledgeIndexState } from "../../shared/stateMachines.generated";
 
 /** Where a project's knowledge index lives: `<workspace>/knowledge/<project>.json`. */
@@ -34,7 +39,7 @@ export function knowledgeDirOf(env: NodeJS.ProcessEnv = process.env): string {
 }
 
 const indexFileOf = (dir: string, projectId: string): string =>
-  path.join(dir, `${projectId.replace(/[^A-Za-z0-9._-]/g, "_")}.json`);
+  path.join(dir, `${safeIdOf(projectId)}.json`);
 
 interface StoredDoc {
   fileId: string;
@@ -232,7 +237,7 @@ export function openKnowledgeIndex(dir: string | null, projectId: string, files:
   // (another process, an older version) sends the open down the usual read-or-rebuild way.
   const key = liveKey(dir, projectId);
   const cached = memo.get(key);
-  if (cached && cached.hash === hash && cached.stamp === stampOf(file)) {
+  if (cached && cached.hash === hash && cached.stamp === stampOf(file) && !rewrittenInTick(cached, file)) {
     memo.delete(key);
     memo.set(key, cached); // most recently used last
     if (live.get(key)?.state === "indexing") stepState(dir, projectId, "indexing", "indexed");
@@ -241,9 +246,12 @@ export function openKnowledgeIndex(dir: string | null, projectId: string, files:
   let docs: StoredDoc[] = [];
   let rebuilt = true;
   let hadStored = false;
+  let storeText: string | null = null; // the store file's text as this open read or wrote it
   try {
     if (file && existsSync(file)) {
-      const stored = JSON.parse(readFileSync(file, "utf8")) as StoredIndex;
+      const text = readFileSync(file, "utf8");
+      const stored = JSON.parse(text) as StoredIndex;
+      storeText = text;
       if (stored?.version === 3 && stored.hash === hash && Array.isArray(stored.docs)) {
         docs = stored.docs;
         rebuilt = false;
@@ -290,7 +298,10 @@ export function openKnowledgeIndex(dir: string | null, projectId: string, files:
     if (file) try {
       mkdirSync(dir!, { recursive: true });
       const stored: StoredIndex = { version: 3, hash, docs };
-      writeAtomic(file, JSON.stringify(stored));
+      const text = JSON.stringify(stored);
+      storeText = null;
+      writeAtomic(file, text);
+      storeText = text;
     } catch (e) {
       // the index still works from memory this session; the next open rebuilds
       console.error(`[knowledge] the index could not be kept: ${(e as Error).message}`);
@@ -301,7 +312,10 @@ export function openKnowledgeIndex(dir: string | null, projectId: string, files:
     stepState(dir, projectId, tracked, "indexed");
   }
   const { postings, lengths } = buildPostings(docs);
-  const entry: Built = { hash, docs, postings, lengths, stamp: stampOf(file) };
+  const entry: Built = {
+    hash, docs, postings, lengths, stamp: stampOf(file),
+    mtimeMs: mtimeOf(file), madeAt: Date.now(), storeHash: storeText === null ? null : hashText(storeText),
+  };
   memo.delete(key);
   memo.set(key, entry);
   while (memo.size > 1 && (memo.size > MEMO_PROJECTS || [...memo.values()].reduce((n, b) => n + charsOf(b), 0) > MEMO_CHARS)) memo.delete(memo.keys().next().value as string);
@@ -314,6 +328,12 @@ interface Built {
   hash: string;
   /** The store file's size and modification time when this entry was made ("" with no store). */
   stamp: string;
+  /** The store file's modification time when this entry was made; null with no store file. */
+  mtimeMs: number | null;
+  /** When this entry was made, or when its store's text was last found unchanged. */
+  madeAt: number;
+  /** A hash of the store file's text as this entry knows it; null when the store was not kept. */
+  storeHash: string | null;
   docs: StoredDoc[];
   postings: Map<string, Posting[]>;
   lengths: number[];
@@ -333,6 +353,30 @@ const stampOf = (file: string | null): string => {
   if (!file) return "";
   try { const st = statSync(file); return `${st.size}:${st.mtimeMs}`; } catch { return "missing"; }
 };
+const mtimeOf = (file: string | null): number | null => {
+  if (!file) return null;
+  try { return statSync(file).mtimeMs; } catch { return null; }
+};
+
+/**
+ * Modification times move in ticks (a millisecond to two seconds, by file system), so a store
+ * rewritten in the same tick as it was last written keeps its time, and its size too when only
+ * a digit changed: the stamp cannot see that rewrite. While the store's time is that close to
+ * when this entry was made, the store's text is compared instead (read and hashed, not parsed);
+ * once it is found unchanged later than that, the stamp alone is trusted again.
+ */
+const TICK_MS = 2000;
+function rewrittenInTick(b: Built, file: string | null): boolean {
+  if (!file || b.mtimeMs === null) return false;
+  if (b.mtimeMs < b.madeAt - TICK_MS) return false;
+  if (b.storeHash === null) return true;
+  let text: string;
+  try { text = readFileSync(file, "utf8"); } catch { return true; }
+  if (hashText(text) !== b.storeHash) return true;
+  b.madeAt = Date.now();
+  return false;
+}
+
 const memo = new Map<string, Built>();
 
 function indexOver(b: Built, rebuilt: boolean, source: KnowledgeIndex["source"]): KnowledgeIndex {
@@ -368,6 +412,35 @@ export function forgetKnowledgeIndexes(): void {
   memo.clear();
 }
 
+/**
+ * Everything a deleted project leaves for its knowledge: the index and its vectors in
+ * `knowledgeDir`, and the full knowledge text the chat offloads to `offloadDir`. The file names
+ * come from safeIdOf, so nothing outside the two folders is reached. The project's index and
+ * vectors held in this process are forgotten too, and its build state is dropped, so the next
+ * open builds afresh. Returns the names of the files removed; files that are not there are skipped.
+ */
+export function removeKnowledgeFiles(knowledgeDir: string, offloadDir: string, projectId: string): string[] {
+  // first: a build or a vector job still running for this project now writes nothing back
+  markKnowledgeForgotten(knowledgeDir, projectId);
+  const id = safeIdOf(projectId);
+  const targets: Array<[string, string]> = [
+    [knowledgeDir, `${id}.json`],
+    [knowledgeDir, `${id}.vectors`],
+    [offloadDir, `${knowledgeOffloadName(projectId)}.txt`],
+  ];
+  const removed: string[] = [];
+  for (const [dir, name] of targets) {
+    const file = path.join(dir, name);
+    if (!existsSync(file)) continue;
+    rmSync(file, { force: true });
+    removed.push(name);
+  }
+  memo.delete(liveKey(knowledgeDir, projectId));
+  live.delete(liveKey(knowledgeDir, projectId));
+  forgetVectorProject(knowledgeDir, projectId);
+  return removed;
+}
+
 // ---------------------------------------------------------------- the background build
 
 /** One build at a time per project, in this process: a second call waits for the running one. */
@@ -392,6 +465,8 @@ export function buildKnowledgeIndexNow(
 ): Promise<{ state: KnowledgeIndexState; count?: number; error?: string }> {
   const key = liveKey(dir, projectId);
   const hash = storedHash(files);
+  // noted when the build is asked for, so a build still queued when the project is deleted is dropped too
+  const generation = forgetCountOf(dir, projectId);
   const running = builds.get(key);
   // The same files: wait for the same build, never two.
   if (running && running.hash === hash) return running.job;
@@ -399,7 +474,7 @@ export function buildKnowledgeIndexNow(
   // by a build of an older version of the files.
   const after = running ? running.job.catch(() => undefined) : Promise.resolve();
   const job = after
-    .then(() => runBackgroundBuild(dir, projectId, files, opts))
+    .then(() => runBackgroundBuild(dir, projectId, files, opts, generation))
     .finally(() => { if (builds.get(key)?.job === job) builds.delete(key); });
   builds.set(key, { hash, job });
   return job;
@@ -410,10 +485,15 @@ async function runBackgroundBuild(
   projectId: string,
   files: KnowledgeFileLike[],
   opts: { onProgress?: (done: number, of: number) => void },
+  generation: number,
 ): Promise<{ state: KnowledgeIndexState; count?: number; error?: string }> {
   const key = liveKey(dir, projectId);
   const file = dir ? indexFileOf(dir, projectId) : null;
   const hash = storedHash(files);
+  // the project was deleted since this build was asked for: nothing is written, no state is kept
+  const deleted = { state: "failed" as const, error: "The project was deleted before its index was built." };
+  const gone = () => forgetCountOf(dir, projectId) !== generation;
+  if (gone()) return deleted;
   // same files as the store already holds: the build exists, nothing to do
   if (knowledgeIndexStatus(dir, projectId, hash).state === "ready") return { state: "ready" };
   // into indexing by the event the observed state names (the machine refuses a wrong one)
@@ -441,11 +521,13 @@ async function runBackgroundBuild(
       throw new Error(`This project holds ${files.length} files; the search index takes at most ${MAX_INDEX_FILES}. Split the files into more projects, or remove some.`);
     }
     for (const [i, f] of files.entries()) {
+      if (gone()) return deleted;
       docs.push(...sections(f));
       live.set(key, { state: "indexing", progress: { done: i + 1, of: files.length } });
       opts.onProgress?.(i + 1, files.length);
       await new Promise((r) => setImmediate(r)); // the status poll gets a turn between files
     }
+    if (gone()) return deleted;
     stepState(dir, projectId, state, "indexed");
   } catch (e) {
     live.set(key, { state: "failed", error: (e as Error).message });
@@ -460,4 +542,21 @@ async function runBackgroundBuild(
     console.error(`[knowledge] the index could not be kept: ${(e as Error).message}`);
   }
   return { state: "ready", count: docs.length };
+}
+
+/**
+ * A project's vectors, made right after its index is built (the Files panel's build), so the
+ * first question that needs them does not wait. `embedderOf` loads the search model, or gives
+ * null when it is not installed. Null back: no model, no files, or the project was deleted
+ * while the model was loading.
+ */
+export async function prepareProjectVectors(
+  dir: string, projectId: string, files: KnowledgeFileLike[], embedderOf: () => Promise<Embedder | null>,
+): Promise<VectorIndex | null> {
+  const generation = forgetCountOf(dir, projectId);
+  const embedder = await embedderOf();
+  if (!embedder || !files.length) return null;
+  // deleted while the model loaded: the index is not opened again (opening it would write it back)
+  if (forgetCountOf(dir, projectId) !== generation) return null;
+  return openVectorIndex(dir, projectId, filesHashOf(files), openKnowledgeIndex(dir, projectId, files).sections(), embedder);
 }

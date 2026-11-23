@@ -3,7 +3,7 @@
 // appear in the matrix, so a new command, method, setting, screen or script
 // cannot ship without a row that says how it was checked.
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { SETTINGS_SCHEMA } from "../src/shared/settingsSchema.ts";
 
@@ -17,10 +17,18 @@ export function tauriCommands(root = process.cwd()) {
   return unique([...block.matchAll(/commands::([a-z0-9_]+)/g)].map((m) => m[1]));
 }
 
-/** The methods the Node sidecar answers on its dispatcher. */
+/** Every .ts file under `dir` (relative to `root`), sub-folders included, in a stable order. */
+const sourcesUnder = (root, dir) =>
+  readdirSync(join(root, dir), { withFileTypes: true })
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .flatMap((e) => (e.isDirectory() ? sourcesUnder(root, `${dir}/${e.name}`) : e.name.endsWith(".ts") ? [`${dir}/${e.name}`] : []));
+
+/** The methods the Node sidecar answers on its dispatcher: main.ts, humain.ts and the area
+ *  files under src/sidecar/register register them. Sorted by name, so a method moved from
+ *  one file to another keeps its row in the matrix. */
 export function sidecarMethods(root = process.cwd()) {
-  const text = read(root, "src/sidecar/main.ts") + "\n" + read(root, "src/sidecar/humain.ts");
-  return unique([...text.matchAll(/dispatcher\.register\("([^"]+)"/g)].map((m) => m[1]));
+  const text = sourcesUnder(root, "src/sidecar").map((f) => read(root, f)).join("\n");
+  return unique([...text.matchAll(/dispatcher\.register\("([^"]+)"/g)].map((m) => m[1])).sort();
 }
 
 /** The Settings categories (primary and advanced). */

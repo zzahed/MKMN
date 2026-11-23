@@ -2,7 +2,7 @@ import { listedHere } from "../core/modelList";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { readBool, readNum, readObj, readSetting } from "../shared/settingsSchema";
-import type { OpenNpuApi, CatalogItem, AppInfo, UpdateState, RuntimeInfo, NpuPlanView, AdaptiveStatusView, HardwareConfigFile, VectorModelStatusView } from "../shared/api";
+import type { MkmnApi, CatalogItem, AppInfo, UpdateState, RuntimeInfo, NpuPlanView, AdaptiveStatusView, HardwareConfigFile, VectorModelStatusView } from "../shared/api";
 import type { SetupState } from "../core/setup";
 import { CATALOG, ref as entryRef } from "../core/catalog";
 import { scoreEntry } from "../core/fit";
@@ -410,7 +410,7 @@ const unknownHardware = (): HardwareProfile => ({
   emulated: false,
 } as unknown as HardwareProfile);
 
-export function createTauriApi(): OpenNpuApi {
+export function createTauriApi(): MkmnApi {
   wireSidecarEvents();
   const versionBook = new VersionBook(tauriHistories, tauriArtifactSource);
   // a scheduled task's artifacts, filed into the local store the pages read, with a version
@@ -1370,6 +1370,10 @@ export function createTauriApi(): OpenNpuApi {
       const list = getLocalJson<Project[]>("mkmn.projects", []).filter((p) => p.id !== id);
       if (!setLocalJson("mkmn.projects", list)) throw new Error("The project could not be removed: local storage refused the write.");
       await refreshTaskProjects(id, null);
+      // its knowledge index, vectors and offloaded knowledge text go with it. Not awaited: the
+      // project is already removed, and a busy sidecar may take up to its call timeout (600 s)
+      // to answer, so a failure here is logged, never thrown
+      void sidecarCall<string[]>("knowledgeForget", id).catch((e) => console.error(`[projects] the knowledge files of a deleted project could not be removed: ${(e as Error).message}`));
       return list;
     },
 
@@ -1639,9 +1643,9 @@ export function setupTauriBridge(): void {
   if (typeof window === "undefined") return;
 
   const runningInTauri = isTauri() || "__TAURI_INTERNALS__" in window || "__TAURI__" in window;
-  if (runningInTauri && !window.opennpu) {
+  if (runningInTauri && !window.mkmn) {
     console.log("[TauriBridge] Initializing native Tauri v2 API bridge for MKMN AI");
-    window.opennpu = createTauriApi();
+    window.mkmn = createTauriApi();
   }
   if (runningInTauri) {
     // A web address clicked in the interface goes to the default browser through the opener

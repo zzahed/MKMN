@@ -74,3 +74,42 @@ describe("modelFolders (the fallback removal path's candidate list)", () => {
     try { fs.rmSync(link, { recursive: true, force: true }); } catch { /* temp best effort */ }
   });
 });
+
+// Canonical model names are lower case ("qualcomm/qwen3-1.7b"); the cache keeps the
+// publisher's spelling ("qualcomm/Qwen3-1.7B"). Windows matches the two by default, but a
+// case-sensitive folder (Linux, or a Windows folder with case sensitivity turned on) does not.
+describe("modelFolders on a case-sensitive file system", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "mkmn-modelcase-"));
+  const models = path.join(root, "models");
+  fs.mkdirSync(path.join(models, "qualcomm", "Qwen3-1.7B"), { recursive: true });
+  fs.mkdirSync(path.join(root, "outside", "qualcomm", "Qwen3-1.7B"), { recursive: true });
+
+  /** exists() as a case-sensitive file system answers it: every segment spelt exactly as on disk. */
+  const exactExists = (p: string): boolean => {
+    const rel = path.relative(models, p);
+    if (rel.startsWith("..") || path.isAbsolute(rel)) return false;
+    let at = models;
+    for (const seg of rel.split(path.sep).filter(Boolean)) {
+      try { if (!fs.readdirSync(at).includes(seg)) return false; } catch { return false; }
+      at = path.join(at, seg);
+    }
+    return true;
+  };
+
+  afterAll(() => {
+    try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* temp best effort */ }
+  });
+
+  it("finds the folder whose name differs from the canonical name only in case", () => {
+    expect(modelFolders("qualcomm/qwen3-1.7b", models, exactExists)).toEqual([path.join(models, "qualcomm", "Qwen3-1.7B")]);
+  });
+
+  it("still finds nothing for a model that is not there in any case", () => {
+    expect(modelFolders("qualcomm/qwen3-4b", models, exactExists)).toEqual([]);
+  });
+
+  it("never matches its way out of the models folder", () => {
+    expect(modelFolders("../Outside/qualcomm/qwen3-1.7b", models, exactExists)).toEqual([]);
+    expect(modelFolders("../Outside/qualcomm/qwen3-1.7b", models)).toEqual([]);
+  });
+});

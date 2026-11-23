@@ -56,7 +56,7 @@ async function handleHostRequest(m) {
     if (m.method === "stopChatServer") {
       if (serveChild) { try { process.kill(serveChild.pid); } catch {} serveChild = null; }
       console.log("HOST stopChatServer");
-      return reply(true, null ? true : true, undefined);
+      return reply(true, true, undefined);
     }
     return reply(false, null, `the smoke host does not offer "${m.method}"`);
   } catch (e) { reply(false, null, String(e.message ?? e)); }

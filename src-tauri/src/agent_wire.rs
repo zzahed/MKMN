@@ -272,7 +272,7 @@ pub fn consequential_word(name: &str) -> Option<String> {
     for p in &list.english {
         if p.len() <= w.len() && w.windows(p.len()).any(|win| win == p.as_slice()) {
             let hit = p.join(" ");
-            if best.as_ref().map_or(true, |b| hit.len() > b.len()) {
+            if best.as_ref().is_none_or(|b| hit.len() > b.len()) {
                 best = Some(hit);
             }
         }
@@ -281,7 +281,7 @@ pub fn consequential_word(name: &str) -> Option<String> {
         return best;
     }
     for a in &list.arabic {
-        if name.contains(a.as_str()) && best.as_ref().map_or(true, |b| a.len() > b.len()) {
+        if name.contains(a.as_str()) && best.as_ref().is_none_or(|b| a.len() > b.len()) {
             best = Some(a.clone());
         }
     }

@@ -385,6 +385,14 @@ export const SETTINGS_SCHEMA = [
     legacy: { tab: "build", section: "sec-chats-long" },
   },
   {
+    key: "privacy.retentionDays", type: "number", default: null, min: 1, max: 3650,
+    scope: "app", level: "advanced", group: "chats", applies: "restart",
+    label: "Keep chat records for", description: "Days run records and long replies are kept; empty keeps them.",
+    tooltip: "Run journals and offloaded replies older than this are removed when the app starts. Empty keeps everything, as before.",
+    oldWords: ["retention", "delete old", "history", "journals", "privacy"],
+    hidden: "no Settings control yet: set it in Config/settings.json; the sidecar reads it at start (src/core/retention.ts)",
+  },
+  {
     key: "turnBudget", type: "object", default: null,
     scope: "chat", level: "advanced", group: "chats", applies: "now",
     label: "Turn budget", description: "A cap on the model calls one turn may make.",

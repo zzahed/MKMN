@@ -630,10 +630,7 @@ fn is_listable(hwnd: HWND) -> bool {
             std::mem::size_of::<u32>() as _,
         )
     };
-    if hr.is_ok() && cloaked != 0 {
-        return false;
-    }
-    true
+    !(hr.is_ok() && cloaked != 0)
 }
 
 fn window_text(hwnd: HWND) -> String {

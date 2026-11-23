@@ -18,6 +18,12 @@
 
 </div>
 
+**Works only on Snapdragon X laptops with Windows 11 (check: Settings → System → About).**
+MKMN AI is an independent project: it is not affiliated with HUMAIN or Qualcomm,
+and they do not develop, sponsor or endorse it.
+
+Release status: v0.0.2 ([release notes](docs/releases/RELEASE_NOTES_v0.0.2.md))
+
 MKMN AI is a personal AI workspace built to explore and demonstrate what
 HUMAIN's Snapdragon X2 Elite laptop can do. It runs AI models directly on the
 laptop's NPU, keeps your chats and files on your PC, and, when you choose,
@@ -172,8 +178,8 @@ keeps your chats and settings (`%APPDATA%\MKMN`, `%LOCALAPPDATA%\MKMN`).
 
 <br>
 
-On a Snapdragon X laptop with Windows 11, install Node.js 24+ (ARM64),
-pnpm 10.26.1, Rust 1.90+ with the `aarch64-pc-windows-msvc` target, Visual
+On a Snapdragon X laptop with Windows 11, install Node.js 26+ (ARM64),
+pnpm 10.26.1, Rust 1.100.0 (pinned in `rust-toolchain.toml`; rustup installs it) with the `aarch64-pc-windows-msvc` target, Visual
 Studio Build Tools (MSVC ARM64 + Windows 11 SDK), and NSIS 3 for the installer.
 
 ```powershell
@@ -196,6 +202,13 @@ you can also place it in `%USERPROFILE%\.arm64-libs\` or point
 state-machine test fails on Windows, run `git config core.autocrlf false` and
 check the files out again.
 
+To build only the installer by hand, after `pnpm dist` has built the app once,
+pass the version from `package.json`:
+
+```powershell
+makensis /DVERSION=0.0.2 installer.nsi
+```
+
 | Folder | Contents |
 | --- | --- |
 | `src/core` | Main logic |
@@ -212,6 +225,8 @@ check the files out again.
 ## Explore Further
 
 - [User guide](docs/guide/user-guide.md): every feature in plain words
+- [Words and common questions](docs/guide/faq.md): NPU, GenieX, FUSE and more; offline use, privacy, a model that won't load
+- [UI work without a Snapdragon laptop](CONTRIBUTING.md#ui-work-without-a-snapdragon-laptop): the browser preview with made-up data
 - [Documentation index](docs/README.md): design notes, research and test matrix
 - [Release notes](docs/RELEASE-NOTES.md) · [Latest release](https://github.com/zzahed/MKMN/releases/latest)
 - [What is stored on your PC](docs/design/data-at-rest.md)
@@ -230,10 +245,9 @@ unlocked.
 
 ## Project Information
 
-MKMN AI is an **independent project**. It was built to test and showcase
-HUMAIN's AI laptop and to connect to HUMAIN's public APIs. It is not developed,
-sponsored or endorsed by HUMAIN or Qualcomm. Product names belong to their
-owners.
+MKMN AI is an **independent project** (see the note at the top of this page).
+It was built to test and showcase HUMAIN's AI laptop and to connect to HUMAIN's
+public APIs. Product names belong to their owners.
 
 Released under the [MIT license](LICENSE). MKMN is based on
 [Open NPU](https://github.com/disposablecameraapp/Open-NPU) (MIT), whose notice

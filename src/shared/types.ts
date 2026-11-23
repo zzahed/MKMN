@@ -637,6 +637,8 @@ export interface Settings {
    * ignored (the default stands) — the guard is never disabled by a bad value.
    */
   turnBudget?: { maxCalls: number; maxOutputTokens: number } | null;
+  /** Days run journals and offloaded payloads are kept (src/core/retention.ts); null keeps them. */
+  privacy?: { retentionDays?: number | null };
   /** Installed models listed in the quick model menu. Unset = all of them. */
   quickModelIds?: string[];
   /** Run the artifacts the model writes (pages in a hidden window, JS / Python syntax) and send the errors back. */

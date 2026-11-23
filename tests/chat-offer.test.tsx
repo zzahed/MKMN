@@ -57,7 +57,7 @@ function boot(chatCalls: { id: string; messages: ChatMessage[]; opts: Record<str
     chat: async (id: string, _modelId: string, messages: ChatMessage[], opts: Record<string, unknown>) => { chatCalls.push({ id, messages, opts }); },
     onChat: (_cb: (e: ChatEvent) => void) => () => {},
   };
-  (window as any).opennpu = new Proxy(api, {
+  (window as any).mkmn = new Proxy(api, {
     get: (t, p) => (p in t ? t[p as string] : (p as string).startsWith("on") ? () => () => {} : () => Promise.resolve(undefined)),
   });
   window.localStorage.setItem("opennpu.conversations", JSON.stringify([

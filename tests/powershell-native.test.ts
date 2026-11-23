@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { itWindows } from "./helpers/platform";
 
 /**
  * A build is judged by the real exit code of each native command, never by text on its
@@ -33,7 +34,7 @@ function standIn(dir: string, name: string, exit: number): string {
 }
 
 describe("native commands are judged by their exit code", () => {
-  it("a warning on stderr from a successful command does not fail the build", () => {
+  itWindows("a warning on stderr from a successful command does not fail the build", () => {
     const dir = mkdtempSync(join(tmpdir(), "mkmn-native-ok-"));
     const exe = standIn(dir, "warn-ok.cmd", 0);
     const log = join(dir, "ok.log");
@@ -54,7 +55,7 @@ describe("native commands are judged by their exit code", () => {
     expect(result).toMatchObject({ ok: true, exitCode: 0 });
   });
 
-  it("a real nonzero exit still fails, and the result file says the real code", () => {
+  itWindows("a real nonzero exit still fails, and the result file says the real code", () => {
     const dir = mkdtempSync(join(tmpdir(), "mkmn-native-fail-"));
     const exe = standIn(dir, "warn-fail.cmd", 7);
     const log = join(dir, "fail.log");
@@ -105,7 +106,7 @@ describe("native commands are judged by their exit code", () => {
     expect(build).not.toMatch(/-Steps @\(\$script:steps\)/);
   });
 
-  it("the overall build result is UTF-8 JSON without a BOM and carries every step", () => {
+  itWindows("the overall build result is UTF-8 JSON without a BOM and carries every step", () => {
     const dir = mkdtempSync(join(tmpdir(), "mkmn-build-result-"));
     const out = join(dir, "build.result.json");
     powershell(`
@@ -124,7 +125,7 @@ describe("native commands are judged by their exit code", () => {
     expect(doc.steps[1]).toMatchObject({ name: "cargo-test", ok: true, exitCode: 0 });
   });
 
-  it("a failed build result says so with a nonzero code", () => {
+  itWindows("a failed build result says so with a nonzero code", () => {
     const dir = mkdtempSync(join(tmpdir(), "mkmn-build-result-fail-"));
     const out = join(dir, "build.result.json");
     powershell(`

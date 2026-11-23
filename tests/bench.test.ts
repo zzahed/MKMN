@@ -804,7 +804,9 @@ describe("the run", () => {
       parts.push(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "stop" }] })}\n\n`, "data: [DONE]\n\n");
       return new ReadableStream({ async start(c) { for (const p of parts) { c.enqueue(enc.encode(p)); if (chunkMs) await new Promise((r) => setTimeout(r, chunkMs)); } c.close(); } });
     };
-    const s = setup({ deps: { fetchFn: (async () => new Response(noUsage("Hello world, this is a streamed answer.", 1), { status: 200 })) as never } });
+    // 20 ms between chunks: a rate is only given for a stream that took over 50 ms (chat.ts), and a
+    // 1 ms timer lasts about 1 ms on Linux but about 15 ms on Windows, so 1 ms passed only on Windows
+    const s = setup({ deps: { fetchFn: (async () => new Response(noUsage("Hello world, this is a streamed answer.", 20), { status: 200 })) as never } });
     s.runner.start({ keys: ["m1"], mode: "express", keepInstalled: false, resume: false }, s.targets);
     await s.done();
     const r: ModelResult = JSON.parse(fs.readFileSync(path.join(s.runner.state().runDir!, "m1.json"), "utf8"));

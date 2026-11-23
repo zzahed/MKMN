@@ -36,7 +36,7 @@ all given back to it, became invented tags and a loop of 600 lines.
 - It has not been tried with the real model. First measures to take: time and number of calls per phase, how many units pass their examples
   at the first try, and what each call was shown (`engine.describe()` in the log).
 
-## Shelved
+## Removed
 
-`src/core/shelved/` holds the platformer made from two closed JSON forms. It is not used. It would have made the results look better than the
-engine deserves.
+A platformer made from two closed JSON forms used to sit in `src/core/shelved/`. It was never used: it would have made the results look
+better than the engine deserves. It is removed; git history keeps it.

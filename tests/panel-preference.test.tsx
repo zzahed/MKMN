@@ -58,7 +58,7 @@ function boot(settingsPatch: Record<string, unknown> = {}) {
     chat: async (id: string) => { chatCalls.push({ id }); },
     onChat: (cb: (e: ChatEvent) => void) => { chatListeners.push(cb); return () => {}; },
   };
-  (window as any).opennpu = new Proxy(api, {
+  (window as any).mkmn = new Proxy(api, {
     get: (t, p) => (p in t ? t[p as string] : (p as string).startsWith("on") ? () => () => {} : () => Promise.resolve(undefined)),
   });
   window.localStorage.setItem("opennpu.conversations", JSON.stringify([

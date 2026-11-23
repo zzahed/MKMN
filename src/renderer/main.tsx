@@ -29,6 +29,6 @@ function UnsupportedHost() {
 }
 
 const root = createRoot(document.getElementById("root")!);
-root.render("opennpu" in window && window.opennpu
+root.render("mkmn" in window && window.mkmn
   ? <ErrorBoundary><App /></ErrorBoundary>
   : <UnsupportedHost />);

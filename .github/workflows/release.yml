@@ -17,9 +17,10 @@ jobs:
           version: 10.26.1
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 26
       - uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: 1.100.0
           targets: aarch64-pc-windows-msvc
       - name: Install and check
         shell: pwsh
@@ -78,7 +79,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: MKMN-Windows-ARM64-unsigned
-          path: |
-            desktop/MKMN-App/dist/MKMN-*-arm64-Setup.exe
-            dist/MKMN-*-arm64-Setup.exe
+          path: dist/MKMN-*-arm64-Setup.exe
           if-no-files-found: error

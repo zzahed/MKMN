@@ -2298,7 +2298,7 @@ impl GenieXSupervisor {
 
         // Publish the child under the same lock as cancellation so a stop either sees
         // the child or prevents it from being created.
-        let (pid, stdout, stderr, spawn_epoch) = {
+        let (stdout, stderr, spawn_epoch) = {
             let mut state = self.inner.write().await;
             if state.cancel_generation != generation { return Err("The GenieX start was cancelled.".into()); }
             let mut child = cmd.spawn().map_err(|e| format!("Failed to spawn geniex.exe: {}", e))?;
@@ -2317,7 +2317,7 @@ impl GenieXSupervisor {
                 Ok(()) => state.append_log(format!("[supervisor] Process {pid} configured with Tier 2 Inference-Critical (ABOVE_NORMAL, Unthrottled)")),
                 Err(e) => state.append_log(format!("[supervisor] Warning: Failed to apply Tier 2 QoS to PID {pid}: {e}")),
             }
-            (pid, stdout, stderr, state.epoch)
+            (stdout, stderr, state.epoch)
         };
 
         // Spawn background log reader tasks for stdout & stderr with active hardware verification
@@ -2744,7 +2744,7 @@ impl GenieXSupervisor {
                         }
                     }
                     // every 15 s: did GenieX release the model while it kept running (its own idle timeout)?
-                    if tick % 5 == 0 {
+                    if tick.is_multiple_of(5) {
                         let answer = client.get(&status_url).send().await.ok();
                         let body = match answer {
                             Some(r) if r.status().is_success() => r.json::<serde_json::Value>().await.ok(),
@@ -3211,6 +3211,9 @@ mod tests {
         let sup = GenieXSupervisor::new();
         let mut req = serve_req(Some("org/model"));
         req.port = Some(port);
+        // a geniex.exe of the test's own, so the test does not depend on GenieX being
+        // installed on the machine that runs it (a CI runner has none); it is never run
+        req.exe = Some(installed_fake_exe().to_string_lossy().into_owned());
 
         let err = sup.start(req).await.expect_err("a held port must not start");
         assert!(err.contains(&port.to_string()), "{err}");
@@ -3469,6 +3472,21 @@ while($true){{
             std::thread::sleep(Duration::from_millis(50));
         }
         FakeGeniex { child, port, exe }
+    }
+
+    /// A geniex.exe that passes the install and version checks but serves nothing: a copy
+    /// of PowerShell under that name, declared as v0.11.0, in a folder of its own.
+    fn installed_fake_exe() -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("mkmn-installed-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let exe = dir.join("geniex.exe");
+        crate::capabilities::test_versions::declare(&exe, "v0.11.0");
+        if !exe.exists() {
+            let windir = std::env::var("WINDIR").expect("WINDIR");
+            let ps = Path::new(&windir).join("System32").join("WindowsPowerShell").join("v1.0").join("powershell.exe");
+            copy_powershell(&ps, &exe).expect("copy powershell as geniex.exe");
+        }
+        exe
     }
 
     fn adopt_req(fake: &FakeGeniex, model: &str) -> StartServerRequest {

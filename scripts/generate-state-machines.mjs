@@ -316,7 +316,8 @@ function main() {
   const files = outputs(registry);
   if (check) {
     const stale = files.filter(([file, content]) => {
-      try { return readFileSync(file, "utf8") !== content; } catch { return true; }
+      // compare with line endings normalized: a Windows checkout holds CRLF
+      try { return readFileSync(file, "utf8").replace(/\r\n/g, "\n") !== content; } catch { return true; }
     });
     if (stale.length) {
       for (const [file] of stale) console.error(`out of date: ${relative(ROOT, file)}`);

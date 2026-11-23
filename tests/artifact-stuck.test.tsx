@@ -12,7 +12,7 @@ import { ArtifactViewer } from "../src/renderer/ArtifactView";
 afterEach(() => { cleanup(); });
 
 function bridge(over: Record<string, any>) {
-  (window as any).opennpu = new Proxy(over, { get: (t, p: string) => (p in t ? t[p] : p.startsWith("on") ? () => () => {} : async () => undefined) });
+  (window as any).mkmn = new Proxy(over, { get: (t, p: string) => (p in t ? t[p] : p.startsWith("on") ? () => () => {} : async () => undefined) });
   (window as any).matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
   Element.prototype.scrollIntoView = () => {}; // jsdom does no layout
 }

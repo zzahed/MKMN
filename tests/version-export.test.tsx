@@ -27,7 +27,7 @@ describe("Save as while an older version is shown", () => {
       artifactVersionText: vi.fn(async () => "the OLD text"),
     };
     // every other bridge call the viewer makes: subscriptions return an unsubscribe, the rest resolve empty
-    (window as any).opennpu = new Proxy(base, { get: (t, p: string) => (p in t ? t[p] : p.startsWith("on") ? () => () => {} : async () => undefined) });
+    (window as any).mkmn = new Proxy(base, { get: (t, p: string) => (p in t ? t[p] : p.startsWith("on") ? () => () => {} : async () => undefined) });
     (window as any).matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
     const onExport = vi.fn();
     const onExportVersion = vi.fn();

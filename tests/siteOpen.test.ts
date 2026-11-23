@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { siteFileName, siteEntry, siteFiles, siteOpenRefusal } from "../src/core/site";
+import { isWindows } from "./helpers/platform";
 
 const f = (title: string, kind: string, language: string, content = "x") => ({ title, kind, language, content });
 
@@ -72,7 +73,9 @@ describe("what may be asked of the browser", () => {
     expect(siteOpenRefusal("run.cmd", dir)).toMatch(/HTML page/);
     expect(siteOpenRefusal("x.js", dir)).toMatch(/HTML page/);
     expect(siteOpenRefusal("../other/index.html", dir)).toMatch(/HTML page/);
-    expect(siteOpenRefusal("sub\\index.html", dir)).toMatch(/HTML page/);
+    expect(siteOpenRefusal("sub/index.html", dir)).toMatch(/HTML page/);
+    // A backslash is a folder separator only on Windows; elsewhere it is part of a file name.
+    if (isWindows) expect(siteOpenRefusal("sub\\index.html", dir)).toMatch(/HTML page/);
     expect(siteOpenRefusal("index.html", dir)).toBeNull();
     expect(siteOpenRefusal("about.htm", dir)).toBeNull();
   });

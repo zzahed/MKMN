@@ -4,6 +4,7 @@ import * as path from "node:path";
 import { NO_PROGRESS_SEC } from "../src/core/chat";
 import { DEFAULT_NO_PROGRESS_SEC, Gateway } from "../src/core/harness/gateway";
 import { FakeModel, DELTA, DONE, USAGE } from "../src/core/harness/testing";
+import { posixRel } from "./helpers/platform";
 
 /**
  * ONE stall watchdog for the whole app: one no-progress window, one health probe,
@@ -23,7 +24,7 @@ describe("one stall watchdog", () => {
   it("the window is defined exactly once, and the gateway's public constant is that value", () => {
     const src = path.join(process.cwd(), "src");
     const defining = walk(src).filter((f) => /NO_PROGRESS_SEC\s*=\s*\d/.test(readFileSync(f, "utf8")));
-    expect(defining.map((f) => path.relative(src, f))).toEqual(["core\\chat.ts"]);
+    expect(defining.map((f) => posixRel(path.relative(src, f)))).toEqual(["core/chat.ts"]);
     expect(NO_PROGRESS_SEC).toBe(45);
     expect(DEFAULT_NO_PROGRESS_SEC).toBe(NO_PROGRESS_SEC); // the gateway owns the policy, the value is the transport's
   });

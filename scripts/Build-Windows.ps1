@@ -74,12 +74,12 @@ $failureText = ""
 $installerPath = ""
 try {
   if ($env:OS -ne "Windows_NT") { throw "Use this script on Windows 11 ARM64." }
-  if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw "Install native Windows ARM64 Node.js 24 LTS first." }
+  if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw "Install native Windows ARM64 Node.js 26 LTS first." }
   if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) { throw "Install pnpm 10.26.1 first, as documented in README.md." }
   $arch = Invoke-Captured -Name "node-arch" -FilePath "node" -Arguments @("-p", "process.arch")
   if ($arch -ne "arm64") { throw "Native ARM64 Node.js is required; found $arch. Do not build under x64 emulation." }
   $nodeMajor = [int](Invoke-Captured -Name "node-version" -FilePath "node" -Arguments @("-p", "process.versions.node.split('.')[0]"))
-  if ($nodeMajor -lt 24) { throw "Use native ARM64 Node.js 24 LTS or later." }
+  if ($nodeMajor -lt 26) { throw "Use native ARM64 Node.js 26 LTS or later." }
 
   Invoke-Checked -Name "pnpm-install" -FilePath "pnpm" -Arguments @("--ignore-workspace", "install", "--frozen-lockfile") -Echo
   # pnpm's allowlist is limited to esbuild. Never enable all scripts.

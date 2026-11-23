@@ -22,7 +22,7 @@ fs.writeFileSync(path.join(tmp, "settings.json"), JSON.stringify({ voice: { sttM
 
 const child = spawn(process.execPath, ["dist/sidecar/main.js"], {
   stdio: ["pipe", "pipe", "pipe"],
-  env: { ...process.env, OPENNPU_FAKE_VOICE: "1", MKMN_DATA_DIR: path.join(tmp, "data"), MKMN_SETTINGS: path.join(tmp, "settings.json") }
+  env: { ...process.env, MKMN_FAKE_VOICE: "1", MKMN_DATA_DIR: path.join(tmp, "data"), MKMN_SETTINGS: path.join(tmp, "settings.json") }
 });
 let buf = "";
 const events = [];

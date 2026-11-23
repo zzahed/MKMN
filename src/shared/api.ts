@@ -89,7 +89,7 @@ export interface AdaptiveStatusView {
   state: import("./types").Settings["adaptiveState"] | null;
 }
 
-/** The bridge exposed on window.opennpu by the preload script. */
+/** The bridge exposed on window.mkmn by the preload script. */
 export interface RouterStatus {
   model: string; sizeGB: number; installed: boolean; enabled: boolean; running: boolean;
   asked: number; lastMs: number | null; lastError: string | null;
@@ -122,7 +122,7 @@ export interface VectorModelStatusView {
   progress?: { done: number; of: number };
 }
 
-export interface OpenNpuApi {
+export interface MkmnApi {
   appInfo(): Promise<AppInfo>;
   hardware(refresh?: boolean): Promise<HardwareProfile>;
   /** One project's knowledge index state, observed from the store — the Project knowledge screen shows it with each file's sections, pages and scanned pages. While indexing, `progress` names how many files of how many are cut. */
@@ -382,6 +382,7 @@ export interface OpenNpuApi {
   readMedia(mediaId: string): Promise<{ dataUrl: string } | null>;
   projects(): Promise<Project[]>;
   saveProject(p: Project): Promise<Project[]>;
+  /** Removes the project, then its knowledge index, search vectors and offloaded knowledge text in the sidecar (a failure there is logged, not thrown). */
   deleteProject(id: string): Promise<Project[]>;
   artifacts(): Promise<Artifact[]>;
   /** Insert or update; chat artifacts use a stable id so a regenerated answer replaces the old one. */

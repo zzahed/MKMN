@@ -3,7 +3,7 @@
  * Tauri host that supervises it.
  *
  * Messages flow both ways:
- *  - Host → sidecar `req` (an OpenNpuApi call), answered by a `res` with the same id.
+ *  - Host → sidecar `req` (an MkmnApi call), answered by a `res` with the same id.
  *  - Sidecar → host `req` (a host capability the sidecar has no native UI for, e.g. a folder
  *    picker), answered by a host `res` with the same id.
  *  - Sidecar → host `event` (progress, streaming) with no reply.

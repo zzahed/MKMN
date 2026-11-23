@@ -7,13 +7,11 @@
  * that keeps this process a plain Node program.
  */
 import { journalDir } from "../core/harness/journal";
-import { forgetConversation } from "../core/harness/forget";
+import { pruneForSettings } from "../core/retention";
 import { taskProjectView } from "../core/taskKnowledge";
 import { raceAbort } from "../core/abortable";
 import { HostSettingsWriter } from "../core/settingsWriter";
 import { approvalBody } from "../core/approval";
-import { pinnedGet } from "../core/netGuard";
-import { lookup as dnsLookup } from "node:dns/promises";
 import { npuResetLaunchCommand, npuResetOutcome } from "../core/npuReset";
 import { execFile } from "child_process";
 import * as fs from "fs";
@@ -26,16 +24,15 @@ import { HARDWARE_SCRIPT, buildProfile, parseRawHardware, type RawHardware } fro
 import { effectiveHardware } from "../core/budget";
 import { readBool, readSetting, voiceSettings as readVoiceSettings } from "../shared/settingsSchema";
 import { HfClient } from "../core/hf";
-import { run, updateProbeArgs, installedRefsOf, findGeniex, pullModel, removeModel, cleanAll, setModelType, configList, diskCheck, freeDiskGB, modelsDir, nameVariants, listInstalled, canonicalName, installedState, type Pull, type PullOptions } from "../core/geniex";
+import { run, updateProbeArgs, installedRefsOf, findGeniex, pullModel, removeModel, diskCheck, freeDiskGB, modelsDir, listInstalled, canonicalName, installedState, type Pull, type PullOptions } from "../core/geniex";
 import { compiledContextOf } from "../core/qairt";
-import { parseModelList, nativeRow, type NativeBundle } from "../core/native";
+import { parseModelList, type NativeBundle } from "../core/native";
 import { resolveModel } from "../core/resolve";
 import { CATALOG, ref as entryRef } from "../core/catalog";
 import { candidateRepos, entryMatches, installedOf, packParts, isDynamicId, sortRequest, type BundleModel, type TaskCategory } from "../core/dynamic";
-import { speedsById as mergeSpeeds } from "../core/speeds";
 import { DYNAMIC_DATA } from "../core/dynamic-data";
 import { VoiceService } from "../core/voiceService";
-import { defaultVoiceModel, voiceModel, clampVoice } from "../core/voiceModels";
+import { defaultVoiceModel, voiceModel } from "../core/voiceModels";
 import { runChatOrchestrator, abortChat, skipStep, chatCount, registerChat, unregisterChat, collect, foldOldMessages, dynamicTeam, type ChatHost, type Served } from "../core/chatOrchestrator";
 import { runAgentLoop, type AgentDriver, type AgentModel } from "./computerUse";
 import { reviewWait, runDocEdit, type DocEditFs } from "./docEditRun";
@@ -43,10 +40,7 @@ import type { AgentRunEvent } from "../shared/agent";
 import { headlessAsk } from "./headless";
 import { startUnknownModelCheck } from "./unknownModelCheck";
 import { checkArtifact } from "../core/construct/checkArtifact";
-import { knowledgeDirOf, knowledgeIndexStatus, buildKnowledgeIndexNow, openKnowledgeIndex } from "../core/knowledge/store";
-import { filesHashOf } from "../core/knowledge/index";
-import { openVectorIndex } from "../core/knowledge/vectors";
-import { installVectorModel, removeVectorModel, vectorEmbedder, vectorModelStatus } from "../core/knowledge/vectorModel";
+import { knowledgeDirOf, openKnowledgeIndex } from "../core/knowledge/store";
 import { resolveModelIdentity } from "../core/modelIdentity";
 import { scoreEntry } from "../core/fit";
 import { describers } from "../core/vision";
@@ -60,7 +54,7 @@ import { GENIEX_INSTALLER_URL } from "../core/setup";
 import { GENIEX_INDEX_URL, geniexReleaseNewer, parseGeniexIndex, resolveGeniexRelease } from "../core/geniexRelease";
 import { Updater } from "../core/updater";
 import { BenchRunner, type BenchConfig, type BenchLive, type BenchState } from "../core/benchRunner";
-import { TEST_COUNT, buildRoster, standardBenchEntries, testCosts } from "../core/bench";
+import { buildRoster, standardBenchEntries } from "../core/bench";
 import { parseLabFile } from "../core/promptLab";
 import { LabRunner, type LabModel } from "../core/labRunner";
 import { runLoadTest, type LoadAttempt } from "../core/npuTest";
@@ -80,7 +74,6 @@ import { runnerFor, withPip } from "../core/runcode";
 import { launchSite } from "./siteLaunch";
 import { JsonStore } from "../core/library";
 import { Scheduler } from "../core/scheduler";
-import { nextRun, validateSchedule } from "../core/schedule";
 import { composeInstructions } from "../core/instructions";
 import { artifactsIn, stripArtifacts } from "../core/artifacts";
 import { buildSystemPrompt, knowledgeBudget } from "../core/projects";
@@ -88,9 +81,15 @@ import { mergedPack, pickModel, tierOf } from "../core/dynamic";
 import { spawn, spawnSync } from "child_process";
 import { createHash, randomUUID } from "crypto";
 import type { Artifact, ChatEvent, RunEvent, ScheduledTask } from "../shared/types";
-import { browse as browseCore, dockerVariants as dockerVariantsCore } from "../core/browse";
-import type { BrowseQuery, BrowseResult, CatalogEntry, ChatMessage, ChatOptions, FriendlyError, HardwareProfile, HfSearchResult, InstallProgress, InstalledModel, SpeakChunk, VoiceDownloadProgress, VoiceKind, VoiceNeed, VoiceSettings, VoiceStatus } from "../shared/types";
+import type { CatalogEntry, ChatMessage, ChatOptions, FriendlyError, HardwareProfile, InstallProgress, InstalledModel, SpeakChunk, VoiceDownloadProgress, VoiceSettings, VoiceStatus } from "../shared/types";
 import { registerHumain, fuseConnection, fuseSearchContext, sourcesBlock } from "./humain";
+import { registerVoice } from "./register/voice";
+import { registerKnowledge } from "./register/knowledge";
+import { registerTasks } from "./register/tasks";
+import { registerAgent } from "./register/agent";
+import { registerFoundry } from "./register/foundry";
+import { registerBench } from "./register/bench";
+import { registerModels } from "./register/models";
 import { CLOUD_CHAT_ID, fuseEntry, fuseServed } from "../core/cloudChat";
 import { installedOnlyEntries, parseInstalledJson } from "../core/installedEntries";
 import { checkOutcome, clearLoadFailure, failuresOfThisGeniex, verdictOf, withLoadFailure } from "../core/loadFailures";
@@ -370,46 +369,6 @@ const dispatcher = new SidecarDispatcher();
 
 dispatcher.register("ping", () => ({ ok: true, node: process.version, sidecar: true }));
 
-dispatcher.register("hfSearch", async (query: string): Promise<HfSearchResult[]> => {
-  return typeof query === "string" ? hf.search(query) : [];
-});
-
-dispatcher.register("browse", async (q: BrowseQuery): Promise<BrowseResult> => {
-  const hw = await chatHardware();
-  const notes: string[] = [];
-  const want = (id: BrowseQuery["sources"][number]) => q.sources.includes(id);
-  const [h, d, n] = await Promise.all([
-    want("hf") ? hf.browse(q).catch((e) => { notes.push(`Hugging Face: ${(e as Error).message}`); return []; }) : [],
-    want("docker") ? docker.models(q.sort === "recent" ? "updated" : "pulls").catch((e) => { notes.push(`Docker Hub: ${(e as Error).message}`); return []; }) : [],
-    want("aihub") ? nativeBundles().then((b) => b.map((x) => nativeRow(x, hw, compiledContextOf(`ai-hub-models/${x.name}`)))).catch((e) => { notes.push(`Qualcomm AI Hub: ${(e as Error).message}`); return []; }) : []
-  ]);
-  return browseCore({ hf: h, docker: d, native: n }, hw, q, notes);
-});
-
-dispatcher.register("dockerVariants", async (name: string) => {
-  if (typeof name !== "string" || name.length > 200) return [];
-  return dockerVariantsCore(name, await docker.tags(name), await chatHardware());
-});
-
-dispatcher.register("resolveModel", async (input: string) => {
-  const r = await resolveModel({ hf, docker, native: nativeBundles }, input, await hardware(), { showKQuants: readBool(settings(), "showKQuants") });
-  if (r.type === "model" && r.inspection.entry) saveCustom(r.inspection.entry);
-  return r;
-});
-
-dispatcher.register("fetchLibrary", async (url: string) => {
-  if (typeof url !== "string" || !/^https:\/\//i.test(url) || url.length > 500) return { ok: false, error: "A library must come from an https address." };
-  try {
-    // https only, no redirect to this PC or the local network, each address checked by the connection's own lookup
-    const r = await pinnedGet(url, { lookup: (host) => dnsLookup(host, { all: true }), maxBytes: 600_000, timeoutMs: 20_000 });
-    if (r.status < 200 || r.status >= 300) return { ok: false, error: `The server answered ${r.status}.` };
-    if (r.truncated) return { ok: false, error: "This library is over 600 KB: too big to keep with a skill." };
-    const source = r.body.toString("utf8");
-    if (/^\s*<(!doctype|html)/i.test(source)) return { ok: false, error: "The address gives a web page, not a JavaScript or CSS file." };
-    return { ok: true, source, kind: /\.css(\?|$)/i.test(url) || /^text\/css/i.test(String(r.headers["content-type"] ?? "")) ? "css" : "js" };
-  } catch (e) { return { ok: false, error: `Could not download it: ${(e as Error).message}` }; }
-});
-
 dispatcher.register("convertLegacyDoc", async (name: string, bytes: unknown) => {
   const raw = asBytes(bytes);
   return typeof name === "string" && raw && raw.length < 40 * 1024 ** 2 ? await convertLegacy(name, raw) : null;
@@ -471,6 +430,16 @@ void geniexVersionTag().then((v) => {
   if (Object.keys(kept).length !== Object.keys(settings().loadFailures ?? {}).length) saveSettings({ loadFailures: kept });
 }).catch(() => undefined);
 
+// Retention (privacy.retentionDays, docs/design/data-at-rest.md): once at start, before any chat
+// runs, the run journals and offloaded payloads older than the setting are removed. Unset (the
+// default) removes nothing. Only the count is logged, never a file name or its contents.
+try {
+  const pruned = pruneForSettings(settings(), [journalDir(), path.join(journalDir(), "offload")], Date.now());
+  if (pruned.length) console.error(`[retention] removed ${pruned.length} run records and offloaded replies older than ${settings().privacy?.retentionDays} days`);
+} catch (e) {
+  console.error(`[retention] old run records could not be removed: ${(e as Error).message}`);
+}
+
 /** Models installed in GenieX that no catalog, pack or custom entry names: listed too (they were invisible). */
 let installedOnlyCache: CatalogEntry[] = [];
 async function refreshInstalledOnly(): Promise<CatalogEntry[]> {
@@ -482,7 +451,6 @@ async function refreshInstalledOnly(): Promise<CatalogEntry[]> {
   installedOnlyCache = installedOnlyEntries(parseInstalledJson(r.out), [...CATALOG, ...customModels() as CatalogEntry[], ...packKnown]);
   return installedOnlyCache;
 }
-dispatcher.register("customEntries", async () => [...customModels() as CatalogEntry[], ...await refreshInstalledOnly()]);
 // the startup check of unknown models reads allEntries(): the installed ones must be known before it runs
 void refreshInstalledOnly();
 
@@ -573,34 +541,6 @@ async function installPackModel(m: BundleModel): Promise<{ done: boolean; failur
   return cancelled ? { done: false, failures, cancelled: true } : { done, failures };
 }
 
-dispatcher.register("install", async (entry: CatalogEntry) => {
-  if (isFoundryEntry(entry)) return installFoundryEntry(entry);
-  let r = await installEntry(entry);
-  // a native bundle is `qualcomm/X` to this GenieX and `ai-hub-models/X` to older ones: the other name is tried before giving up on it.
-  // A CANCELLED first attempt must stay cancelled: the user stopped the install, they did
-  // not ask for the same download again under its other name (a cancellation is not a
-  // failed provider to be retried).
-  if (!r.ok && !r.cancelled && entry.engine === "qairt") for (const name of nameVariants(entryRef(entry)).filter((n) => n !== entryRef(entry))) {
-    r = await installEntry(entry, name);
-    if (r.ok || r.cancelled) break;
-  }
-  if (r.ok || r.cancelled || entry.engine !== "qairt") {
-    // a model the app does not know is loaded once under the best setting this PC accepts, and gets its badge
-    if (r.ok) void checkNewModel(entry).catch(() => undefined);
-    return r;
-  }
-  // a precompiled bundle this chip has no build of: the GGUF of the same model, when a Dynamic pack knows one
-  const m = Object.values(DYNAMIC_DATA.packs).flatMap((p) => packParts(p)).find((x) => x.repo === entry.repo && x.altRepos?.length);
-  if (!m) return r;
-  const alt = await installPackModel(m);
-  return alt.done ? { ok: true } : r;
-});
-
-dispatcher.register("cancelInstall", (ref: string) => {
-  pulls.get(String(ref))?.cancel();
-  foundryDownloads.get(String(ref))?.abort();
-});
-
 /**
  * Every removal of a GenieX model goes through here and is logged (the host log keeps the sidecar's lines): on
  * two model folders vanished during a load and no line said what removed them.
@@ -611,144 +551,6 @@ async function removeGeniexModel(ref: string, why: string): Promise<{ ok: boolea
   console.warn(`[models] ${r.ok ? "removed" : "could not remove"} ${ref}${r.ok ? "" : `: ${r.out.trim().slice(0, 200)}`}`);
   return r;
 }
-
-dispatcher.register("uninstall", async (entry: CatalogEntry) => {
-  if (isFoundryEntry(entry)) return uninstallFoundryEntry(entry);
-  const r = await removeGeniexModel(entryRef(entry), "the person removed it in Models");
-  return { ok: r.ok, message: r.out.trim() };
-});
-
-// ---- GenieX model management (the CLI's own commands, surfaced in MKMN)
-
-/** `geniex model set-type <name> <llm|vlm>`: which path a cached model takes. */
-dispatcher.register("geniexSetType", async (input: { name?: string; type?: string }) => {
-  const exe = geniexExe();
-  const name = String(input?.name ?? "").trim();
-  const type = String(input?.type ?? "").trim().toLowerCase();
-  if (!name) return { ok: false, message: "Name the model first." };
-  if (type !== "llm" && type !== "vlm") return { ok: false, message: "The type must be llm or vlm." };
-  const r = await setModelType(exe, name, type);
-  return { ok: r.ok, message: r.ok ? `${name} now installs as a ${type.toUpperCase()}.` : r.out || "geniex refused the change" };
-});
-
-/** `geniex config list`: the CLI's own stored configuration (chipset and friends), as text. */
-dispatcher.register("geniexConfigList", async (): Promise<{ ok: boolean; text?: string; error?: string }> => {
-  try {
-    const exe = geniexExe();
-    return { ok: true, text: await configList(exe) };
-  } catch (e) {
-    return { ok: false, error: (e as Error).message };
-  }
-});
-
-/** `geniex clean`: remove every cached model. The UI confirms twice; a refusal is reported. */
-dispatcher.register("geniexClean", async (): Promise<{ ok: boolean; message: string }> => {
-  try {
-    const exe = geniexExe();
-    const r = await cleanAll(exe);
-    return { ok: r.ok, message: r.ok ? (r.out || "All cached models were removed.") : r.out };
-  } catch (e) {
-    return { ok: false, message: (e as Error).message };
-  }
-});
-
-/** The byte size of a file, or of a folder walked recursively (0 when it cannot be read). */
-function sourceBytes(p: string): number {
-  try {
-    const st = fs.statSync(p);
-    if (st.isFile()) return st.size;
-    if (!st.isDirectory()) return 0;
-    let total = 0;
-    for (const entry of fs.readdirSync(p)) total += sourceBytes(path.join(p, entry));
-    return total;
-  } catch {
-    return 0;
-  }
-}
-
-/** `geniex pull <name> --local-path <path> [--model-type llm|vlm]`: import a local model
- *  folder or an AI Hub .zip. Progress rides the same `install` events as a normal install,
- *  keyed by the local name, so the Models library shows one familiar progress card. */
-dispatcher.register("geniexPullLocal", async (input: { path?: string; name?: string; type?: string }) => {
-  const exe = geniexExe();
-  const localPath = String(input?.path ?? "").trim();
-  const name = String(input?.name ?? "").trim();
-  if (!localPath) return { ok: false, error: "Choose a model folder or an AI Hub .zip file first." };
-  if (!fs.existsSync(localPath)) return { ok: false, error: "That folder or file does not exist." };
-  if (!name || !/^[\w.-]+(\/[\w.-]+)*$/.test(name)) return { ok: false, error: "Give the model a name like local/my-model (letters, digits, dots, dashes, slashes)." };
-  const type = String(input?.type ?? "").trim().toLowerCase();
-  if (type && type !== "llm" && type !== "vlm") return { ok: false, error: "The model type must be llm or vlm, or left empty so GenieX detects it." };
-  const ref = name;
-  let last: InstallProgress | null = null;
-  const emit = (p: InstallProgress) => { last = p; emitEvent("install", p); };
-  let pull: Pull | null = null;
-  try {
-    // geniex pull COPIES the source into the cache: the free space must hold the source itself.
-    const needGB = Math.max(sourceBytes(localPath) / 1024 ** 3, 0.1);
-    emit({ ref, phase: "checking", percent: null, line: "Checking disk space" });
-    const disk = diskCheck(freeDiskGB(modelsDir()), needGB);
-    if (disk) { emit({ ref, phase: "error", percent: null, error: disk }); return { ok: false, error: disk.title }; }
-    emit({ ref, phase: "downloading", percent: null, line: `Importing ${localPath}` });
-    pull = pullModel(exe, ref, (x) => emit({ ...x, ref }), undefined, { localPath, ...(type ? { modelType: type as "llm" | "vlm" } : {}) });
-    pulls.set(ref, pull);
-    await pull.done;
-  } catch (e) {
-    emit({ ref, phase: "error", percent: null, error: { id: "install", title: "Import could not start", fix: "See the raw message below.", raw: String((e as Error).message) } });
-  } finally {
-    pulls.delete(ref);
-  }
-  if (pull?.cancelled) return { ok: false, cancelled: true, error: "cancelled" };
-  // The closure-assigned `last` is re-widened by hand (the same as installEntry above):
-  // the type checker cannot see through `emit`.
-  const end = last as InstallProgress | null;
-  const ok = end?.phase === "done";
-  if (ok) void recordEvidence([{ kind: "download-verified", ref }]);
-  return ok ? { ok: true, name: ref } : { ok: false, error: (end?.error as { title?: string } | undefined)?.title ?? end?.phase ?? "not finished" };
-});
-
-dispatcher.register("installDynamic", async (packId: string) => {
-  const pack = DYNAMIC_DATA.packs[packId];
-  if (!pack) return;
-  const have = await installedEntries().catch(() => [] as CatalogEntry[]);
-  const todo = packParts(pack).filter((m) => !installedOf(m, have));
-  const say = (p: { tier: string; name: string; step: number; total: number; phase: "start" | "done" | "error"; error?: string; cancelled?: boolean }) => emitEvent("dynamicInstall", p);
-  let step = 0;
-  for (const m of todo) {
-    step++;
-    say({ tier: packId, name: m.name, step, total: todo.length, phase: "start" });
-    // A cancellation ends the WHOLE pack run: moving on to the next model would start
-    // new downloads behind the back of a user who just pressed stop.
-    const { done, failures, cancelled } = await installPackModel(m);
-    say({ tier: packId, name: m.name, step, total: todo.length, phase: done ? "done" : "error", error: done ? undefined : cancelled ? `Stopped before ${m.name} finished installing.` : `Could not install ${m.name} from any provider. ${failures.join("; ")}`, cancelled: done ? undefined : cancelled });
-    if (cancelled) break;
-  }
-});
-
-// One model of a pack, for the voice chat pack: the speech models and this one are installed together, not the whole pack.
-dispatcher.register("installDynamicModel", async (packId: string, ref: string) => {
-  const m = packParts(DYNAMIC_DATA.packs[packId] ?? ({ models: [] } as never)).find((x) => x.ref === ref);
-  if (!m) return;
-  const say = (p: { tier: string; name: string; step: number; total: number; phase: "start" | "done" | "error"; error?: string; cancelled?: boolean }) => emitEvent("dynamicInstall", p);
-  say({ tier: packId, name: m.name, step: 1, total: 1, phase: "start" });
-  const { done, failures, cancelled } = await installPackModel(m);
-  say({ tier: packId, name: m.name, step: 1, total: 1, phase: done ? "done" : "error", error: done ? undefined : cancelled ? "Stopped before the install finished." : `Could not install ${m.name} from any provider. ${failures.join("; ")}`, cancelled: done ? undefined : cancelled });
-});
-
-// One click removes every installed model of a pack. A model that two packs share goes too: it is installed again with the other pack.
-// The model server is stopped by the caller (the bridge) before this runs: the sidecar does not own the server, the Rust host does.
-dispatcher.register("uninstallDynamic", async (packId: string) => {
-  const pack = DYNAMIC_DATA.packs[packId];
-  if (!pack) return { ok: false, removed: [] as string[], failed: [] as string[] };
-  const have = await installedEntries().catch(() => [] as CatalogEntry[]);
-  const removed: string[] = [], failed: string[] = [];
-  for (const m of packParts(pack)) {
-    const e = installedOf(m, have);
-    if (!e) continue;
-    const r = await removeGeniexModel(entryRef(e), `the person removed the ${packId} pack`);
-    (r.ok ? removed : failed).push(m.name);
-  }
-  return { ok: failed.length === 0, removed, failed };
-});
 
 // ---- voice (the speech worker, forked from this process — pure Node)
 // The same VoiceService the desktop build runs (src/core/voiceService.ts): it owns the
@@ -787,96 +589,7 @@ async function ensureVoice(): Promise<void> {
   })().finally(() => { voiceLoad = null; }));
 }
 
-const voiceInstalled = (id: string | null | undefined): boolean => {
-  if (!id) return false;
-  const m = voiceModel(id);
-  return !!m && voice.isInstalled(m);
-};
-
-/** Samples as they arrive over JSON: a real Float32Array (fork IPC), an array, or an object with numeric keys (invoke). */
-function toFloat32(v: unknown): Float32Array | null {
-  if (v instanceof Float32Array) return v;
-  if (Array.isArray(v)) return Float32Array.from(v as number[]);
-  if (v && typeof v === "object") {
-    const keys = Object.keys(v as Record<string, unknown>).filter((k) => /^\d+$/.test(k));
-    if (!keys.length) return null;
-    const out = new Float32Array(keys.length);
-    for (const k of keys) out[Number(k)] = Number((v as Record<string, unknown>)[k]);
-    return out;
-  }
-  return null;
-}
-
-dispatcher.register("voiceModels", () => voice.models());
-
-dispatcher.register("voiceStatus", () => voice.status());
-
-dispatcher.register("voiceDownload", async (id: string) => { await voice.download(String(id)); });
-
-dispatcher.register("voiceCancelDownload", (id: string) => voice.cancelDownload(String(id)));
-
-dispatcher.register("voiceRemove", async (id: string) => {
-  await voice.remove(String(id));
-  const v = voiceSettings();
-  if (v.sttModelId === id || v.ttsModelId === id) {
-    saveSettings({ voice: { ...v, ...(v.sttModelId === id ? { sttModelId: null } : {}), ...(v.ttsModelId === id ? { ttsModelId: null } : {}) } });
-  }
-});
-
-dispatcher.register("voiceApply", async (): Promise<VoiceStatus> => {
-  try { await ensureVoice(); } catch { /* status carries the error */ }
-  return voice.status();
-});
-
-dispatcher.register("transcribe", async (samples: unknown, sampleRate: number, partial?: boolean) => {
-  const s = toFloat32(samples);
-  if (!s) throw new Error("No audio samples arrived.");
-  if (!voice.status().stt) await ensureVoice();
-  return voice.transcribe(s, Number(sampleRate) || 16000, !!partial);
-});
-
-dispatcher.register("voiceNeeds", async (kinds: VoiceKind[]): Promise<VoiceNeed[]> => {
-  const out: VoiceNeed[] = [];
-  for (const kind of Array.isArray(kinds) ? kinds : []) {
-    const v = voiceSettings();
-    if (voiceInstalled(kind === "stt" ? v.sttModelId : v.ttsModelId)) continue;
-    // no Foundry Local in this build: the CPU model is the recommendation
-    out.push({ kind, model: defaultVoiceModel(kind) });
-  }
-  return out;
-});
-
-dispatcher.register("voiceQuickInstall", async (kinds: VoiceKind[], _alt?: boolean) => {
-  for (const kind of Array.isArray(kinds) ? kinds : []) {
-    const m = defaultVoiceModel(kind);
-    if (!voiceInstalled(m.id)) {
-      await voice.download(m.id);
-      if (!voiceInstalled(m.id)) return { ok: false, error: `${m.name} could not be installed.` };
-    }
-    const v = voiceSettings();
-    saveSettings({ voice: { ...v, ...(kind === "stt" ? { sttModelId: m.id } : { ttsModelId: m.id }) } });
-  }
-  void ensureVoice().catch(() => undefined);
-  return { ok: true };
-});
-
-dispatcher.register("speak", async (id: string, text: string) => {
-  if (!voice.status().tts) await ensureVoice();
-  const v = voiceSettings();
-  await voice.speak(String(id), String(text), v.ttsSid, v.ttsSpeed);
-});
-
-dispatcher.register("cancelSpeak", (id: string) => voice.cancelSpeak(String(id)));
-
-dispatcher.register("saveVoice", async (patch: Partial<VoiceSettings>): Promise<any> => {
-  const before = voiceSettings();
-  const clamped: any = { ...patch };
-  for (const k of ["minLevel", "minSpeechMs", "endSilenceMs", "waitMs", "interruptLevel", "interruptMs"] as const) if (k in clamped) clamped[k] = clampVoice(k, clamped[k] as number);
-  const merged = saveSettings({ voice: { ...before, ...clamped } });
-  const reload = ["sttModelId", "ttsModelId", "sttCompute", "ttsCompute", "sttLanguage"].some((k) => k in (patch as any) && (patch as any)[k] !== (before as any)[k]);
-  if (reload) void ensureVoice().catch(() => undefined);
-  return merged;
-});
+registerVoice(dispatcher, { voice, voiceSettings, saveSettings, ensureVoice });
 
 // ---- chat (the orchestrator runs here; the model server belongs to the Rust host)
 // The shared runChatOrchestrator. Everything it needs from the
@@ -927,10 +640,6 @@ function resolveServeRefFor(entry: CatalogEntry, installedRefs: string[]): strin
   throw new Error(r.reason);
 }
 
-dispatcher.register("resolveModelIdentity", (id: string) => resolveModelIdentity(String(id), {
-  customEntries: customModels() as CatalogEntry[],
-}));
-
 /** The generation speeds measured here, by catalog id (the same file the desktop build keeps). */
 const speedFile = () => dataFile("speeds.json");
 function recordSpeed(entry: CatalogEntry, tokPerSec: number | null, tokens: number) {
@@ -942,50 +651,6 @@ function recordSpeed(entry: CatalogEntry, tokPerSec: number | null, tokens: numb
   // A timed generation on this PC is "Performance measured" evidence too.
   void recordEvidence([{ kind: "performance-measured", ref: entryRef(entry), result: { tokPerSec, tokens } }]);
 }
-
-/** Measured speeds of the Dynamic pack models, by the pack model's own ref (the same
- * mapping the desktop build's speedsByRef does): only models ACTUALLY timed here are
- * reported, so the UI never quotes an invented figure for a model it never ran. */
-dispatcher.register("speedsByRef", async (): Promise<Record<string, number>> => {
-  const all = readJson<Record<string, number>>(speedFile(), {});
-  const entries = allEntries();
-  const out: Record<string, number> = {};
-  for (const pack of Object.values(DYNAMIC_DATA.packs)) {
-    for (const m of packParts(pack)) {
-      const e = entries.find((x) => (x as any).dynamicRef === m.ref || entryMatches(x, m.ref) || entryMatches(x, m.repo) || entryMatches(x, m.name));
-      if (e && all[e.id]) out[m.ref] = all[e.id];
-    }
-  }
-  return out;
-});
-
-/** Measured generation speeds by catalog id, for the model menu: the chat EMA and
- * the benchmark evidence merged (the EMA wins; see core/speeds.ts). Only models
- * this machine actually timed appear — no estimate is invented here. */
-dispatcher.register("speedsById", async (): Promise<Record<string, number>> => {
-  const evidence = await dispatcher.callHost(
-    (m) => { void write(m); }, "getModelEvidence", [], 30_000
-  ).then((r) => (Array.isArray(r) ? (r as import("../core/manifest").EvidenceRecord[]) : []))
-    .catch(() => [] as import("../core/manifest").EvidenceRecord[]);
-  return mergeSpeeds(readJson<Record<string, number>>(speedFile(), {}), evidence, allEntries(), entryMatches, (e) => entryRef(e));
-});
-
-/** The compiled window of every installed QAIRT pack artifact, keyed by the pack's model ref
- * (canonical, ai-hub-models counts as qualcomm). Read from each bundle's own genie_config.json —
- * the per-artifact evidence the renderer and the pack verdicts need but cannot read themselves
- * (the renderer never touches the file system). A bundle that is not installed (or says nothing)
- * is simply absent: the caller then labels its context number as an estimate. */
-dispatcher.register("compiledContexts", (): Record<string, number> => {
-  const out: Record<string, number> = {};
-  for (const pack of Object.values(DYNAMIC_DATA.packs)) {
-    for (const m of packParts(pack)) {
-      if (!/^ai-hub-models\//i.test(m.repo)) continue;
-      const v = compiledContextOf(m.repo);
-      if (v !== null) out[canonicalName(m.repo)] = v;
-    }
-  }
-  return out;
-});
 
 /** Asks the Rust host to bring the model's server up (it owns geniex.exe) and answers where it listens.
  * A load setting rides along (the benchmark and the NPU test start models under a specific one):
@@ -1008,7 +673,7 @@ import {
   type Measurement,
   type Selection,
 } from "../core/adaptiveCompute";
-import { FoundryHost, cliRunner, findFoundry, type FoundryActionResult, type FoundryAdminView, type FoundryCachedVariant, type FoundryServerActionResult } from "../core/foundryHost";
+import { FoundryHost, cliRunner, findFoundry, type FoundryCachedVariant } from "../core/foundryHost";
 
 /** hardware.json lives in the host's Config dir (mkmnPaths), the file the Rust host writes after each benchmark. */
 const hardwareFile = () => PATHS.hardwareFile;
@@ -1263,6 +928,12 @@ async function uninstallFoundryEntry(entry: CatalogEntry): Promise<{ ok: boolean
   void foundryEntries().catch(() => undefined);
   return r;
 }
+
+registerModels(dispatcher, {
+  hf, docker, nativeBundles, chatHardware, hardware, settings, saveCustom, customModels, refreshInstalledOnly,
+  pulls, foundryDownloads, installEntry, installPackModel, installFoundryEntry, uninstallFoundryEntry, checkNewModel,
+  removeGeniexModel, geniexExe, emitEvent, recordEvidence, installedEntries, isFoundryEntry, allEntries, speedFile, readJson, write,
+});
 
 /**
  * The Foundry branch of ensureServer: exact variant selection from the CACHE, load
@@ -2249,58 +1920,8 @@ async function startBench(cfg: BenchConfig): Promise<{ ok: boolean; error?: stri
   return { ok: true };
 }
 
-dispatcher.register("benchRoster", async () => {
-  // Precision-aware inventory: a repository that only declares Q4_0 does not make a
-  // Q8_0 target "installed". A failed list is an unknown state, not an empty cache.
-  let listed: InstalledModel[] | null = null;
-  try { listed = await listInstalled(geniexExe()); } catch { listed = null; }
-  const entries = allEntries();
-  // A Foundry model is installed when FOUNDRY's cache holds it, never the GenieX cache:
-  // a Foundry entry read against `geniex list` would always show "not installed".
-  let foundryCached: Set<string> | null | false = false; // false: not applicable · null: the cache could not be read
-  if (entries.some((e) => isFoundryEntry(e))) {
-    const f = await foundryHost();
-    if (!f) foundryCached = null;
-    else {
-      const list = await f.cached().catch(() => null);
-      foundryCached = list === null ? null : new Set(list.map((v) => v.alias.toLowerCase()));
-    }
-  }
-  const tested = benchRunner().testedKeys();
-  return {
-    inventoryKnown: listed !== null,
-    targets: (await benchRosterAll()).map((t) => {
-      const e = entries.find((x) => (t.entryId && x.id === t.entryId) || (t.bundleRef && x.dynamicRef === t.bundleRef));
-      const state = !e ? false
-        : isFoundryEntry(e) ? (foundryCached === null ? null : foundryCached instanceof Set && foundryCached.has(String(e.repo).toLowerCase()))
-        : installedState(e, listed, entryRef(e));
-      return { ...t, tested: tested.has(t.key), installed: state === true, installedUnknown: state === null };
-    }),
-    tests: TEST_COUNT,
-    costs: { launch: testCosts("launch"), express: testCosts("express"), quick: testCosts("quick"), full: testCosts("full") },
-    freeGB: freeDiskGB(modelsDir()),
-    folder: benchRoot()
-  };
-});
+registerBench(dispatcher, { benchRunner, currentBench: () => bench, startBench, benchRoot, benchRosterAll, foundryHost, allEntries, isFoundryEntry, geniexExe, write });
 
-dispatcher.register("benchState", () => benchRunner().state());
-// The finished models of the run, without the long texts, for the charts and the table.
-dispatcher.register("benchResults", () => benchRunner().results().map((r) => ({ ...r, tests: r.tests.map((t) => ({ ...t, answer: "", thinking: "" })) })));
-// The report to publish, written next to the results; the bridge shows it in the file manager.
-dispatcher.register("benchExport", async () => {
-  const r = await benchRunner().exportReport();
-  if (!r) return { ok: false, error: "No finished model yet: there is nothing to export." };
-  // The exact file list travels too: the renderer announces only what exists
-  // (a launch-only export has no HTML report or charts to point at).
-  return { ok: true, dir: r.dir, report: r.report, html: r.html, files: r.files };
-});
-dispatcher.register("benchReveal", async (file: string | null) => {
-  // null means "the results folder": the latest run directory (or the bench root when
-  // nothing has run yet) — the button was wired to a call that could only answer false.
-  const target = typeof file === "string" && file ? file
-    : benchRunner().state().runDir ?? benchRoot();
-  try { await dispatcher.callHost((m) => { void write(m); }, "revealPath", [target]); return true; } catch { return false; }
-});
 // Open the edited copy of an Edit-a-copy run with its default app (the
 // "Open edited copy" button). The person just saw the path in the interface;
 // the sidecar has no shell, so the host starts the app.
@@ -2308,10 +1929,6 @@ dispatcher.register("openEditedCopy", async (target: string) => {
   if (typeof target !== "string" || !target) return false;
   try { await dispatcher.callHost((m) => { void write(m); }, "openEditedCopy", [target], 15_000); return true; } catch { return false; }
 });
-dispatcher.register("benchStart", (cfg: BenchConfig) => startBench(cfg));
-dispatcher.register("benchStop", () => { bench?.stop(); });
-// a completed run's measurements, written to the profiles the Models list reads (they were never shown there before)
-dispatcher.register("benchImportResults", () => benchRunner().importMeasured());
 
 // ---- adaptive compute status (what the last request selected, and why)
 
@@ -2328,182 +1945,7 @@ dispatcher.register("adaptiveStatus", () => {
   };
 });
 
-// ---- Foundry Local engine status (Tauri build: discovered + version-checked by the sidecar)
-
-dispatcher.register("foundryStatus", async () => {
-  const f = await foundryHost();
-  if (!f) return { installed: false, version: null, loaded: null, cached: null, note: "foundry.exe was not found (or it did not answer --version)" };
-  const list = await f.cached().catch(() => null);
-  return {
-    installed: true,
-    version: f.features.version,
-    loaded: f.loaded,
-    cached: list?.length ?? null,
-    note: f.statusLine(),
-  };
-});
-
-dispatcher.register("foundryEntries", async () => {
-  try { return await foundryEntries(); } catch { return []; }
-});
-
-// ---- Foundry Local management (Developer settings): the same CLI, read and written in one place
-
-const foundryMissing = (): FoundryActionResult => ({
-  ok: false,
-  message: "Microsoft Foundry Local is not installed (or its version could not be read). Install it first, then refresh."
-});
-
-function existingFolder(value: unknown): string | null {
-  const p = typeof value === "string" ? value.trim() : "";
-  if (!p || p.length > 2_000) return null;
-  try { return fs.statSync(p).isDirectory() ? p : null; } catch { return null; }
-}
-
-function existingFile(value: unknown): string | null {
-  const p = typeof value === "string" ? value.trim() : "";
-  if (!p || p.length > 2_000) return null;
-  try { return fs.statSync(p).isFile() ? p : null; } catch { return null; }
-}
-
-dispatcher.register("foundryAdmin", async (): Promise<FoundryAdminView> => {
-  const exe = findFoundry(process.env, (p) => { try { return fs.existsSync(p); } catch { return false; } });
-  const f = await foundryHost();
-  if (!f) {
-    return {
-      installed: false, version: null, exe, error: "foundry.exe was not found (or it did not answer --version).",
-      server: null, config: null, cacheLocation: null, cache: null, status: null, statusText: "", recent: []
-    };
-  }
-  const [server, config, cacheLocation, cache, diagnostics] = await Promise.all([
-    f.serverStatus().catch(() => null),
-    f.config().catch(() => null),
-    f.cacheLocation().catch(() => null),
-    f.cached().catch(() => null),
-    f.diagnostics().catch(() => ({ data: null, text: "" }))
-  ]);
-  return {
-    installed: true,
-    version: f.features.version,
-    exe,
-    server,
-    config,
-    cacheLocation,
-    cache,
-    status: diagnostics.data,
-    statusText: diagnostics.text,
-    recent: f.recent.slice(-40)
-  };
-});
-
-dispatcher.register("foundryConfigSet", async (key: string, value: string): Promise<FoundryActionResult> => {
-  const f = await foundryHost();
-  if (!f) return foundryMissing();
-  return f.configSet(String(key ?? ""), String(value ?? ""));
-});
-
-dispatcher.register("foundryConfigReset", async (key?: string): Promise<FoundryActionResult> => {
-  const f = await foundryHost();
-  if (!f) return foundryMissing();
-  return f.configReset(key ? String(key) : undefined);
-});
-
-dispatcher.register("foundryCacheSet", async (target: string): Promise<FoundryActionResult> => {
-  const f = await foundryHost();
-  if (!f) return foundryMissing();
-  const folder = existingFolder(target);
-  if (!folder) return { ok: false, message: "That folder does not exist. Choose an existing folder Foundry may use for its cache." };
-  const r = await f.cacheSet(folder);
-  if (r.ok) void foundryEntries().catch(() => undefined);
-  return r;
-});
-
-dispatcher.register("foundryCacheRemove", async (alias?: string): Promise<FoundryActionResult> => {
-  const f = await foundryHost();
-  if (!f) return foundryMissing();
-  const a = typeof alias === "string" && alias.trim() ? alias.trim().slice(0, 300) : undefined;
-  const r = await f.cacheRemove(a);
-  if (r.ok) void foundryEntries().catch(() => undefined);
-  return r;
-});
-
-dispatcher.register("foundryServer", async (action: string, opts?: { port?: number | null; idleTimeoutMinutes?: number | null }): Promise<FoundryServerActionResult> => {
-  const f = await foundryHost();
-  if (!f) return { ...foundryMissing(), server: null };
-  if (!["start", "stop", "restart"].includes(action)) {
-    return { ok: false, message: "The server action must be start, stop or restart.", server: await f.serverStatus().catch(() => null) };
-  }
-  const port = opts?.port === undefined || opts?.port === null ? null : Number(opts.port);
-  const idle = opts?.idleTimeoutMinutes === undefined || opts?.idleTimeoutMinutes === null ? null : Number(opts.idleTimeoutMinutes);
-  return f.serverAction(action as "start" | "stop" | "restart", { port, idleTimeoutMinutes: idle });
-});
-
-dispatcher.register("foundryLogs", async (lines?: number): Promise<string> => {
-  const f = await foundryHost();
-  if (!f) return "";
-  const n = Number.isFinite(Number(lines)) ? Math.min(2_000, Math.max(1, Math.floor(Number(lines)))) : 50;
-  return f.logs(n);
-});
-
-dispatcher.register("foundryModelInfo", async (alias: string) => {
-  const f = await foundryHost();
-  if (!f) return { info: null, text: "" };
-  return f.modelInfo(String(alias ?? ""));
-});
-
-dispatcher.register("foundryModelRegister", async (input: Record<string, unknown>): Promise<FoundryActionResult> => {
-  const f = await foundryHost();
-  if (!f) return foundryMissing();
-  const folder = existingFolder(input?.path);
-  if (!folder) return { ok: false, message: "That model folder does not exist." };
-  const r = await f.registerModel({
-    path: folder,
-    modelId: String(input?.modelId ?? ""),
-    task: String(input?.task ?? ""),
-    displayName: typeof input?.displayName === "string" ? input.displayName : undefined,
-    device: typeof input?.device === "string" ? input.device : undefined,
-    executionProvider: typeof input?.executionProvider === "string" ? input.executionProvider : undefined,
-    contextLength: input?.contextLength === undefined || input?.contextLength === null ? undefined : Number(input.contextLength)
-  });
-  if (r.ok) void foundryEntries().catch(() => undefined);
-  return r;
-});
-
-dispatcher.register("foundryModelUnregister", async (alias: string): Promise<FoundryActionResult> => {
-  const f = await foundryHost();
-  if (!f) return foundryMissing();
-  const r = await f.unregisterModel(String(alias ?? ""));
-  if (r.ok) void foundryEntries().catch(() => undefined);
-  return r;
-});
-
-dispatcher.register("foundryModelLoad", async (alias: string, device?: string | null): Promise<FoundryActionResult> => {
-  const f = await foundryHost();
-  if (!f) return foundryMissing();
-  const dev = typeof device === "string" && /^(cpu|gpu|npu)$/i.test(device) ? device.toUpperCase() : null;
-  if (runtimeLease.isBusy()) return { ok: false, message: "A model task is running. Wait for it to finish, then retry." };
-  const r = await npuOwner.run("foundry", () => f.loadModel(String(alias ?? ""), dev));
-  return r;
-});
-
-dispatcher.register("foundryModelUnload", async (alias: string): Promise<FoundryActionResult> => {
-  const f = await foundryHost();
-  if (!f) return foundryMissing();
-  return f.unloadModel(String(alias ?? ""));
-});
-
-dispatcher.register("foundryTranscribe", async (input: { file?: string; model?: string; language?: string }) => {
-  const f = await foundryHost();
-  if (!f) return { ok: false, error: "Microsoft Foundry Local is not installed (or its version could not be read)." };
-  const file = existingFile(input?.file);
-  if (!file) return { ok: false, error: "That audio file does not exist." };
-  if (runtimeLease.isBusy()) return { ok: false, error: "A model task is running. Wait for it to finish, then retry." };
-  return npuOwner.run("foundry", () => f.transcribe({
-    file,
-    model: typeof input?.model === "string" ? input.model : undefined,
-    language: typeof input?.language === "string" ? input.language : undefined
-  }));
-});
+registerFoundry(dispatcher, { foundryHost, foundryEntries, npuOwner });
 
 // ---- What MKMN needs on the PC, and installing a missing one from the internet (src/core/requirements.ts)
 
@@ -2558,12 +2000,6 @@ dispatcher.register("updateRequirement", async (a: { id?: unknown; pkg?: unknown
   const r = await updateRequirement(String(a?.id ?? ""), String(a?.pkg ?? ""), { run });
   if (r.ok) { pythonFound = undefined; foundryHostCache = null; }
   return r;
-});
-
-dispatcher.register("foundryReport", async (): Promise<{ ok: boolean; message: string }> => {
-  const f = await foundryHost();
-  if (!f) return { ok: false, message: "Microsoft Foundry Local is not installed (or its version could not be read)." };
-  return f.foundryReport();
 });
 
 // ---- the NPU load test (Developer settings): the settings that make a model load, tried in order
@@ -2948,18 +2384,6 @@ const agentDriver: AgentDriver = {
   endRun: () => agentCallHost("agentEndRun", [], 15_000),
 };
 
-dispatcher.register("agentRun", (runId: string, hwnd: number, task: string, modelId: string) => {
-  // fire and forget: the progress streams out as `agentRun` events; the run ends
-  // with a terminal status on the last one (done | unresolved | failed | cancelled)
-  void runAgent(String(runId), Number(hwnd), String(task ?? ""), String(modelId ?? ""));
-});
-
-// "" stops every run: the window that lost track of its run (reopened, redrawn) has no id to give
-dispatcher.register("agentStopRun", (runId: string) => {
-  if (!runId) { for (const ac of agentRuns.values()) ac.abort(); return; }
-  agentRuns.get(String(runId))?.abort();
-});
-
 /**
  * The review gate of Edit a copy: the run emits its proposed change and stops
  * here until the person answers in the interface. The resolver is registered
@@ -2969,21 +2393,7 @@ dispatcher.register("agentStopRun", (runId: string) => {
  */
 const docEditReviews = new Map<string, (ok: boolean) => void>();
 
-dispatcher.register("agentDocEditDecide", (runId: string, approved: unknown) => {
-  const id = String(runId);
-  const resolve = docEditReviews.get(id);
-  if (!resolve) return; // the run already settled (or never reached the gate)
-  docEditReviews.delete(id);
-  resolve(approved === true);
-});
-
-// Edit a copy (docs/design/doc-edit-copy.md): the document-aware road to a Word
-// edit the window loop cannot take — no driver, no grant, no process touched.
-// The run is registered in the SAME agentRuns map, so agentStopRun and
-// appShutdown abort it with no new code.
-dispatcher.register("agentDocEdit", (runId: string, sourcePath: string, task: string, modelId: string) => {
-  void runDocEditAgent(String(runId), String(sourcePath ?? ""), String(task ?? ""), String(modelId ?? ""));
-});
+registerAgent(dispatcher, { agentRuns, docEditReviews, runAgent, runDocEditAgent });
 
 /** The sidecar's own fs, as the loop's DocEditFs sees it. */
 const docEditFs: DocEditFs = {
@@ -3106,47 +2516,7 @@ dispatcher.register("launchSite", (files: { title: string; kind: string; languag
 
 const MEDIA_DIR = dataFile("media");
 
-// One project's knowledge index state: what the Project knowledge
-// screen shows. Observed from the store and this process's tracker, never a rebuild.
-dispatcher.register("knowledgeStatus", (projectId: string, filesHash: string) =>
-  knowledgeIndexStatus(knowledgeDirOf(), String(projectId), String(filesHash ?? "")));
-
-// The index build, started by the Files panel's add/remove: the same
-// machine-tracked build a chat's retrieval would run, begun in the background here so
-// the FIRST chat already finds the index ready. The files ride whole from the renderer
-// (the project store lives in the webview); the build yields between files and its
-// progress (n of m) is read through knowledgeStatus.
-dispatcher.register("knowledgeBuild", async (projectId: string, files: unknown) => {
-  const list = Array.isArray(files) ? files : [];
-  const clean = list
-    .map((f) => (f && typeof f === "object" ? (f as { id?: unknown; name?: unknown; content?: unknown }) : null))
-    .filter((f): f is { id: string; name: string; content: string } =>
-      !!f && typeof f.id === "string" && typeof f.name === "string" && typeof f.content === "string");
-  const built = await buildKnowledgeIndexNow(knowledgeDirOf(), String(projectId), clean);
-  // with the multilingual model installed, the project's vectors are made now too, so the
-  // first question that needs them does not wait for them (a failure only logs: the chat
-  // makes them itself, or falls back to the rewrite)
-  if (built.state === "ready") void prepareVectors(String(projectId), clean);
-  return built;
-});
-
-async function prepareVectors(projectId: string, files: { id: string; name: string; content: string }[]): Promise<void> {
-  try {
-    const embedder = await vectorEmbedder();
-    if (!embedder || !files.length) return;
-    const t = Date.now();
-    const v = await openVectorIndex(knowledgeDirOf(), projectId, filesHashOf(files), openKnowledgeIndex(knowledgeDirOf(), projectId, files).sections(), embedder);
-    if (v.source === "built") console.error(`[knowledge] vectors for ${v.count} sections made in ${Date.now() - t} ms`);
-  } catch (e) {
-    console.error(`[knowledge] the vectors could not be made: ${(e as Error).message}`);
-  }
-}
-
-// The multilingual search model (Settings → Files & projects): installed only when the
-// person asks, from pinned files whose SHA-256 is checked before anything is replaced.
-dispatcher.register("vectorModelStatus", () => vectorModelStatus());
-dispatcher.register("vectorModelInstall", () => installVectorModel());
-dispatcher.register("vectorModelRemove", () => removeVectorModel());
+registerKnowledge(dispatcher);
 
 dispatcher.register("saveMedia", (dataUrl: string) => {
   const match = /^data:(image\/[a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/=]+)$/.exec(typeof dataUrl === "string" ? dataUrl : "");
@@ -3265,50 +2635,7 @@ const scheduler = new Scheduler({
 });
 scheduler.start();
 
-dispatcher.register("tasks", () => taskStore.list());
-
-dispatcher.register("saveTask", (t: ScheduledTask) => {
-  const now = Date.now();
-  const prev = taskStore.get(t.id);
-  const changed = !prev || JSON.stringify(prev.schedule) !== JSON.stringify(t.schedule) || (t.enabled && !prev.enabled);
-  const bad = t.enabled && changed ? validateSchedule(t.schedule, now) : null;
-  if (bad) throw new Error(bad);
-  taskStore.upsert({
-    ...t, created: prev?.created ?? now, runs: prev?.runs ?? [], running: prev?.running ?? false,
-    nextRun: !t.enabled ? null : changed ? nextRun(t.schedule, now) : prev?.nextRun ?? nextRun(t.schedule, now)
-  });
-  return taskStore.list();
-});
-
-// Deleting a chat deletes the run journals and payloads it left in Workspace\harness (harness/forget.ts).
-dispatcher.register("forgetConversation", (convId: string) => {
-  if (typeof convId !== "string" || !convId || convId.length > 200) return { journals: 0, payloads: 0 };
-  const r = forgetConversation(convId, journalDir());
-  if (r.journals || r.payloads) console.error(`[harness] a deleted chat's records were removed: ${r.journals} journal(s), ${r.payloads} payload(s)`);
-  return r;
-});
-dispatcher.register("deleteTask", (id: string) => { taskStore.remove(String(id)); return taskStore.list(); });
-
-dispatcher.register("runTask", (id: string) => {
-  const t = taskStore.get(String(id));
-  if (!t) return;
-  if (chatCount() > 0 || bench?.running || runtimeLease.isBusy()) {
-    taskStore.upsert({
-      ...t,
-      runs: [{
-        id: `${t.id}:${Date.now()}`,
-        startedAt: Date.now(),
-        finishedAt: Date.now(),
-        status: "error" as const,
-        output: "",
-        error: "NPU is currently busy with another task",
-        artifactIds: []
-      }, ...t.runs].slice(0, 20)
-    });
-    return;
-  }
-  void scheduler.execute(String(id));
-});
+registerTasks(dispatcher, { taskStore, scheduler, benchRunning: () => !!bench?.running });
 
 // ---- the stdio loop
 

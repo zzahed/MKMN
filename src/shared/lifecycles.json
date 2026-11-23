@@ -148,9 +148,9 @@
       "owner": "core, sidecar",
       "userVisible": true,
       "classification": "not-a-machine",
-      "where": "src/sidecar/main.ts (`NpuTestState.status`); src/core/npuTest.ts",
+      "where": "src/sidecar/main.ts (`NpuTestState`); src/core/npuTest.ts",
       "reason": "A running boolean plus an append-only attempt log; no phases and no transitions.",
-      "scan": ["src/sidecar/main.ts:NpuTestState.status"]
+      "scan": []
     },
     {
       "id": "agent-run",
@@ -188,9 +188,9 @@
       "owner": "core, sidecar",
       "userVisible": true,
       "classification": "not-a-machine",
-      "where": "src/shared/types.ts (`TaskRun.status`); src/core/scheduler.ts",
+      "where": "src/shared/types.ts (`TaskRun.status`); src/core/scheduler.ts; src/sidecar/register/tasks.ts (`runTask` records a busy refusal as an error result)",
       "reason": "A terminal result (ok/error) plus a running boolean; the scheduler has no state to transition.",
-      "scan": ["src/shared/types.ts:TaskRun.status"]
+      "scan": ["src/shared/types.ts:TaskRun.status", "src/sidecar/register/tasks.ts:TaskDeps.status"]
     },
     {
       "id": "work-log",

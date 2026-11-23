@@ -20,8 +20,9 @@ explained in English in Settings → About; the interface itself is English only
 
 The public-facing display brand is **MKMN AI**. Internal identifiers (the
 `app.mkmn.desktop` app id, the `MKMN` executable and product name, the
-`opennpu` storage keys and IPC bridge name, install paths and user-data
-directories) are retained for compatibility and are not user-facing branding.
+`opennpu.*` storage keys that saved chats and layout live under, install paths
+and user-data directories) are retained for compatibility and are not
+user-facing branding. The window's bridge to the app is `window.mkmn`.
 
 ## Positioning and personality
 

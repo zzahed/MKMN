@@ -10,7 +10,7 @@ import type { ArtifactKind, CatalogEntry, ChatEvent, ChatMessage, ChatOptions, C
 import { readBool, readNum, readObj } from "../shared/settingsSchema";
 import * as nodePath from "node:path";
 import { existsSync } from "node:fs";
-import { CATEGORY_INFO, THINKING_OK, isDynamicId, installedOf, mergedPack, pickModel, sortRequest, tierOf, wantedNote, type BundleModel, type TaskCategory } from "./dynamic";
+import { CATEGORY_INFO, isDynamicId, installedOf, mergedPack, pickModel, sortRequest, tierOf, wantedNote, type BundleModel, type TaskCategory } from "./dynamic";
 import { DYNAMIC_DATA } from "./dynamic-data";
 import { scoreEntry } from "./fit";
 import { scoreOf } from "./scores";
@@ -30,7 +30,7 @@ import type { StepUsage } from "./harness/journal";
 import { journalDir } from "./harness/journal";
 import { DEFAULT_ENDPOINT } from "./geniex";
 const isFoundryEntry = (e: CatalogEntry) => e.id.startsWith("foundry:");
-import { applyEffort, autoEffort, effectiveEffort, stageEffort, thinkingSupport, visionSupport, withSystem } from "./effort";
+import { applyEffort, effectiveEffort, stageEffort, thinkingSupport, visionSupport, withSystem } from "./effort";
 import { codeSampling } from "./sampling";
 import { latestArtifacts, compactHistory, reviewCode, resolveEdits, stripEdits } from "./review";
 import { interfaceOf, stepwise, stubHistory, type Session } from "./build";
@@ -38,7 +38,7 @@ import { compactConversation, compacted, foldedText, isValidSummary, KEEP_SHARE,
 import { digestOf, isFilesMessage, isMemoMessage } from "./memo";
 import { promptTokens, tokensOf } from "./context";
 import { DESCRIBE_INSTRUCTIONS, describePrompt, describers, imageBlock, imageKey, imageLost, imagesOf, swapImages } from "./vision";
-import { documentSourcesOf, hasPdfDocs, locatorMessages, parseLocatorReply, questionOf, resolvePdfDocs } from "./pdfSections";
+import { hasPdfDocs, locatorMessages, parseLocatorReply, questionOf, resolvePdfDocs } from "./pdfSections";
 import { improve } from "./improve";
 import { artifactsIn, stripPromptLeak } from "./artifacts";
 import { mergeFiles } from "./bundle";
@@ -47,7 +47,10 @@ import { templateChart } from "./chartTemplates";
 import { CHART_FIX_INSTRUCTIONS, settleCharts, mendLeakedFormulas, chartBlocks, chartFlaw } from "./chart";
 import { settleBlocks } from "./blocks";
 import { diagramFixInstructions } from "./diagram";
-import { takeToolCommands, type ToolName } from "./toolCommands";
+import { prepareTurn } from "./chatPrepare";
+import { chooseEffort } from "./chatRoute";
+import { readDocumentQuestion } from "./chatRetrieve";
+import { knowledgeOffloadName } from "./knowledge/ids";
 import { orchestrate } from "./orchestrate";
 import { makeDeck, wantsDeck } from "./deckBuild";
 import { changeDeck } from "./deckEdit";
@@ -63,7 +66,7 @@ import { filesHashOf, scriptOf, tokenize } from "./knowledge/index";
 import type { Embedder } from "./knowledge/embed";
 import { openVectorIndex } from "./knowledge/vectors";
 import { vectorEmbedder } from "./knowledge/vectorModel";
-import { asksOwnership, COVERAGE_MIN, figurePassage, locatorMessagesFor, mergeByBestRank, namesPeriod, outlineLines, ownershipPassage, packSections, placeOf, QUERY_STOP, queryCoverage, STRONG_COVERAGE, STRONG_MAX, STRONG_OUTLINE_CHARS, STRONG_RATIO, type RetrSection } from "./knowledge/retrieve";
+import { COVERAGE_MIN, locatorMessagesFor, mergeByBestRank, outlineLines, packSections, placeOf, QUERY_STOP, queryCoverage, STRONG_COVERAGE, STRONG_MAX, STRONG_OUTLINE_CHARS, STRONG_RATIO, type RetrSection } from "./knowledge/retrieve";
 import { citeAnswer, citationGuardStep, unsupportedFigures, unsupportedNotice, type CitedSection } from "./cite";
 import { FOUNDRY_MIN_TOKENS } from "./benchRunner";
 import { appendInstructions, type InstructionBlock, type Relevance } from "./prompts";
@@ -716,33 +719,10 @@ export async function runChatOrchestrator(host: ChatHost, id: string, entryId: s
   let policyStop: string | undefined;
   try {
     const settings = host.settings();
-    // tools on command: the "/" words at the start of the message say which tools this message may use, and are not part of the request
-    const onCommand = readBool(settings, "toolsOnCommand");
-    const asked = new Set<ToolName>();
-    if (onCommand) {
-      const at = messages.map((m) => m.role).lastIndexOf("user");
-      const last = messages[at];
-      if (typeof last?.content === "string") {
-        const r = takeToolCommands(last.content);
-        r.used.forEach((t) => asked.add(t));
-        messages = messages.map((m, i) => (i === at ? { ...m, content: r.text } : m));
-      } else if (last) {
-        const parts = last.content.map((p) => {
-          if (p.type !== "text" || asked.size) return p;
-          const r = takeToolCommands(p.text);
-          r.used.forEach((t) => asked.add(t));
-          return { ...p, text: r.text };
-        });
-        messages = messages.map((m, i) => (i === at ? { ...m, content: parts } : m));
-      }
-    }
-    const may = (t: ToolName) => !onCommand || asked.has(t);
-    // The option alone does not put the delegation rules in the request: `agentsOptIn` only says the
-    // person allows them here, and the closed question below decides whether THIS request needs them.
-    const agentsOptIn = !!opts.subagents && may("agents");
-    const useLoop = settings.agentLoop && may("improve");
-    const useCheck = settings.autoCheck && may("check");
-    const useBuild = may("build"); // the steps that plan, write, test and fix files (decks, templates, pages, programs)
+    // prepare (src/core/chatPrepare.ts): the "/" tool words come off the message, and the turn's tools are decided
+    const prepared = prepareTurn(settings, messages, opts);
+    messages = prepared.messages;
+    const { onCommand, asked, agentsOptIn, useLoop, useCheck, useBuild } = prepared;
     // "Dynamic" is a team: this request is sorted into a kind of task and handed to the team's best installed model for it
     if (host.benchRunning()) throw new Error("A benchmark is using the NPU. Stop it in Settings, Developer settings, or wait for it to finish.");
     let team = isDynamicId(entryId) ? await dynamicTeam(host, entryId, messages, !onCommand) : null;
@@ -760,28 +740,10 @@ export async function runChatOrchestrator(host: ChatHost, id: string, entryId: s
       if (isDynamicId(entryId)) { team = await dynamicTeam(host, entryId, messages, !onCommand); if (team) entry = team.pick.entry; } // sorted again on the words, now that the image is text
       lap("Reading the image");
     }
-    // a model that can think is told not to, except for reasoning, maths and plans: its thinking is minutes of waiting for a mail or a page
-    let effortNow = team && !THINKING_OK.has(team.pick.category) ? ("off" as const) : opts.effort;
-    // Auto: the level is read from the kind of request and its words, no model call; a model that cannot think has nothing to settle
-    if (opts.effort === "auto" && thinkingSupport(entry) !== "none") {
-      const lastUser = [...messages].reverse().find((m) => m.role === "user");
-      const words = typeof lastUser?.content === "string" ? lastUser.content : (lastUser?.content ?? []).map((p) => (p.type === "text" ? p.text : "")).join("");
-      const category = team ? team.pick.category : sortRequest(words, { hasFiles: latestArtifacts(messages).length > 0 }).category;
-      const auto = autoEffort(category, words);
-      effortNow = auto.level;
-      host.send({ id, type: "notice", text: `Thinking: ${auto.level} (${auto.why}).` });
-    }
-    // the default level (Medium) of a model picked by hand: a request the words already show to be plain (a mail, a translation, a chat) is
-    // answered without the minutes of thinking; High, Low and Off are the person's own choice and stay
-    if (!team && opts.effort === "medium" && thinkingSupport(entry) === "toggle") {
-      const lastUser = [...messages].reverse().find((m) => m.role === "user");
-      const words = typeof lastUser?.content === "string" ? lastUser.content : (lastUser?.content ?? []).map((p) => (p.type === "text" ? p.text : "")).join("");
-      const kind = sortRequest(words, { hasFiles: latestArtifacts(messages).length > 0 });
-      if (kind.confidence >= 0.8 && !THINKING_OK.has(kind.category)) {
-        effortNow = "off";
-        host.send({ id, type: "notice", text: "A plain request: answered without thinking first (choose High to make it think)." });
-      }
-    }
+    // route (src/core/chatRoute.ts): how much the model thinks for this request, and the notice that says so
+    const thinking = chooseEffort(opts.effort, entry, team ? { category: team.pick.category } : null, messages);
+    const effortNow = thinking.effort;
+    if (thinking.notice) host.send({ id, type: "notice", text: thinking.notice });
     // F04: the served object is carried through model switches — `bring()` re-serves
     // and updates it, so every use below (streams, compaction, helper passes) names
     // the model the server ACTUALLY runs now, not the one the chat started with.
@@ -796,62 +758,22 @@ export async function runChatOrchestrator(host: ChatHost, id: string, entryId: s
     const support = thinkingSupport(entry);
     const level = effortNow ? effectiveEffort(effortNow, support) : null;
     let lean = compactHistory(messages); // older versions of a file only cost context
-    const asks = messages.filter((m) => m.role === "user" && !isMemoMessage(m) && !isFilesMessage(m)).map(questionOf);
-    const latestAsk = asks.at(-1) ?? "";
-    const isVerification = (ask: string) => /^(?:please\s+)?(?:double[ -]check\b|(?:can you |could you )?(?:verify|check again)\b|is it the other way\b|(?:it|that) is wrong\b)/i.test(ask);
-    const verification = isVerification(latestAsk);
-    const priorAsk = verification ? asks.slice(0, -1).reverse().find((ask) => ask && !isVerification(ask)) : undefined;
-    const sourceAsk = priorAsk || latestAsk;
-    const knowledgeFiles = (opts.knowledge ?? []).filter((f) => f.content?.trim());
-    const ownershipLookup = asksOwnership(sourceAsk);
-    const percentageLookup = /\bpercent(?:age)?\b|%/.test(sourceAsk.toLowerCase());
-    // a question that names a reporting period (a quarter, a year, a dated day) asks for a reported figure:
-    // the period is part of the fact, so the evidence must hold it beside the entity and the value
-    const periodLookup = namesPeriod(sourceAsk);
-    const attachments = verification || ownershipLookup || percentageLookup || periodLookup ? documentSourcesOf(messages) : [];
-    const hasSources = knowledgeFiles.length > 0 || attachments.length > 0;
-    const ownership = !opts.buildWanted && hasSources && (ownershipLookup || percentageLookup)
-      ? ownershipPassage([...knowledgeFiles, ...attachments], sourceAsk) : null;
-    if (!opts.buildWanted && hasSources && (ownershipLookup || ownership)) {
-      if (ownership) loadedSections.push(ownership);
-      const text = ownership
-        ? citeAnswer(`${verification ? "I checked the source again.\n\n" : ""}> ${ownership.passage}\n\n[source 1]`, loadedSections).text
-        : "I couldn't verify the ownership percentage from an unambiguous passage in the available documents.";
+    // retrieve (src/core/chatRetrieve.ts): the question read off the conversation, and an answer quoted straight
+    // from the documents when one passage settles it (an ownership stake, a reported figure), with no model call
+    const docQuestion = readDocumentQuestion(messages, opts);
+    const { priorAsk, knowledgeFiles, verification, percentageLookup, periodLookup, hasSources } = docQuestion;
+    const quoted = docQuestion.quoted;
+    if (quoted) {
+      // the sections go in before the step: the citation hook reads them when the step settles
+      loadedSections.push(...quoted.sections);
       await run.step({
-        id: `${id}:know`, kind: "retrieve", input: { query: sourceAsk, place: ownership?.place },
-        schema: sString(), exec: () => ({ output: text, reply: text }),
+        id: `${id}:know`, kind: "retrieve", input: quoted.input,
+        schema: sString(), exec: () => ({ output: quoted.text, reply: quoted.text }),
       });
+      if (quoted.log) console.log(`[knowledge] ${id}: ${quoted.log}`);
       ac.signal.throwIfAborted();
-      host.send({ id, type: "answer", text });
-      host.send({ id, type: "done", stats: { ttftSec: null, tokPerSec: null, tokens: 0, totalSec: 0 } });
-      return;
-    }
-    // A reported figure (an amount, a percentage or a date tied to a named period) or a
-    // recheck of an earlier answer is quoted from the sentence that holds the entity, the
-    // period and the value together, cited, with no model call (the ownership answer's way,
-    // measured on the retrieval benchmark). Sentences that disagree are quoted side by side;
-    // no such sentence leaves the question to the model, told to say when the evidence is
-    // missing or conflicting.
-    let figureMs = 0;
-    const figure = !opts.buildWanted && hasSources && (periodLookup || verification)
-      ? (() => { const t = performance.now(); const f = figurePassage([...knowledgeFiles, ...attachments], sourceAsk, { anyCount: verification && !periodLookup }); figureMs = performance.now() - t; return f; })()
-      : null;
-    if (figure) {
-      const quotes = figure.kind === "one" ? [figure] : figure.quotes;
-      loadedSections.push(...quotes.map(({ file, place }) => ({ file, place })));
-      const lead = verification ? "I checked the source again.\n\n" : "";
-      const body = figure.kind === "one"
-        ? `> ${figure.passage}\n\n[source 1]`
-        : `The sources do not agree on this figure:\n\n${quotes.map((q, i) => `> ${q.passage} [source ${i + 1}]`).join("\n\n")}`;
-      const text = citeAnswer(`${lead}${body}`, loadedSections).text;
-      await run.step({
-        id: `${id}:know`, kind: "retrieve", input: { query: sourceAsk, quoted: figure.kind, places: quotes.map((q) => `${q.file} (${q.place})`), timings: { figureMs: round1(figureMs) } },
-        schema: sString(), exec: () => ({ output: text, reply: text }),
-      });
-      console.log(`[knowledge] ${id}: answered from the source (${figure.kind === "one" ? "one passage" : `${quotes.length} passages that disagree`}) in ${round1(figureMs)} ms, no model call`);
-      ac.signal.throwIfAborted();
-      host.send({ id, type: "answer", text });
-      host.send({ id, type: "done", stats: { ttftSec: null, tokPerSec: null, tokens: 0, totalSec: Math.round((Date.now() - t0) / 10) / 100 } });
+      host.send({ id, type: "answer", text: quoted.text });
+      host.send({ id, type: "done", stats: { ttftSec: null, tokPerSec: null, tokens: 0, totalSec: quoted.kind === "figure" ? Math.round((Date.now() - t0) / 10) / 100 : 0 } });
       return;
     }
     let memoTurnsNow = opts.memoTurns ?? 0; // how many turns the summary at the start of the conversation stands for
@@ -1198,7 +1120,7 @@ export async function runChatOrchestrator(host: ChatHost, id: string, entryId: s
             const foldDir = foldDirOf(host);
             if (foldDir) {
               const full = sections.map((s) => `- ${s.file} — ${s.title} (${placeOf(s)})`).join("\n");
-              const ref = offloadPayload(foldDir, `knowledge-${String(opts.projectId).replace(/[^A-Za-z0-9._-]/g, "_")}`, full);
+              const ref = offloadPayload(foldDir, knowledgeOffloadName(String(opts.projectId)), full);
               rest += `\n[${outline.overflow > 0 ? `${outline.overflow} more sections are listed` : "the sections left out"} in the offload store: ${ref.file}]`;
               knowlOffload = offloadSection(ref);
             }

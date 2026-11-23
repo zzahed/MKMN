@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import * as http from "node:http";
 import type { AddressInfo } from "node:net";
 import { checkedLookup, isPrivateAddress, pinnedGet, type Lookup } from "../src/core/netGuard";
@@ -94,8 +95,13 @@ describe("pinnedGet", () => {
 
 describe("the sidecar reads outside addresses only through the pinned guard", () => {
   it("guards library downloads with the connection-time check and exposes no web search handler", () => {
-    const src = readFileSync("src/sidecar/main.ts", "utf8");
-    expect(src).toContain("const r = await pinnedGet(");
+    // the library download (fetchLibrary) lives with the model methods; the refusals below hold
+    // for every file of the sidecar, main.ts and its area files alike
+    expect(readFileSync("src/sidecar/register/models.ts", "utf8")).toContain("const r = await pinnedGet(");
+    const dir = "src/sidecar";
+    const files = readdirSync(dir, { recursive: true, encoding: "utf8" }).filter((f) => f.endsWith(".ts"));
+    expect(files).toContain("main.ts");
+    const src = files.map((f) => readFileSync(join(dir, f), "utf8")).join("\n");
     expect(src).not.toContain("guardedFetch");
     expect(src).not.toMatch(/register\("(?:testWebSearch|wikimediaImage)"/);
     expect(src).not.toMatch(/redirect: "follow"/);

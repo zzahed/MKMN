@@ -14,6 +14,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSyn
 import * as path from "node:path";
 import { dot, type Embedder } from "./embed";
 import { placeOf } from "./retrieve";
+import { forgetCountOf, safeIdOf } from "./ids";
 
 type SectionLike = { name: string; title: string; text: string; page?: number; slide?: number; sheet?: string; rowFrom?: number; rowTo?: number; scanned?: boolean };
 
@@ -44,7 +45,7 @@ interface Stored {
   count: number;
 }
 
-const fileOf = (dir: string, projectId: string): string => path.join(dir, `${projectId.replace(/[^A-Za-z0-9._-]/g, "_")}.vectors`);
+const fileOf = (dir: string, projectId: string): string => path.join(dir, `${safeIdOf(projectId)}.vectors`);
 
 /** The most recently asked projects' vectors, as the BM25 store keeps its postings. */
 const MEMO_PROJECTS = 4;
@@ -57,6 +58,11 @@ const stampOf = (file: string | null): string => {
 
 export function forgetVectorIndexes(): void {
   memo.clear();
+}
+
+/** Forget one project's vectors held in this process (its file is removed by removeKnowledgeFiles). */
+export function forgetVectorProject(dir: string | null, projectId: string): void {
+  memo.delete(keyOf(dir, projectId));
 }
 
 function over(vectors: Float32Array[], source: VectorIndex["source"]): VectorIndex {
@@ -113,8 +119,11 @@ export async function openVectorIndex(
   let vectors = file ? readStore(file, filesHash, embedder.id) : null;
   let source: VectorIndex["source"] = "store";
   if (!vectors || vectors.length !== sections.length) {
+    const generation = forgetCountOf(dir, projectId);
     vectors = await embedder.embed(sections.map(sectionText));
     source = "built";
+    // the project was deleted while its vectors were being made: they are neither kept nor written
+    if (forgetCountOf(dir, projectId) !== generation) return over(vectors, source);
     if (file) try {
       mkdirSync(dir!, { recursive: true });
       writeStore(file, filesHash, embedder.id, vectors);

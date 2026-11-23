@@ -2,7 +2,7 @@
 
 MKMN 0.0.2 requires Qualcomm GenieX v0.11.0 or newer for local inference and checks it before any GenieX server starts or is adopted. This inventory is generated from source.
 
-Generated from 40 host commands, 132 sidecar methods, 0 Settings groups, 51 Settings sections, 107 Settings rows, 4 Smart functions, 9 screens and 45 scripts.
+Generated from 40 host commands, 133 sidecar methods, 0 Settings groups, 51 Settings sections, 107 Settings rows, 4 Smart functions, 9 screens and 45 scripts.
 
 ## How to read the result column
 
@@ -105,138 +105,139 @@ node scripts/generate-feature-matrix.mjs --check
 
 | ID | Method | Area | How checked | Result |
 |---|---|---|---|---|
-| SID001 | `ping` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID002 | `hfSearch` | Models & catalog | tests/providers.test.ts; tests/modelList.test.ts; tests/removal-safety.test.ts | CONTRACT |
-| SID003 | `browse` | Models & catalog | tests/providers.test.ts; tests/modelList.test.ts; tests/removal-safety.test.ts | CONTRACT |
-| SID004 | `dockerVariants` | Models & catalog | tests/providers.test.ts; tests/modelList.test.ts; tests/removal-safety.test.ts | CONTRACT |
-| SID005 | `resolveModel` | Models & catalog | tests/providers.test.ts; tests/modelList.test.ts; tests/removal-safety.test.ts | CONTRACT |
-| SID006 | `fetchLibrary` | Models & catalog | tests/providers.test.ts; tests/modelList.test.ts; tests/removal-safety.test.ts | CONTRACT; live BLOCKED |
-| SID007 | `convertLegacyDoc` | Documents | tests/officeRead.test.ts | CONTRACT |
-| SID008 | `pickFolder` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID009 | `customEntries` | Models & catalog | tests/providers.test.ts; tests/modelList.test.ts; tests/removal-safety.test.ts | CONTRACT |
-| SID010 | `install` | Models & catalog | tests/providers.test.ts; tests/modelList.test.ts; tests/removal-safety.test.ts | CONTRACT; live PASS |
-| SID011 | `cancelInstall` | Models & catalog | tests/providers.test.ts; tests/modelList.test.ts; tests/removal-safety.test.ts | CONTRACT |
-| SID012 | `uninstall` | Models & catalog | tests/providers.test.ts; tests/modelList.test.ts; tests/removal-safety.test.ts | CONTRACT |
-| SID013 | `geniexSetType` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID014 | `geniexConfigList` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID015 | `geniexClean` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID016 | `geniexPullLocal` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID017 | `installDynamic` | Models & catalog | tests/providers.test.ts; tests/modelList.test.ts; tests/removal-safety.test.ts | CONTRACT; live PASS |
-| SID018 | `installDynamicModel` | Models & catalog | tests/providers.test.ts; tests/modelList.test.ts; tests/removal-safety.test.ts | CONTRACT; live PASS |
-| SID019 | `uninstallDynamic` | Models & catalog | tests/providers.test.ts; tests/modelList.test.ts; tests/removal-safety.test.ts | CONTRACT |
-| SID020 | `voiceModels` | Voice | tests/voice.test.ts; tests/bridge-voice.test.ts; tests/voiceSpeech.test.ts | CONTRACT |
-| SID021 | `voiceStatus` | Voice | tests/voice.test.ts; tests/bridge-voice.test.ts; tests/voiceSpeech.test.ts | CONTRACT |
-| SID022 | `voiceDownload` | Voice | tests/voice.test.ts; tests/bridge-voice.test.ts; tests/voiceSpeech.test.ts | CONTRACT; live BLOCKED |
-| SID023 | `voiceCancelDownload` | Voice | tests/voice.test.ts; tests/bridge-voice.test.ts; tests/voiceSpeech.test.ts | CONTRACT |
-| SID024 | `voiceRemove` | Voice | tests/voice.test.ts; tests/bridge-voice.test.ts; tests/voiceSpeech.test.ts | CONTRACT |
-| SID025 | `voiceApply` | Voice | tests/voice.test.ts; tests/bridge-voice.test.ts; tests/voiceSpeech.test.ts | CONTRACT |
-| SID026 | `transcribe` | Voice | tests/voice.test.ts; tests/bridge-voice.test.ts; tests/voiceSpeech.test.ts | CONTRACT; live BLOCKED |
-| SID027 | `voiceNeeds` | Voice | tests/voice.test.ts; tests/bridge-voice.test.ts; tests/voiceSpeech.test.ts | CONTRACT |
-| SID028 | `voiceQuickInstall` | Voice | tests/voice.test.ts; tests/bridge-voice.test.ts; tests/voiceSpeech.test.ts | CONTRACT; live BLOCKED |
-| SID029 | `speak` | Voice | tests/voice.test.ts; tests/bridge-voice.test.ts; tests/voiceSpeech.test.ts | CONTRACT; live BLOCKED |
-| SID030 | `cancelSpeak` | Voice | tests/voice.test.ts; tests/bridge-voice.test.ts; tests/voiceSpeech.test.ts | CONTRACT |
-| SID031 | `saveVoice` | Voice | tests/voice.test.ts; tests/bridge-voice.test.ts; tests/voiceSpeech.test.ts | CONTRACT |
-| SID032 | `resolveModelIdentity` | Model data | tests/modelIdentity.test.ts; tests/speeds.test.ts; tests/compiled-context-ipc.test.ts | CONTRACT |
-| SID033 | `speedsByRef` | Model data | tests/modelIdentity.test.ts; tests/speeds.test.ts; tests/compiled-context-ipc.test.ts | CONTRACT |
-| SID034 | `speedsById` | Model data | tests/modelIdentity.test.ts; tests/speeds.test.ts; tests/compiled-context-ipc.test.ts | CONTRACT |
-| SID035 | `compiledContexts` | Model data | tests/modelIdentity.test.ts; tests/speeds.test.ts; tests/compiled-context-ipc.test.ts | CONTRACT |
-| SID036 | `startGeniexModel` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID037 | `preloadGeniexModel` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID038 | `restartGeniexModel` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID039 | `benchmarkGeniexModel` | Benchmark | tests/bench.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
-| SID040 | `chat` | Chat | tests/bridge-chat.test.ts; tests/core-chat-orchestrator.test.ts | CONTRACT; live PASS |
-| SID041 | `abortChat` | Chat | tests/bridge-chat.test.ts; tests/core-chat-orchestrator.test.ts | CONTRACT |
-| SID042 | `routerFileKind` | Router | tests/router.test.ts | CONTRACT |
-| SID043 | `skipStep` | Chat | tests/bridge-chat.test.ts; tests/core-chat-orchestrator.test.ts | CONTRACT |
-| SID044 | `routerStatus` | Router | tests/router.test.ts | CONTRACT |
-| SID045 | `routerCandidates` | Router | tests/router.test.ts | CONTRACT |
-| SID046 | `routerBench` | Router | tests/router.test.ts | CONTRACT; live PASS |
-| SID047 | `routerInstall` | Router | tests/router.test.ts | CONTRACT; live PASS |
-| SID048 | `routerTest` | Router | tests/router.test.ts | CONTRACT; live PASS |
-| SID049 | `compactChat` | Chat | tests/bridge-chat.test.ts; tests/core-chat-orchestrator.test.ts | CONTRACT |
-| SID050 | `fixBlock` | Chat | tests/bridge-chat.test.ts; tests/core-chat-orchestrator.test.ts | CONTRACT |
-| SID051 | `setupState` | Setup | tests/setup.test.ts; tests/bridge-setup.test.ts | CONTRACT |
-| SID052 | `setupConfirm` | Setup | tests/setup.test.ts; tests/bridge-setup.test.ts | CONTRACT |
-| SID053 | `setupDecline` | Setup | tests/setup.test.ts; tests/bridge-setup.test.ts | CONTRACT |
-| SID054 | `setupDismiss` | Setup | tests/setup.test.ts; tests/bridge-setup.test.ts | CONTRACT |
-| SID055 | `setupSkip` | Setup | tests/setup.test.ts; tests/bridge-setup.test.ts | CONTRACT |
-| SID056 | `setupRetry` | Setup | tests/setup.test.ts; tests/bridge-setup.test.ts | CONTRACT |
-| SID057 | `setupRunUnsigned` | Setup | tests/setup.test.ts; tests/bridge-setup.test.ts | CONTRACT |
-| SID058 | `updateState` | Updates | tests/bridge-setup.test.ts (contract only) | CONTRACT |
-| SID059 | `updateCheck` | Updates | tests/bridge-setup.test.ts (contract only) | CONTRACT |
-| SID060 | `updateInstall` | Updates | tests/bridge-setup.test.ts (contract only) | CONTRACT; live BLOCKED |
-| SID061 | `updateForce` | Updates | tests/bridge-setup.test.ts (contract only) | CONTRACT; live BLOCKED |
-| SID062 | `benchRoster` | Benchmark | tests/bench.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
-| SID063 | `benchState` | Benchmark | tests/bench.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
-| SID064 | `benchResults` | Benchmark | tests/bench.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
-| SID065 | `benchExport` | Benchmark | tests/bench.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
-| SID066 | `benchReveal` | Benchmark | tests/bench.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
-| SID067 | `openEditedCopy` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID068 | `benchStart` | Benchmark | tests/bench.test.ts; tests/bridge-devtools.test.ts | CONTRACT; live PASS |
-| SID069 | `benchStop` | Benchmark | tests/bench.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
-| SID070 | `benchImportResults` | Benchmark | tests/bench.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
-| SID071 | `adaptiveStatus` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
-| SID072 | `foundryStatus` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
-| SID073 | `foundryEntries` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
-| SID074 | `foundryAdmin` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
-| SID075 | `foundryConfigSet` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
-| SID076 | `foundryConfigReset` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
-| SID077 | `foundryCacheSet` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
-| SID078 | `foundryCacheRemove` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
-| SID079 | `foundryServer` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
-| SID080 | `foundryLogs` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
-| SID081 | `foundryModelInfo` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
-| SID082 | `foundryModelRegister` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
-| SID083 | `foundryModelUnregister` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
-| SID084 | `foundryModelLoad` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
-| SID085 | `foundryModelUnload` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
-| SID086 | `foundryTranscribe` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
-| SID087 | `requirements` | Requirements | tests/requirements.test.ts; tests/requirement-updates.test.ts; tests/requirements-panel.test.tsx | CONTRACT |
-| SID088 | `installRequirement` | Requirements | tests/requirements.test.ts; tests/requirement-updates.test.ts; tests/requirements-panel.test.tsx | CONTRACT |
-| SID089 | `requirementUpdates` | Requirements | tests/requirements.test.ts; tests/requirement-updates.test.ts; tests/requirements-panel.test.tsx | CONTRACT |
-| SID090 | `updateRequirement` | Requirements | tests/requirements.test.ts; tests/requirement-updates.test.ts; tests/requirements-panel.test.tsx | CONTRACT |
-| SID091 | `foundryReport` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
-| SID092 | `npuTestState` | NPU | tests/npuLoad.test.ts; tests/npu-runtime-safety.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
-| SID093 | `npuTestRoster` | NPU | tests/npuLoad.test.ts; tests/npu-runtime-safety.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
-| SID094 | `npuTestStart` | NPU | tests/npuLoad.test.ts; tests/npu-runtime-safety.test.ts; tests/bridge-devtools.test.ts | CONTRACT; live PASS |
-| SID095 | `npuTestStop` | NPU | tests/npuLoad.test.ts; tests/npu-runtime-safety.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
-| SID096 | `npuReset` | NPU | tests/npuLoad.test.ts; tests/npu-runtime-safety.test.ts; tests/bridge-devtools.test.ts | CONTRACT; live BLOCKED |
-| SID097 | `npuResetStatus` | NPU | tests/npuLoad.test.ts; tests/npu-runtime-safety.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
-| SID098 | `batteryRead` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID099 | `labStart` | Prompt lab | tests/promptLab.test.ts; tests/labCode.escape.test.ts; tests/bridge-devtools.test.ts | CONTRACT; live PASS |
-| SID100 | `labStop` | Prompt lab | tests/promptLab.test.ts; tests/labCode.escape.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
-| SID101 | `labState` | Prompt lab | tests/promptLab.test.ts; tests/labCode.escape.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
-| SID102 | `unknownModelCheckState` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID103 | `runCode` | Code execution | tests/runcode.test.ts | CONTRACT |
-| SID104 | `runCommand` | Code execution | tests/runcode.test.ts | CONTRACT |
-| SID105 | `writeRun` | Code execution | tests/runcode.test.ts | CONTRACT |
-| SID106 | `stopRun` | Code execution | tests/runcode.test.ts | CONTRACT |
-| SID107 | `agentRun` | Computer Use | tests/computerUse.test.ts (17 loop tests over the real wire shapes, incl. the long-multiline verify pin); tests/docEdit.test.ts (the Edit-a-copy engine and loop: surgical document.xml edit, verification, Stop, refusals) | CONTRACT |
-| SID108 | `agentStopRun` | Computer Use | tests/computerUse.test.ts (17 loop tests over the real wire shapes, incl. the long-multiline verify pin); tests/docEdit.test.ts (the Edit-a-copy engine and loop: surgical document.xml edit, verification, Stop, refusals) | CONTRACT |
-| SID109 | `agentDocEditDecide` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID110 | `agentDocEdit` | Computer Use | tests/computerUse.test.ts (17 loop tests over the real wire shapes, incl. the long-multiline verify pin); tests/docEdit.test.ts (the Edit-a-copy engine and loop: surgical document.xml edit, verification, Stop, refusals) | CONTRACT |
-| SID111 | `appShutdown` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID112 | `launchSite` | Websites | tests/siteOpen.test.ts | CONTRACT |
-| SID113 | `knowledgeStatus` | Knowledge | tests/knowledge-vectors.test.ts (vector path, store, pinned install); tests/multilingual-search.test.tsx; tests/knowledge-panel.test.ts; tests/knowledge-lifecycle.test.ts | CONTRACT |
-| SID114 | `knowledgeBuild` | Knowledge | tests/knowledge-vectors.test.ts (vector path, store, pinned install); tests/multilingual-search.test.tsx; tests/knowledge-panel.test.ts; tests/knowledge-lifecycle.test.ts | CONTRACT |
-| SID115 | `vectorModelStatus` | Knowledge | tests/knowledge-vectors.test.ts (vector path, store, pinned install); tests/multilingual-search.test.tsx; tests/knowledge-panel.test.ts; tests/knowledge-lifecycle.test.ts | CONTRACT |
-| SID116 | `vectorModelInstall` | Knowledge | tests/knowledge-vectors.test.ts (vector path, store, pinned install); tests/multilingual-search.test.tsx; tests/knowledge-panel.test.ts; tests/knowledge-lifecycle.test.ts | CONTRACT |
-| SID117 | `vectorModelRemove` | Knowledge | tests/knowledge-vectors.test.ts (vector path, store, pinned install); tests/multilingual-search.test.tsx; tests/knowledge-panel.test.ts; tests/knowledge-lifecycle.test.ts | CONTRACT |
-| SID118 | `saveMedia` | Media | tests/media-persistence.test.ts; tests/upload-ownership.test.ts | CONTRACT |
-| SID119 | `readMedia` | Media | tests/media-persistence.test.ts; tests/upload-ownership.test.ts | CONTRACT |
-| SID120 | `tasks` | Tasks | tests/workspace.test.ts (store only) | CONTRACT |
-| SID121 | `saveTask` | Tasks | tests/workspace.test.ts (store only) | CONTRACT |
-| SID122 | `forgetConversation` | Privacy | tests/forget-conversation.test.ts | CONTRACT |
-| SID123 | `deleteTask` | Tasks | tests/workspace.test.ts (store only) | CONTRACT |
-| SID124 | `runTask` | Tasks | tests/workspace.test.ts (store only) | CONTRACT; live PASS |
-| SID125 | `humainKeySaved` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID126 | `humainSaveKey` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID127 | `humainModels` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID128 | `humainRealtimeOpen` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID129 | `humainRealtimeEvents` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID130 | `humainRealtimeSend` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID131 | `humainRealtimeClose` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
-| SID132 | `humainOperation` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID001 | `abortChat` | Chat | tests/bridge-chat.test.ts; tests/core-chat-orchestrator.test.ts | CONTRACT |
+| SID002 | `adaptiveStatus` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
+| SID003 | `agentDocEdit` | Computer Use | tests/computerUse.test.ts (17 loop tests over the real wire shapes, incl. the long-multiline verify pin); tests/docEdit.test.ts (the Edit-a-copy engine and loop: surgical document.xml edit, verification, Stop, refusals) | CONTRACT |
+| SID004 | `agentDocEditDecide` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID005 | `agentRun` | Computer Use | tests/computerUse.test.ts (17 loop tests over the real wire shapes, incl. the long-multiline verify pin); tests/docEdit.test.ts (the Edit-a-copy engine and loop: surgical document.xml edit, verification, Stop, refusals) | CONTRACT |
+| SID006 | `agentStopRun` | Computer Use | tests/computerUse.test.ts (17 loop tests over the real wire shapes, incl. the long-multiline verify pin); tests/docEdit.test.ts (the Edit-a-copy engine and loop: surgical document.xml edit, verification, Stop, refusals) | CONTRACT |
+| SID007 | `appShutdown` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID008 | `batteryRead` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID009 | `benchExport` | Benchmark | tests/bench.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
+| SID010 | `benchImportResults` | Benchmark | tests/bench.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
+| SID011 | `benchResults` | Benchmark | tests/bench.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
+| SID012 | `benchReveal` | Benchmark | tests/bench.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
+| SID013 | `benchRoster` | Benchmark | tests/bench.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
+| SID014 | `benchStart` | Benchmark | tests/bench.test.ts; tests/bridge-devtools.test.ts | CONTRACT; live PASS |
+| SID015 | `benchState` | Benchmark | tests/bench.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
+| SID016 | `benchStop` | Benchmark | tests/bench.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
+| SID017 | `benchmarkGeniexModel` | Benchmark | tests/bench.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
+| SID018 | `browse` | Models & catalog | tests/providers.test.ts; tests/modelList.test.ts; tests/removal-safety.test.ts | CONTRACT |
+| SID019 | `cancelInstall` | Models & catalog | tests/providers.test.ts; tests/modelList.test.ts; tests/removal-safety.test.ts | CONTRACT |
+| SID020 | `cancelSpeak` | Voice | tests/voice.test.ts; tests/bridge-voice.test.ts; tests/voiceSpeech.test.ts | CONTRACT |
+| SID021 | `chat` | Chat | tests/bridge-chat.test.ts; tests/core-chat-orchestrator.test.ts | CONTRACT; live PASS |
+| SID022 | `compactChat` | Chat | tests/bridge-chat.test.ts; tests/core-chat-orchestrator.test.ts | CONTRACT |
+| SID023 | `compiledContexts` | Model data | tests/modelIdentity.test.ts; tests/speeds.test.ts; tests/compiled-context-ipc.test.ts | CONTRACT |
+| SID024 | `convertLegacyDoc` | Documents | tests/officeRead.test.ts | CONTRACT |
+| SID025 | `customEntries` | Models & catalog | tests/providers.test.ts; tests/modelList.test.ts; tests/removal-safety.test.ts | CONTRACT |
+| SID026 | `deleteTask` | Tasks | tests/workspace.test.ts (store only) | CONTRACT |
+| SID027 | `dockerVariants` | Models & catalog | tests/providers.test.ts; tests/modelList.test.ts; tests/removal-safety.test.ts | CONTRACT |
+| SID028 | `fetchLibrary` | Models & catalog | tests/providers.test.ts; tests/modelList.test.ts; tests/removal-safety.test.ts | CONTRACT; live BLOCKED |
+| SID029 | `fixBlock` | Chat | tests/bridge-chat.test.ts; tests/core-chat-orchestrator.test.ts | CONTRACT |
+| SID030 | `forgetConversation` | Privacy | tests/forget-conversation.test.ts; tests/knowledge-forget.test.ts | CONTRACT |
+| SID031 | `foundryAdmin` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
+| SID032 | `foundryCacheRemove` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
+| SID033 | `foundryCacheSet` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
+| SID034 | `foundryConfigReset` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
+| SID035 | `foundryConfigSet` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
+| SID036 | `foundryEntries` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
+| SID037 | `foundryLogs` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
+| SID038 | `foundryModelInfo` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
+| SID039 | `foundryModelLoad` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
+| SID040 | `foundryModelRegister` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
+| SID041 | `foundryModelUnload` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
+| SID042 | `foundryModelUnregister` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
+| SID043 | `foundryReport` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
+| SID044 | `foundryServer` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
+| SID045 | `foundryStatus` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
+| SID046 | `foundryTranscribe` | Engines | tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts | CONTRACT |
+| SID047 | `geniexClean` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID048 | `geniexConfigList` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID049 | `geniexPullLocal` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID050 | `geniexSetType` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID051 | `hfSearch` | Models & catalog | tests/providers.test.ts; tests/modelList.test.ts; tests/removal-safety.test.ts | CONTRACT |
+| SID052 | `humainKeySaved` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID053 | `humainModels` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID054 | `humainOperation` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID055 | `humainRealtimeClose` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID056 | `humainRealtimeEvents` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID057 | `humainRealtimeOpen` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID058 | `humainRealtimeSend` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID059 | `humainSaveKey` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID060 | `install` | Models & catalog | tests/providers.test.ts; tests/modelList.test.ts; tests/removal-safety.test.ts | CONTRACT; live PASS |
+| SID061 | `installDynamic` | Models & catalog | tests/providers.test.ts; tests/modelList.test.ts; tests/removal-safety.test.ts | CONTRACT; live PASS |
+| SID062 | `installDynamicModel` | Models & catalog | tests/providers.test.ts; tests/modelList.test.ts; tests/removal-safety.test.ts | CONTRACT; live PASS |
+| SID063 | `installRequirement` | Requirements | tests/requirements.test.ts; tests/requirement-updates.test.ts; tests/requirements-panel.test.tsx | CONTRACT |
+| SID064 | `knowledgeBuild` | Knowledge | tests/knowledge-vectors.test.ts (vector path, store, pinned install); tests/multilingual-search.test.tsx; tests/knowledge-panel.test.ts; tests/knowledge-lifecycle.test.ts | CONTRACT |
+| SID065 | `knowledgeForget` | Privacy | tests/forget-conversation.test.ts; tests/knowledge-forget.test.ts | CONTRACT |
+| SID066 | `knowledgeStatus` | Knowledge | tests/knowledge-vectors.test.ts (vector path, store, pinned install); tests/multilingual-search.test.tsx; tests/knowledge-panel.test.ts; tests/knowledge-lifecycle.test.ts | CONTRACT |
+| SID067 | `labStart` | Prompt lab | tests/promptLab.test.ts; tests/labCode.escape.test.ts; tests/bridge-devtools.test.ts | CONTRACT; live PASS |
+| SID068 | `labState` | Prompt lab | tests/promptLab.test.ts; tests/labCode.escape.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
+| SID069 | `labStop` | Prompt lab | tests/promptLab.test.ts; tests/labCode.escape.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
+| SID070 | `launchSite` | Websites | tests/siteOpen.test.ts | CONTRACT |
+| SID071 | `npuReset` | NPU | tests/npuLoad.test.ts; tests/npu-runtime-safety.test.ts; tests/bridge-devtools.test.ts | CONTRACT; live BLOCKED |
+| SID072 | `npuResetStatus` | NPU | tests/npuLoad.test.ts; tests/npu-runtime-safety.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
+| SID073 | `npuTestRoster` | NPU | tests/npuLoad.test.ts; tests/npu-runtime-safety.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
+| SID074 | `npuTestStart` | NPU | tests/npuLoad.test.ts; tests/npu-runtime-safety.test.ts; tests/bridge-devtools.test.ts | CONTRACT; live PASS |
+| SID075 | `npuTestState` | NPU | tests/npuLoad.test.ts; tests/npu-runtime-safety.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
+| SID076 | `npuTestStop` | NPU | tests/npuLoad.test.ts; tests/npu-runtime-safety.test.ts; tests/bridge-devtools.test.ts | CONTRACT |
+| SID077 | `openEditedCopy` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID078 | `pickFolder` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID079 | `ping` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID080 | `preloadGeniexModel` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID081 | `readMedia` | Media | tests/media-persistence.test.ts; tests/upload-ownership.test.ts | CONTRACT |
+| SID082 | `requirementUpdates` | Requirements | tests/requirements.test.ts; tests/requirement-updates.test.ts; tests/requirements-panel.test.tsx | CONTRACT |
+| SID083 | `requirements` | Requirements | tests/requirements.test.ts; tests/requirement-updates.test.ts; tests/requirements-panel.test.tsx | CONTRACT |
+| SID084 | `resolveModel` | Models & catalog | tests/providers.test.ts; tests/modelList.test.ts; tests/removal-safety.test.ts | CONTRACT |
+| SID085 | `resolveModelIdentity` | Model data | tests/modelIdentity.test.ts; tests/speeds.test.ts; tests/compiled-context-ipc.test.ts | CONTRACT |
+| SID086 | `restartGeniexModel` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID087 | `routerBench` | Router | tests/router.test.ts | CONTRACT; live PASS |
+| SID088 | `routerCandidates` | Router | tests/router.test.ts | CONTRACT |
+| SID089 | `routerFileKind` | Router | tests/router.test.ts | CONTRACT |
+| SID090 | `routerInstall` | Router | tests/router.test.ts | CONTRACT; live PASS |
+| SID091 | `routerStatus` | Router | tests/router.test.ts | CONTRACT |
+| SID092 | `routerTest` | Router | tests/router.test.ts | CONTRACT; live PASS |
+| SID093 | `runCode` | Code execution | tests/runcode.test.ts | CONTRACT |
+| SID094 | `runCommand` | Code execution | tests/runcode.test.ts | CONTRACT |
+| SID095 | `runTask` | Tasks | tests/workspace.test.ts (store only) | CONTRACT; live PASS |
+| SID096 | `saveMedia` | Media | tests/media-persistence.test.ts; tests/upload-ownership.test.ts | CONTRACT |
+| SID097 | `saveTask` | Tasks | tests/workspace.test.ts (store only) | CONTRACT |
+| SID098 | `saveVoice` | Voice | tests/voice.test.ts; tests/bridge-voice.test.ts; tests/voiceSpeech.test.ts | CONTRACT |
+| SID099 | `setupConfirm` | Setup | tests/setup.test.ts; tests/bridge-setup.test.ts | CONTRACT |
+| SID100 | `setupDecline` | Setup | tests/setup.test.ts; tests/bridge-setup.test.ts | CONTRACT |
+| SID101 | `setupDismiss` | Setup | tests/setup.test.ts; tests/bridge-setup.test.ts | CONTRACT |
+| SID102 | `setupRetry` | Setup | tests/setup.test.ts; tests/bridge-setup.test.ts | CONTRACT |
+| SID103 | `setupRunUnsigned` | Setup | tests/setup.test.ts; tests/bridge-setup.test.ts | CONTRACT |
+| SID104 | `setupSkip` | Setup | tests/setup.test.ts; tests/bridge-setup.test.ts | CONTRACT |
+| SID105 | `setupState` | Setup | tests/setup.test.ts; tests/bridge-setup.test.ts | CONTRACT |
+| SID106 | `skipStep` | Chat | tests/bridge-chat.test.ts; tests/core-chat-orchestrator.test.ts | CONTRACT |
+| SID107 | `speak` | Voice | tests/voice.test.ts; tests/bridge-voice.test.ts; tests/voiceSpeech.test.ts | CONTRACT; live BLOCKED |
+| SID108 | `speedsById` | Model data | tests/modelIdentity.test.ts; tests/speeds.test.ts; tests/compiled-context-ipc.test.ts | CONTRACT |
+| SID109 | `speedsByRef` | Model data | tests/modelIdentity.test.ts; tests/speeds.test.ts; tests/compiled-context-ipc.test.ts | CONTRACT |
+| SID110 | `startGeniexModel` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID111 | `stopRun` | Code execution | tests/runcode.test.ts | CONTRACT |
+| SID112 | `tasks` | Tasks | tests/workspace.test.ts (store only) | CONTRACT |
+| SID113 | `transcribe` | Voice | tests/voice.test.ts; tests/bridge-voice.test.ts; tests/voiceSpeech.test.ts | CONTRACT; live BLOCKED |
+| SID114 | `uninstall` | Models & catalog | tests/providers.test.ts; tests/modelList.test.ts; tests/removal-safety.test.ts | CONTRACT |
+| SID115 | `uninstallDynamic` | Models & catalog | tests/providers.test.ts; tests/modelList.test.ts; tests/removal-safety.test.ts | CONTRACT |
+| SID116 | `unknownModelCheckState` | Host bridge | tests/sidecarProtocol.test.ts; tests/runtime-contracts.test.ts | CONTRACT |
+| SID117 | `updateCheck` | Updates | tests/bridge-setup.test.ts (contract only) | CONTRACT |
+| SID118 | `updateForce` | Updates | tests/bridge-setup.test.ts (contract only) | CONTRACT; live BLOCKED |
+| SID119 | `updateInstall` | Updates | tests/bridge-setup.test.ts (contract only) | CONTRACT; live BLOCKED |
+| SID120 | `updateRequirement` | Requirements | tests/requirements.test.ts; tests/requirement-updates.test.ts; tests/requirements-panel.test.tsx | CONTRACT |
+| SID121 | `updateState` | Updates | tests/bridge-setup.test.ts (contract only) | CONTRACT |
+| SID122 | `vectorModelInstall` | Knowledge | tests/knowledge-vectors.test.ts (vector path, store, pinned install); tests/multilingual-search.test.tsx; tests/knowledge-panel.test.ts; tests/knowledge-lifecycle.test.ts | CONTRACT |
+| SID123 | `vectorModelRemove` | Knowledge | tests/knowledge-vectors.test.ts (vector path, store, pinned install); tests/multilingual-search.test.tsx; tests/knowledge-panel.test.ts; tests/knowledge-lifecycle.test.ts | CONTRACT |
+| SID124 | `vectorModelStatus` | Knowledge | tests/knowledge-vectors.test.ts (vector path, store, pinned install); tests/multilingual-search.test.tsx; tests/knowledge-panel.test.ts; tests/knowledge-lifecycle.test.ts | CONTRACT |
+| SID125 | `voiceApply` | Voice | tests/voice.test.ts; tests/bridge-voice.test.ts; tests/voiceSpeech.test.ts | CONTRACT |
+| SID126 | `voiceCancelDownload` | Voice | tests/voice.test.ts; tests/bridge-voice.test.ts; tests/voiceSpeech.test.ts | CONTRACT |
+| SID127 | `voiceDownload` | Voice | tests/voice.test.ts; tests/bridge-voice.test.ts; tests/voiceSpeech.test.ts | CONTRACT; live BLOCKED |
+| SID128 | `voiceModels` | Voice | tests/voice.test.ts; tests/bridge-voice.test.ts; tests/voiceSpeech.test.ts | CONTRACT |
+| SID129 | `voiceNeeds` | Voice | tests/voice.test.ts; tests/bridge-voice.test.ts; tests/voiceSpeech.test.ts | CONTRACT |
+| SID130 | `voiceQuickInstall` | Voice | tests/voice.test.ts; tests/bridge-voice.test.ts; tests/voiceSpeech.test.ts | CONTRACT; live BLOCKED |
+| SID131 | `voiceRemove` | Voice | tests/voice.test.ts; tests/bridge-voice.test.ts; tests/voiceSpeech.test.ts | CONTRACT |
+| SID132 | `voiceStatus` | Voice | tests/voice.test.ts; tests/bridge-voice.test.ts; tests/voiceSpeech.test.ts | CONTRACT |
+| SID133 | `writeRun` | Code execution | tests/runcode.test.ts | CONTRACT |
 
 ## Settings groups
 

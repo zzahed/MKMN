@@ -28,6 +28,11 @@ if (-not (Test-Path "dist\sidecar\main.js")) { throw "The sidecar is not built: 
 $nodeArch = (& $NodeExe -p "process.arch").Trim()
 if ($nodeArch -ne "arm64") { throw "The given Node.js is '$nodeArch', but MKMN ships an ARM64 runtime. Pass an arm64 node.exe." }
 
+# Generated code runs under Node's permission model, which blocks network access only from
+# Node 25 on; the project requires Node 26 (package.json "engines"). Never ship an older one.
+$nodeMajor = [int](& $NodeExe -p "process.versions.node.split('.')[0]").Trim()
+if ($nodeMajor -lt 26) { throw "The given Node.js is version $nodeMajor, but MKMN ships Node.js 26 or later. Pass a newer node.exe." }
+
 New-Item -ItemType Directory -Force -Path "dist\sidecar-runtime" | Out-Null
 Copy-Item $NodeExe "dist\sidecar-runtime\node.exe" -Force
 

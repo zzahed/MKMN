@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { canTransition, isMachineState, machineDefinition, nextState, STATE_MACHINES } from "../src/shared/stateMachines";
 // The scan is plain ESM so the docs generator and this test look with the same eyes.
@@ -180,6 +180,24 @@ describe("the generated state machine files", () => {
       timeout: 60000,
     });
     expect(output).toContain(`state machines are up to date (${registry.machines.length} machines)`);
+  });
+
+  it("finds nothing stale in a Windows checkout, where the files have CRLF line endings", () => {
+    // GitHub's Windows runners check files out with CRLF; the content is the same
+    const files = ["src/shared/stateMachines.generated.ts", "src-tauri/src/state_machine.rs", "docs/state-machines.md"]
+      .map((f) => join(ROOT, f));
+    const original = files.map((f) => readFileSync(f));
+    try {
+      for (const [i, f] of files.entries()) writeFileSync(f, original[i].toString("utf8").replace(/\r?\n/g, "\r\n"));
+      const output = execFileSync(process.execPath, ["scripts/generate-state-machines.mjs", "--check"], {
+        cwd: ROOT,
+        encoding: "utf8",
+        timeout: 60000,
+      });
+      expect(output).toContain("state machines are up to date");
+    } finally {
+      for (const [i, f] of files.entries()) writeFileSync(f, original[i]);
+    }
   });
 });
 

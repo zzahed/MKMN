@@ -1,0 +1,3 @@
+# Text files are stored with LF line endings, whatever the checkout: a CRLF commit made the
+# whole file show as changed (src/core/server.ts and its test, once). Binary files are left alone.
+* text=auto eol=lf

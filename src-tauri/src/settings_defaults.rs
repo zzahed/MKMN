@@ -56,6 +56,7 @@ pub static SCHEMA_DECLS: &[SchemaDecl] = &[
     SchemaDecl { key: "effort", kind: "enum", values: &["auto", "off", "low", "medium", "high"], min: None, max: None },
     SchemaDecl { key: "subagents", kind: "boolean", values: &[], min: None, max: None },
     SchemaDecl { key: "autoCompact", kind: "boolean", values: &[], min: None, max: None },
+    SchemaDecl { key: "privacy.retentionDays", kind: "number", values: &[], min: Some(1.0), max: Some(3650.0) },
     SchemaDecl { key: "turnBudget", kind: "object", values: &[], min: None, max: None },
     SchemaDecl { key: "turnBudget.maxCalls", kind: "number", values: &[], min: Some(1.0), max: Some(100000.0) },
     SchemaDecl { key: "turnBudget.maxOutputTokens", kind: "number", values: &[], min: Some(1.0), max: Some(100000000.0) },
@@ -167,6 +168,9 @@ static DEFAULTS_JSON: &str = r#"
         "effort": "auto",
         "subagents": false,
         "autoCompact": true,
+        "privacy": {
+            "retentionDays": null
+        },
         "turnBudget": null,
         "toolsOnCommand": false,
         "openFilesBesideChat": true,

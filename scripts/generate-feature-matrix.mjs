@@ -95,7 +95,7 @@ const SIDECAR_AREA = (name) => {
   if (/^(adaptiveStatus|foundry)/.test(name)) return "Engines";
   if (/^(compiledContexts|speedsByRef|speedsById|resolveModelIdentity)$/.test(name)) return "Model data";
   if (name === "convertLegacyDoc") return "Documents";
-  if (name === "forgetConversation") return "Privacy";
+  if (/^(forgetConversation|knowledgeForget)$/.test(name)) return "Privacy";
   if (/^(knowledge(Status|Build)|vectorModel(Status|Install|Remove))$/.test(name)) return "Knowledge";
   if (name === "wikimediaImage") return "Pictures";
   if (name === "testWebSearch") return "Web search";
@@ -121,7 +121,7 @@ const SIDECAR_EVIDENCE = {
   Engines: "tests/foundry.test.ts; tests/foundryAdmin.test.ts; tests/adaptiveCompute.test.ts",
   "Model data": "tests/modelIdentity.test.ts; tests/speeds.test.ts; tests/compiled-context-ipc.test.ts",
   Documents: "tests/officeRead.test.ts",
-  Privacy: "tests/forget-conversation.test.ts",
+  Privacy: "tests/forget-conversation.test.ts; tests/knowledge-forget.test.ts",
   Knowledge: "tests/knowledge-vectors.test.ts (vector path, store, pinned install); tests/multilingual-search.test.tsx; tests/knowledge-panel.test.ts; tests/knowledge-lifecycle.test.ts",
   Pictures: "tests/wikimedia.test.ts",
   "Web search": "manual check (needs a provider)",

@@ -224,7 +224,7 @@ describe("voice worker process (fake backend, real IPC)", () => {
   }, 60000);
   afterAll(() => { fs.rmSync(out, { recursive: true, force: true }); fs.rmSync(models, { recursive: true, force: true }); });
 
-  const mk = (env: NodeJS.ProcessEnv = {}) => new VoiceService(models, path.join(out, "voice", "worker.js"), { OPENNPU_FAKE_VOICE: "1", ...env });
+  const mk = (env: NodeJS.ProcessEnv = {}) => new VoiceService(models, path.join(out, "voice", "worker.js"), { MKMN_FAKE_VOICE: "1", ...env });
   const settings = { ...DEFAULT_VOICE_SETTINGS, sttModelId: "stt-whisper-base", ttsModelId: "tts-kokoro-multi" };
 
   it("loads both models on the CPU, transcribes and streams speech", async () => {
@@ -248,7 +248,7 @@ describe("voice worker process (fake backend, real IPC)", () => {
     await ok.apply({ ...settings, sttCompute: "npu", ttsCompute: "npu" });
     expect([ok.status().sttProvider, ok.status().ttsProvider]).toEqual(["npu", "npu"]);
     await ok.stop();
-    const bad = mk({ OPENNPU_FAKE_QNN_FAIL: "1" });
+    const bad = mk({ MKMN_FAKE_QNN_FAIL: "1" });
     await bad.apply({ ...settings, sttCompute: "npu", ttsCompute: "npu" });
     expect([bad.status().sttProvider, bad.status().ttsProvider]).toEqual(["cpu", "cpu"]);
     expect(bad.status().notice).toMatch(/could not start on the NPU/);
@@ -257,7 +257,7 @@ describe("voice worker process (fake backend, real IPC)", () => {
   }, 20000);
 
   it("NPU switch: a runtime that exits the process on QNN falls back to the CPU", async () => {
-    const v = mk({ OPENNPU_FAKE_QNN_CRASH: "1" });
+    const v = mk({ MKMN_FAKE_QNN_CRASH: "1" });
     await v.apply({ ...settings, sttCompute: "npu", ttsCompute: "npu" });
     expect([v.status().stt, v.status().tts]).toEqual(["stt-whisper-base", "tts-kokoro-multi"]);
     expect([v.status().sttProvider, v.status().ttsProvider]).toEqual(["cpu", "cpu"]);

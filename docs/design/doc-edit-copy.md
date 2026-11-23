@@ -31,9 +31,10 @@ The loop is the same shape the person already knows from the agent strip:
   verify loop. Dependency-injected exactly like `computerUse.ts` (an fs-shaped
   object `{ readFile, writeFile, rename, hash, exists, unlink }`, the model,
   `emit`, `signal`), so tests drive it with fakes and temp files.
-- `src/sidecar/main.ts` — registers `agentDocEdit` in the SAME `agentRuns`
+- `src/sidecar/register/agent.ts` registers `agentDocEdit`; the run itself
+  (`runDocEditAgent` in `src/sidecar/main.ts`) uses the SAME `agentRuns`
   AbortController map that backs `agentStopRun` and appShutdown, so Stop and
-  shutdown work with no new code. The method wraps its work in the
+  shutdown work with no new code. It wraps its work in the
   `withChatSideLease` machinery exactly like `agentRun` does (same "chat" lease,
   same busy-then-refuse behavior).
 - `src/shared/api.ts` + `src/renderer/tauriBridge.ts` — `docPickSource` (a
