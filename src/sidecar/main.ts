@@ -90,6 +90,7 @@ import { registerHumain, fuseConnection, fuseSearchContext, sourcesBlock } from 
 import { registerVoice } from "./register/voice";
 import { registerKnowledge } from "./register/knowledge";
 import { registerTasks } from "./register/tasks";
+import { registerAgent } from "./register/agent";
 import { CLOUD_CHAT_ID, fuseEntry, fuseServed } from "../core/cloudChat";
 import { installedOnlyEntries, parseInstalledJson } from "../core/installedEntries";
 import { checkOutcome, clearLoadFailure, failuresOfThisGeniex, verdictOf, withLoadFailure } from "../core/loadFailures";
@@ -2868,18 +2869,6 @@ const agentDriver: AgentDriver = {
   endRun: () => agentCallHost("agentEndRun", [], 15_000),
 };
 
-dispatcher.register("agentRun", (runId: string, hwnd: number, task: string, modelId: string) => {
-  // fire and forget: the progress streams out as `agentRun` events; the run ends
-  // with a terminal status on the last one (done | unresolved | failed | cancelled)
-  void runAgent(String(runId), Number(hwnd), String(task ?? ""), String(modelId ?? ""));
-});
-
-// "" stops every run: the window that lost track of its run (reopened, redrawn) has no id to give
-dispatcher.register("agentStopRun", (runId: string) => {
-  if (!runId) { for (const ac of agentRuns.values()) ac.abort(); return; }
-  agentRuns.get(String(runId))?.abort();
-});
-
 /**
  * The review gate of Edit a copy: the run emits its proposed change and stops
  * here until the person answers in the interface. The resolver is registered
@@ -2889,21 +2878,7 @@ dispatcher.register("agentStopRun", (runId: string) => {
  */
 const docEditReviews = new Map<string, (ok: boolean) => void>();
 
-dispatcher.register("agentDocEditDecide", (runId: string, approved: unknown) => {
-  const id = String(runId);
-  const resolve = docEditReviews.get(id);
-  if (!resolve) return; // the run already settled (or never reached the gate)
-  docEditReviews.delete(id);
-  resolve(approved === true);
-});
-
-// Edit a copy (docs/design/doc-edit-copy.md): the document-aware road to a Word
-// edit the window loop cannot take — no driver, no grant, no process touched.
-// The run is registered in the SAME agentRuns map, so agentStopRun and
-// appShutdown abort it with no new code.
-dispatcher.register("agentDocEdit", (runId: string, sourcePath: string, task: string, modelId: string) => {
-  void runDocEditAgent(String(runId), String(sourcePath ?? ""), String(task ?? ""), String(modelId ?? ""));
-});
+registerAgent(dispatcher, { agentRuns, docEditReviews, runAgent, runDocEditAgent });
 
 /** The sidecar's own fs, as the loop's DocEditFs sees it. */
 const docEditFs: DocEditFs = {
