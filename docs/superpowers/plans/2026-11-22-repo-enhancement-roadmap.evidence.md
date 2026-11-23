@@ -536,3 +536,8 @@ All files: statements 73.18% (33878/46292), branches 63.75% (25677/40273), funct
 ## CI run 45118319810 (PR 6, commit d526c42, Task 19)
 
 All jobs pass, CodeQL too (0 open alerts). `windows-arm64-tests` ran the suite with coverage: 279 files, 2871 tests passed, 1 skipped; statements 73.2%, branches 63.77%, functions 64.73%, lines 78.46%, within 0.02 of the local baseline and above every threshold. The `coverage` artifact (summary and lcov) was uploaded. Task 18 (b247f06) passed on run 45117160589; Tasks 18 and 19 are green.
+
+## CI run for 92f07c0 (PR 6, Task 20)
+
+`e2e` failed on its first run: in "send a chat message", `getByRole('main').getByRole('status')` matched two elements while the reply streamed (the screen-reader announcement and the "Thinking" indicator), and Playwright's strict mode refuses an ambiguous locator. A bug in the spec, not in the app; it passed locally by timing. Reproduced locally with `--repeat-each 8 --workers 4` (failed), fixed by waiting for the one status that reads "Answer finished", then 24 of 24 passed under the same load. The other two specs passed in CI.
+

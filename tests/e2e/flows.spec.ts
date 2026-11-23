@@ -17,7 +17,9 @@ test("send a chat message and see the reply stream in", async ({ page }) => {
   await expect(main.getByText("Hello there", { exact: true })).toBeVisible();
   // while the reply streams, Stop replaces Send; it goes once the answer is done
   await expect(page.getByRole("button", { name: "Stop", exact: true })).toBeVisible();
-  await expect(main.getByRole("status")).toHaveText("Answer finished", { timeout: 15_000 });
+  // two status regions live in the chat while it streams (the screen-reader announcement and
+  // the "Thinking" indicator): wait for the announcement that the answer is finished
+  await expect(main.getByRole("status").filter({ hasText: /^Answer finished$/ })).toHaveCount(1, { timeout: 15_000 });
   await expect(page.getByRole("button", { name: "Stop", exact: true })).toBeHidden();
   await expect(main.getByText(/This is the preview build, so I am a mock/)).toBeVisible();
   await expect(main.getByText(/tok\/s/)).toBeVisible();
