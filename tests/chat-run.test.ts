@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { CatalogEntry, ChatEvent, ChatMessage, ChatOptions, HardwareProfile, Settings } from "../src/shared/types";
+import type { CatalogEntry, ChatEvent, ChatOptions, HardwareProfile, Settings } from "../src/shared/types";
 import { runChatOrchestrator, type ChatHost, type Served } from "../src/core/chatOrchestrator";
 import { readJournal } from "../src/core/harness/journal";
 

@@ -245,7 +245,6 @@ export function openKnowledgeIndex(dir: string | null, projectId: string, files:
   }
   let docs: StoredDoc[] = [];
   let rebuilt = true;
-  let hadStored = false;
   let storeText: string | null = null; // the store file's text as this open read or wrote it
   try {
     if (file && existsSync(file)) {
@@ -255,8 +254,7 @@ export function openKnowledgeIndex(dir: string | null, projectId: string, files:
       if (stored?.version === 3 && stored.hash === hash && Array.isArray(stored.docs)) {
         docs = stored.docs;
         rebuilt = false;
-        hadStored = true;
-      } else hadStored = true;
+      }
     }
   } catch {
     docs = []; // a damaged store is a store that does not exist

@@ -2,7 +2,6 @@ import type { ChatEvent, ChatMessage, ReviewRun, ReviewStep } from "../shared/ty
 import { ArtifactSegment, artifactsIn, replaceArtifact, stripFence, withoutPointers } from "./artifacts";
 export { withoutPointers };
 import type { CheckReport } from "./codecheck";
-import { stripSubagents } from "./agents";
 import { diffText, errorLines, excerpts, outline, outlineText, Range } from "./focus";
 
 export const REVIEWER_INSTRUCTIONS = [

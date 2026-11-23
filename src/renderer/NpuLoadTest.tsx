@@ -17,7 +17,7 @@ export function NpuLoadTest({ settings, onSave }: { settings: import("../shared/
   const [roster, setRoster] = useState<Roster>([]);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [all, setAll] = useState(false);
-  const [resetReady, setResetReady] = useState(false);
+  const [, setResetReady] = useState(false);
   const hybrid = readBool(settings, "allowHybridLoad");
   const [state, setState] = useState<State>({ running: false, lines: [], results: [] });
   const [error, setError] = useState("");

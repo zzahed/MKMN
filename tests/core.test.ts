@@ -419,7 +419,7 @@ describe("pdf text", () => {
   });
 });
 
-import { splitSections, renderPdf, isPdfText, wrapPdfDoc, resolvePdfDocs, parseLocatorReply, locatorMessages, hasPdfDocs } from "../src/core/pdfSections";
+import { splitSections, renderPdf, isPdfText, wrapPdfDoc, resolvePdfDocs, parseLocatorReply, hasPdfDocs } from "../src/core/pdfSections";
 describe("pdf chapters", () => {
   const page = (items: string[]) => ({ getTextContent: async () => ({ items: items.map((str) => ({ str, hasEOL: true })) }) });
   const body = (w: string) => `${w} `.repeat(300).trim();

@@ -4,7 +4,7 @@
 // structure is pinned by source (grid, name-only options, plain-words result tile).
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { benchmarkTargets, normalizeBenchTarget, runsOnNote } from "../src/core/settingsUi";
+import { normalizeBenchTarget, runsOnNote } from "../src/core/settingsUi";
 import { badgePlacement, benchOptionLabel } from "../src/core/modelList";
 
 const read = (p: string) => readFileSync(p, "utf8");

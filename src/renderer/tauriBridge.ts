@@ -7,11 +7,9 @@ import type { SetupState } from "../core/setup";
 import { CATALOG, ref as entryRef } from "../core/catalog";
 import { scoreEntry } from "../core/fit";
 import { backendChoices, backendNote } from "../core/backends";
-import { applyEffort, effectiveEffort, thinkingSupport } from "../core/effort";
 import { buildOffice, type OfficeKind } from "../core/office";
 import { officeSourceOf } from "../core/exportFormats";
 import { picFromData, type Pics } from "../core/slides";
-import { writeZip } from "../core/zip";
 import { fileExtension } from "../core/artifacts";
 import { VersionBook, type HistoryStorage, type ArtifactSource } from "../core/versionBook";
 import type { History } from "../core/versions";
@@ -23,7 +21,6 @@ import type {
   ChatMessage,
   ChatOptions,
   ChatEvent,
-  ChatStats,
   RunEvent,
   HardwareProfile,
   InstalledModel,
@@ -43,10 +40,7 @@ import type {
   Verdict,
   BenchmarkResult,
   QoSSummary,
-  Sha256VerificationResult,
-  BrowseResult,
-  BrowseRow
-} from "../shared/types";
+  Sha256VerificationResult} from "../shared/types";
 import type { AgentGrant, AgentRunEvent, DriverWindow } from "../shared/agent";
 import { uninstallGate } from "./modelSwitch";
 
@@ -362,16 +356,6 @@ export function dynamicItems(ramGB: number, installed: InstalledModel[], setting
     return [{ entry: e, verdict, hidden: false, installed: installedRefs.has(e.id.toLowerCase()), ref: e.id, custom: false, runsOn: measured }];
   });
 }
-
-/**
- * The model argument `geniex serve --model` and the completions call get for a model id.
- * The static catalog entries resolve to their ref; a Dynamic pack ref ("qwen3-1.7b-native")
- * or a pack id ("dynamic:2B") resolves to the INSTALLED model of the pack that matches
- * (the same matching rule as the desktop build: ai-hub-models/X counts as qualcomm/X, and
- * the pack's alt repos are tried). A ref that matches nothing comes back unchanged, so a
- * failure names the model that was asked for instead of silently serving another one.
- */
-const canonical = (s: string) => s.trim().toLowerCase().replace(/^ai-hub-models\//, "qualcomm/");
 
 /**
  * Model identity resolution runs through the ONE shared resolver

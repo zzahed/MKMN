@@ -140,7 +140,7 @@ export async function* improve(o: ImproveOptions): AsyncGenerator<ChatEvent> {
         what = /^\s*improvement:\s*(.+)$/im.exec(plan)?.[1]?.trim().slice(0, 160) ?? "an improvement";
         const wanted = (/^\s*where:\s*(.+)$/im.exec(plan)?.[1] ?? "").split(/[,;]/).map((x) => x.trim()).filter(Boolean);
         const budget = Math.max(2000, Math.floor(o.maxChars / 2));
-        let pieces = piecesFor(arts, (a, i) => resolveSpots(a.content, wanted.filter((w) => !/^[^:]+:/.test(w) || w.toLowerCase().startsWith(`${a.title.toLowerCase()}:`) || arts.length === 1), outline(a.content)).slice(0, 6), budget);
+        let pieces = piecesFor(arts, (a, _i) => resolveSpots(a.content, wanted.filter((w) => !/^[^:]+:/.test(w) || w.toLowerCase().startsWith(`${a.title.toLowerCase()}:`) || arts.length === 1), outline(a.content)).slice(0, 6), budget);
         if (!pieces) pieces = piecesFor(arts, (a) => resolveSpots(a.content, what.split(/\W+/).filter((w) => w.length > 3)).slice(0, 4), budget);
         if (!pieces) { // nothing matched: start from the top of the first file rather than asking for nothing
           pieces = fileTag(arts[0], excerpts(arts[0].content, [[1, 80]], budget, 0));

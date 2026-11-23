@@ -30,9 +30,8 @@ import { SKILL_DOCS } from "../core/skillDocs";
 import { allSkills } from "../core/skillsDefault";
 import { registerLibraries } from "../core/skillLibs";
 import { Customize } from "./Customize";
-import { ArtifactIcon, BriefcaseIcon, ChipIcon, ClockIcon, GearIcon, PinIcon, PlusIcon, ProjectIcon, SearchIcon } from "./Icons";
+import { ArtifactIcon, BriefcaseIcon, ChipIcon, ClockIcon, GearIcon, PinIcon, ProjectIcon, SearchIcon } from "./Icons";
 import { ICONS, Icon } from "./Icon";
-import { Collapse } from "./Collapse";
 import { usePresence, useFocusTrap, EXIT_MS, reducedMotion } from "./usePresence";
 import { Conversation, Turn, adoptInlineMedia, hydrateConversations, loadConversations, mergeConversations, newConversation, writePersistableConversations } from "./store";
 import { createConversationSaver, type ConversationSaver } from "./conversationSaver";
@@ -801,7 +800,6 @@ export function App() {
     const text = r.content;
     updateTurns(m[1], (turns) => turns.map((t, i) => (i === Number(m[2]) ? { ...t, content: replaceArtifact(t.content, Number(m[3]), text) } : t)));
   }, [updateTurns]);
-  const project = projects.find((p) => p.id === active.projectId) ?? null;
   /** The skills guide opens as a message in a chat of its own. */
   const openSkillDocs = () => {
     const c: Conversation = { ...newConversation(null), title: "Writing skills", turns: [{ role: "assistant", content: SKILL_DOCS, modelName: "Guide" }] };

@@ -56,7 +56,6 @@ const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 /** Word-bounded alternative of every name, longest first. */
 const alt = (names: string[]) => names.map(escapeRe).join("|");
 const NAME_RE = new RegExp(`(?:${alt([...MODELS, ...ENGINES])})`, "giu");
-const MAKER_RE = new RegExp(`(?:${alt(MAKERS)})`, "giu");
 
 /** First-person cues: the sentence speaks about the assistant itself. Arabic letters are not ASCII word characters, so the edges are letter look-arounds, never \b. */
 const SELF_CUE =

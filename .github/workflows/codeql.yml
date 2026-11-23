@@ -1,6 +1,7 @@
 name: codeql
 
-# Code scanning for the JavaScript and TypeScript code, on every pull request and once a week.
+# Code scanning for the TypeScript and JavaScript code, the Rust host and these workflows, on every pull request and once a week.
+# It runs the security-and-quality suite, so findings cover code quality as well as security.
 # Findings appear under the repository's Security tab; this workflow never changes the code.
 # Each action is pinned to a commit; the comment beside it names the version that commit is.
 on:
@@ -19,18 +20,24 @@ concurrency:
 
 jobs:
   analyze:
+    name: analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
       actions: read
       security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, actions, rust]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: github/codeql-action/init@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4
         with:
-          languages: javascript-typescript
+          languages: ${{ matrix.language }}
           build-mode: none
+          queries: security-and-quality
       - uses: github/codeql-action/analyze@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4
         with:
-          category: /language:javascript-typescript
+          category: /language:${{ matrix.language }}

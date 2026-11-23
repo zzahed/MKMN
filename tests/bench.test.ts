@@ -689,7 +689,7 @@ describe("the run", () => {
     // leave it alone even with keepInstalled false.
     const s = setup({
       deps: {
-        install: async (e) => ({ ok: true, alreadyInstalled: true }) as never,
+        install: async (_e) => ({ ok: true, alreadyInstalled: true }) as never,
       },
     });
     s.runner.start({ keys: ["m1", "m2"], mode: "launch", keepInstalled: false, resume: false }, s.targets);

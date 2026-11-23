@@ -5,7 +5,6 @@ import * as path from "node:path";
 import type { CatalogEntry, ChatEvent, ChatMessage, ChatOptions, HardwareProfile, Settings } from "../src/shared/types";
 import { runChatOrchestrator, type ChatHost, type Served } from "../src/core/chatOrchestrator";
 import { Q } from "../src/core/router";
-import { memoMessage } from "../src/core/memo";
 import { readJournal } from "../src/core/harness/journal";
 import { foldOffloadName } from "../src/core/harness/offload";
 

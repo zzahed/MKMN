@@ -1,4 +1,4 @@
-import type { CatalogEntry, Sampling, WriterRole } from "../shared/types";
+import type { CatalogEntry, Sampling } from "../shared/types";
 import { thinkingSupport } from "./effort";
 
 /**

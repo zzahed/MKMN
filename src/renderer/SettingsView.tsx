@@ -509,13 +509,6 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
     return okV && okR;
   }, [settings, save, saveV]);
 
-  /** Reset: writes the schema value, never a hand-copied set. */
-  const resetKeys = useCallback((keys: string[]): Promise<boolean> => {
-    const values: Record<string, unknown> = {};
-    for (const k of keys) values[k] = settingDefault(k);
-    return applyLeaf(values);
-  }, [applyLeaf]);
-
   /** Reset with Undo: the values being replaced are kept so one click restores them. */
   const resetWithUndo = useCallback(async (keys: string[]) => {
     const previous: Record<string, unknown> = {};

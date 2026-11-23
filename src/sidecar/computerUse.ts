@@ -21,7 +21,6 @@ import {
   type AgentRunEvent,
   type AgentRunStatus,
   type AgentStepPhase,
-  type DriverWindow,
   type NodeInfo,
   type ObserveResult,
 } from "../shared/agent";
@@ -344,7 +343,6 @@ export async function runAgentLoop(deps: AgentRunDeps): Promise<AgentRunOutcome>
   const deadline = Date.now() + limits.runBudgetMs;
 
   let step = 0;
-  let lastObserve: ObserveResult | null = null;
   // The note carried into the next proposal: why the last proposal was refused,
   // or that the window's focus moved (the grant never moves with it).
   let note = "";
@@ -394,7 +392,6 @@ export async function runAgentLoop(deps: AgentRunDeps): Promise<AgentRunOutcome>
         if (kind === "gone") return settle("failed", "the window is gone");
         return settle("failed", `the window could not be read: ${String((e as Error)?.message ?? e).slice(0, 200)}`);
       }
-      lastObserve = obs;
       const focusNote = obs.focused ? "" : " (the window is not focused; the grant stays)";
       emitNow("running", step, "observe", `Read ${obs.nodes.length} element${obs.nodes.length === 1 ? "" : "s"} of "${obs.window.title}"${obs.truncated ? " (the tree was cut to fit)" : ""}${focusNote}`);
 
@@ -483,9 +480,8 @@ export async function runAgentLoop(deps: AgentRunDeps): Promise<AgentRunOutcome>
 
       // ---- 4. execute
       emitNow("running", step, "act", describeAction(proposal));
-      let res: ActResult;
       try {
-        res = await withSignal(driver.act(hwnd, proposal), signal);
+        await withSignal(driver.act(hwnd, proposal), signal);
       } catch (e) {
         if (isAborted()) return settle("cancelled", "the person stopped the run");
         const kind = classifyErr(e);

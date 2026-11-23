@@ -20,7 +20,7 @@ import * as path from "node:path";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { datasetHashOf, evaluateIdentityCase, evaluateKnowledgeCase, evaluateLongConversationCase, appendRunRecord, summarizeRun, type EvalDataset, type EvalCase } from "../src/core/harness/evals";
+import { datasetHashOf, evaluateIdentityCase, evaluateKnowledgeCase, evaluateLongConversationCase, appendRunRecord, summarizeRun, type EvalDataset } from "../src/core/harness/evals";
 import { openKnowledgeIndex } from "../src/core/knowledge/store";
 import { readOffice } from "../src/core/office";
 import { extractPdfText } from "../src/core/pdf";

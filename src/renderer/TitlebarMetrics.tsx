@@ -9,7 +9,7 @@ export const TitlebarMetrics: React.FC = () => {
   const [flyoutOpen, setFlyoutOpen] = useState(false);
   // re-renders the staleness verdict: a payload that goes past MAX_METRICS_AGE_MS
   // must flip to "—" even when no event ever arrives to say so (M08)
-  const [tick, setTick] = useState(0);
+  const [, setTick] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   // the event subscription is registered once: read the flyout state through a ref
   const flyoutOpenRef = useRef(false);

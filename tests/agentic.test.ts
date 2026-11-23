@@ -3,7 +3,7 @@ import { streamComplete } from "../src/core/chat";
 import { CONTINUE_PROMPT, endsOpen, fitMessages, joinContinuation, promptTokens, requestUse, tokensOf } from "../src/core/context";
 import { latestArtifacts } from "../src/core/review";
 import { artifactsIn } from "../src/core/artifacts";
-import { parseSearches, stripSubagents, toolResultsMessage } from "../src/core/agents";
+import { parseSearches, stripSubagents } from "../src/core/agents";
 import { orchestrate } from "../src/core/orchestrate";
 import { improve } from "../src/core/improve";
 import { diffText, errorLines, excerpts, outline, resolveSpots } from "../src/core/focus";

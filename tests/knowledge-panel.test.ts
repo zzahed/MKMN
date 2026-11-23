@@ -17,9 +17,7 @@ import type { KnowledgeFileLike } from "../src/core/knowledge/index";
 const read = (p: string) => readFileSync(p, "utf8");
 const proj = read("src/renderer/Projects.tsx");
 const api = read("src/shared/api.ts");
-const machineJson = read("src/shared/stateMachines.json");
 
-const yieldTick = () => new Promise((r) => setImmediate(r));
 const file = (id: string, name: string, content: string): KnowledgeFileLike => ({ id, name, content });
 
 describe("the machine can recover a build that died indexing (the extension C2 needs)", () => {

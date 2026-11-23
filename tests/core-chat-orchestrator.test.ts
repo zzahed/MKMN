@@ -178,7 +178,6 @@ describe("the chat orchestrator (core, fake host)", () => {
     await vi.waitFor(() => expect(die).not.toBeNull());
     abortChat("c3");
     await run;
-    const types = events.map((e) => e.type);
     expect(events.filter((e) => e.type !== "run").at(-1)?.type).toBe("done"); // the terminal event the UI clears busy on (the run view trails it)
     expect(events.some((e) => e.type === "error")).toBe(false);
   });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Gateway } from "../src/core/harness/gateway";
-import { FakeModel, FunctionModel, answerReply, DELTA, STOP, USAGE, DONE, jsonReply } from "../src/core/harness/testing";
+import { FakeModel, FunctionModel, DELTA, STOP, USAGE, DONE, jsonReply } from "../src/core/harness/testing";
 import { sObject, sString, sNumber } from "../src/core/harness/schema";
 
 const SAFE = { temperature: 0, top_p: 1, max_tokens: 50 };

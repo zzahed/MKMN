@@ -201,7 +201,6 @@ export function ArtifactViewer({ artifact, files, live, unit, stage, drawing, pi
   // a page opens on its preview, also while it is written: the preview is redrawn as the file grows (code stays one click away)
   useEffect(() => { setTab(canPreview ? "preview" : "code"); }, [live, canPreview]);
   const tabNow = tab === "edit" && onEdit ? "edit" : canPreview ? (tab === "edit" ? "preview" : tab) : "code";
-  const frame = useRef<HTMLIFrameElement>(null);
   // the code on screen: revealed at an even pace while it is being written
   const smooth = useSmoothText(artifact.content, !!live);
   const typing = !!live || smooth.length < artifact.content.length;
