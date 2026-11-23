@@ -23,6 +23,6 @@ describe("the v0.0.3-rc.1 candidate version", () => {
     expect(notes).toContain(`MKMN AI ${version}`);
     expect(readFileSync("docs/RELEASE-NOTES.md", "utf8")).toContain(`Current candidate: v${version}`);
     expect(readFileSync("README.md", "utf8")).toContain(`Release candidate: v${version}`);
-    expect(readFileSync("docs/README.md", "utf8")).toContain(`Current release: v${version}`);
+    expect(readFileSync("docs/README.md", "utf8")).toContain(`Current candidate: v${version}`);
   });
 });
