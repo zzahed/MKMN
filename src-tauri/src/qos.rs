@@ -10,6 +10,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, HANDLE, INVALID_HANDLE_VALUE};
 use windows_sys::Win32::System::Threading::*;
+// the match on a priority class names each constant by its path: a bare name that stopped resolving would become a
+// binding that matches every value, while a path that stops resolving does not compile
+use windows_sys::Win32::System::Threading as threading;
 
 use crate::paths::append_log;
 use crate::power::set_sleep_inhibit;
@@ -452,11 +455,11 @@ pub fn get_process_qos_summary(pid: u32) -> Result<QoSSummary, String> {
         let timer_coalescing = (throttling.StateMask & PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION) != 0;
 
         let (tier, prio_str) = match prio {
-            ABOVE_NORMAL_PRIORITY_CLASS | HIGH_PRIORITY_CLASS | REALTIME_PRIORITY_CLASS => {
+            threading::ABOVE_NORMAL_PRIORITY_CLASS | threading::HIGH_PRIORITY_CLASS | threading::REALTIME_PRIORITY_CLASS => {
                 (QoSTier::InferenceCritical, "ABOVE_NORMAL_PRIORITY_CLASS")
             }
-            BELOW_NORMAL_PRIORITY_CLASS => (QoSTier::BackgroundEco, "BELOW_NORMAL_PRIORITY_CLASS"),
-            IDLE_PRIORITY_CLASS => (QoSTier::BackgroundEco, "IDLE_PRIORITY_CLASS"),
+            threading::BELOW_NORMAL_PRIORITY_CLASS => (QoSTier::BackgroundEco, "BELOW_NORMAL_PRIORITY_CLASS"),
+            threading::IDLE_PRIORITY_CLASS => (QoSTier::BackgroundEco, "IDLE_PRIORITY_CLASS"),
             _ => {
                 if ecoqos_active {
                     (QoSTier::BackgroundEco, "NORMAL_PRIORITY_CLASS (EcoQoS Overridden)")
