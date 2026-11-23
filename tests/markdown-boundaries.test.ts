@@ -15,7 +15,7 @@ describe("Markdown thematic-break boundaries", () => {
 
   it("preserves subsequent list, quote and fenced-code boundaries", () => {
     expect(
-      parseMarkdown("before\n---\n- item\n> quote\n\`\`\`js\nconst n = 1;\n\`\`\`").map(
+      parseMarkdown("before\n---\n- item\n> quote\n```js\nconst n = 1;\n```").map(
         (block) => block.t,
       ),
     ).toEqual(["p", "hr", "ul", "quote", "code"]);
