@@ -469,15 +469,20 @@ describe("the Edit a copy loop", () => {
 
   it("Stop while the review gate stands open settles cancelled with nothing written", async () => {
     const { f, run, events, ac, files } = await loopSetup();
-    // the gate blocks until the run's own abort signal reaches it (main.ts's shape)
+    // the gate blocks until the run's own abort signal reaches it (main.ts's shape), and says
+    // when the run has reached it: Stop is pressed then, not after a guessed delay that a busy
+    // machine can outrun (the run then stopped before the gate, with another line)
+    let reachedGate!: () => void;
+    const atGate = new Promise<void>((r) => { reachedGate = r; });
     const gate = {
       waitFor: (_id: string, signal: AbortSignal) =>
         new Promise<boolean>((_resolve, reject) => {
           signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+          reachedGate();
         }),
     };
     const pending = run(fakeModel([EDITS([["shared drive", "Q3 archive"]])]), gate);
-    await new Promise((r) => setTimeout(r, 10));
+    await atGate;
     ac.abort();
     await pending;
     const last = events[events.length - 1]!;
