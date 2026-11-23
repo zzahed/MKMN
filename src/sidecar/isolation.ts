@@ -28,46 +28,65 @@ export function codeDirs(sidecarDir: string): string[] {
  *  that does not answers ECONNREFUSED (or CONNECTED). */
 const PROBE = `const s = require("net").connect(9, "127.0.0.1"); s.on("connect", () => { console.log("CONNECTED"); s.destroy(); }); s.on("error", (e) => console.log(e.code));`;
 const PROBE_MS = 10_000;
-/** Only this answer proves the ban: no output, a timeout or a crash is never taken as proof. */
-const denied = (stdout: unknown): boolean => String(stdout ?? "").trim() === "ERR_ACCESS_DENIED";
+/**
+ * What the probe printed. Only ERR_ACCESS_DENIED proves the ban (true). CONNECTED or a socket
+ * error code (ECONNREFUSED, EACCES...) proves the network open (false). No output, a timeout, a
+ * crash or anything else cannot tell (null): never taken as proof, and asked again next run.
+ */
+export function probeVerdict(stdout: unknown): boolean | null {
+  const out = String(stdout ?? "").trim();
+  if (out === "ERR_ACCESS_DENIED") return true;
+  if (/^(?:CONNECTED|E(?!RR_)[A-Z0-9]+)$/.test(out)) return false;
+  return null;
+}
 
 /** Whether `nodePath`, started with the same locked flags as the isolated checks, really blocks
- *  network access. Asked once before the first isolated run; false refuses generated code. */
-export function proveNetworkDenied(nodePath: string, readDirs: string[]): Promise<boolean> {
+ *  network access (probeVerdict): true runs generated code, false and null refuse it. */
+export function proveNetworkDenied(nodePath: string, readDirs: string[]): Promise<boolean | null> {
   return new Promise((resolve) => {
-    execFile(nodePath, [...lockedNodeArgs(readDirs, "-e"), PROBE], { windowsHide: true, timeout: PROBE_MS, env: {} }, (_e, stdout) => resolve(denied(stdout)));
+    execFile(nodePath, [...lockedNodeArgs(readDirs, "-e"), PROBE], { windowsHide: true, timeout: PROBE_MS, env: {} }, (_e, stdout) => resolve(probeVerdict(stdout)));
   });
 }
 
 /** proveNetworkDenied for a synchronous first run. */
-export function proveNetworkDeniedSync(nodePath: string, readDirs: string[]): boolean {
+export function proveNetworkDeniedSync(nodePath: string, readDirs: string[]): boolean | null {
   const r = spawnSync(nodePath, [...lockedNodeArgs(readDirs, "-e"), PROBE], { windowsHide: true, timeout: PROBE_MS, encoding: "utf8", env: {} });
-  return !r.error && denied(r.stdout);
+  return r.error ? null : probeVerdict(r.stdout);
 }
 
 /** How the runner proves the runtime blocks the network (injected by tests). */
-export interface NetworkProbe { probe?: () => Promise<boolean>; probeSync?: () => boolean }
+export interface NetworkProbe { probe?: () => Promise<boolean | null>; probeSync?: () => boolean | null }
 
 export function lockedNodeRunner(nodeExe = process.execPath, worker = path.join(__dirname, "isolateWorker.js"), readDirs = codeDirs(__dirname), net: NetworkProbe = {}): IsolationRunner {
   const args = lockedNodeArgs(readDirs, worker);
   const probe = net.probe ?? (() => proveNetworkDenied(nodeExe, readDirs));
   const probeSync = net.probeSync ?? (() => proveNetworkDeniedSync(nodeExe, readDirs));
-  // Asked once per sidecar start, before the first generated code runs, then remembered.
-  // There is no fallback: a runtime that cannot block the network runs no generated code.
+  // Asked before the first generated code runs; a definite answer (proven blocked, proven open)
+  // is remembered for the sidecar's life. "Could not tell" (no output, a timeout, a probe that
+  // threw) refuses that run and is asked again next time: a slow first start under load is not
+  // kept as "unsafe" for the session. There is no fallback: only a proof runs generated code.
   let verdict: boolean | null = null;
-  let asking: Promise<boolean> | null = null;
-  const safe = async (): Promise<boolean> => {
+  let asking: Promise<boolean | null> | null = null;
+  const safe = async (): Promise<boolean | null> => {
     if (verdict !== null) return verdict;
-    asking ??= probe().catch(() => false).then((v) => (verdict ??= v));
+    asking ??= probe().catch(() => null).then((v) => {
+      asking = null;
+      if (v !== null) verdict ??= v;
+      return verdict ?? v;
+    });
     return asking;
   };
-  const safeSync = (): boolean => {
-    if (verdict === null) { try { verdict = probeSync(); } catch { verdict = false; } }
-    return verdict;
+  const safeSync = (): boolean | null => {
+    if (verdict !== null) return verdict;
+    let v: boolean | null;
+    try { v = probeSync(); } catch { v = null; }
+    if (v !== null) verdict = v;
+    return v;
   };
   return {
     async run(op: IsolatedOp, a: unknown[]): Promise<unknown> {
-      if (!(await safe())) throw new IsolationUnsafeError();
+      const proven = await safe();
+      if (proven !== true) throw new IsolationUnsafeError(proven === null);
       return new Promise((resolve, reject) => {
         const child = spawn(nodeExe, args, { windowsHide: true, env: bareEnv(), stdio: ["pipe", "pipe", "pipe"] });
         let out = "", err = "";
@@ -83,7 +102,8 @@ export function lockedNodeRunner(nodeExe = process.execPath, worker = path.join(
       });
     },
     runSync(op: IsolatedOp, a: unknown[]): unknown {
-      if (!safeSync()) throw new IsolationUnsafeError();
+      const proven = safeSync();
+      if (proven !== true) throw new IsolationUnsafeError(proven === null);
       const r = spawnSync(nodeExe, args, { windowsHide: true, env: bareEnv(), input: JSON.stringify({ op, args: a }), encoding: "utf8", timeout: LIMIT_MS, maxBuffer: 16 << 20 });
       if (r.error) throw r.error;
       return readReply(r.stdout ?? "", r.stderr ?? "", r.status);

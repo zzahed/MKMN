@@ -7,7 +7,7 @@ import { runExamples, smokeRun } from "../src/core/construct/sandbox";
 import { runCases } from "../src/core/benchChecks";
 import { codeChecks } from "../src/core/labCode";
 import { IsolationUnsafeError, lockedNodeArgs, setIsolation } from "../src/core/isolate";
-import { codeDirs, lockedNodeRunner, proveNetworkDenied, proveNetworkDeniedSync } from "../src/sidecar/isolation";
+import { codeDirs, lockedNodeRunner, probeVerdict, proveNetworkDenied, proveNetworkDeniedSync } from "../src/sidecar/isolation";
 
 /**
  * Code a model wrote was run with node:vm INSIDE the sidecar: Node says vm is not a
@@ -124,10 +124,45 @@ describe("generated code runs only on a runtime that is proven to block the netw
     expect(src).not.toMatch(/from\s+"(node:)?(child_process|fs|net|dgram|dns|os|path|http|https)"/);
   });
 
-  it("fails closed: no answer from the probe is never taken as a denied network", async () => {
-    expect(await proveNetworkDenied(NO_NODE, dirs())).toBe(false);
-    expect(proveNetworkDeniedSync(NO_NODE, dirs())).toBe(false);
+  it("fails closed: no answer from the probe is never taken as a denied network (it is 'could not tell')", async () => {
+    expect(await proveNetworkDenied(NO_NODE, dirs())).toBeNull();
+    expect(proveNetworkDeniedSync(NO_NODE, dirs())).toBeNull();
   }, 60_000);
+
+  // The final review: one slow first start (an antivirus scan, a loaded PC) used to be kept as
+  // "unsafe" for the whole session, and the message blamed the runtime. Only a definite answer
+  // is remembered now; "could not tell" refuses that run and is asked again.
+  it("reads the probe's output: only ERR_ACCESS_DENIED proves the ban, a socket error code proves it open, anything else is 'could not tell'", () => {
+    expect(probeVerdict("ERR_ACCESS_DENIED\n")).toBe(true);
+    expect(probeVerdict("ECONNREFUSED")).toBe(false);
+    expect(probeVerdict("CONNECTED")).toBe(false);
+    expect(probeVerdict("EACCES")).toBe(false);
+    expect(probeVerdict("")).toBeNull();
+    expect(probeVerdict(undefined)).toBeNull();
+    expect(probeVerdict("node:internal/modules/cjs/loader:1\nError: boom")).toBeNull();
+  });
+
+  it("'could not tell' refuses this run with its own message, is not remembered, and a later proof lets the check run", async () => {
+    const answers: (boolean | null)[] = [null, true];
+    let probes = 0;
+    const next = (): boolean | null => (probes < answers.length ? answers[probes++] : (probes++, true));
+    const runner = lockedNodeRunner(process.execPath, worker, dirs(), { probe: async () => next(), probeSync: () => next() });
+    const first = await runner.run("runExamples", []).catch((e: Error) => e);
+    expect(first).toBeInstanceOf(IsolationUnsafeError);
+    expect((first as Error).message).toBe("Generated code is paused: MKMN could not confirm that this Node.js runtime blocks network access. It checks again on the next run.");
+    setIsolation(runner);
+    expect(await runExamples([], "function add(a, b) { return a + b; }", [{ call: "add(2, 3)", expect: "5" }])).toEqual({ ok: true, failures: [] });
+    expect(await runExamples([], "function add(a, b) { return a + b; }", [{ call: "add(1, 1)", expect: "2" }])).toEqual({ ok: true, failures: [] });
+    expect(probes).toBe(2); // asked again after "could not tell", then the proof is remembered
+  }, 60_000);
+
+  it("a probe that throws is 'could not tell' too, on the synchronous path as well", () => {
+    let probes = 0;
+    const runner = lockedNodeRunner(NO_NODE, worker, dirs(), { probe: async () => { throw new Error("spawn failed"); }, probeSync: () => { probes++; throw new Error("spawn failed"); } });
+    expect(() => runner.runSync("runExamples", [])).toThrow(/could not confirm/);
+    expect(() => runner.runSync("runExamples", [])).toThrow(/could not confirm/);
+    expect(probes).toBe(2);
+  });
 
   it("a locked process cannot resolve a name, send UDP or fetch either", async () => {
     const run = (code: string) => new Promise<string>((resolve) => {

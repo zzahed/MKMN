@@ -28,10 +28,13 @@ export function lockedNodeArgs(readDirs: string[], script: string): string[] {
   return ["--permission", ...readDirs.map((d) => `--allow-fs-read=${d}`), script];
 }
 
-/** Raised instead of running generated code on a Node.js that does not enforce the network ban. */
+/** Raised instead of running generated code on a Node.js that does not enforce the network ban,
+ *  or, with `unconfirmed`, when the check could not tell this time (it is asked again next run). */
 export class IsolationUnsafeError extends Error {
-  constructor() {
-    super("Generated code is turned off: this Node.js runtime cannot block network access.");
+  constructor(unconfirmed = false) {
+    super(unconfirmed
+      ? "Generated code is paused: MKMN could not confirm that this Node.js runtime blocks network access. It checks again on the next run."
+      : "Generated code is turned off: this Node.js runtime cannot block network access.");
     this.name = "IsolationUnsafeError";
   }
 }
