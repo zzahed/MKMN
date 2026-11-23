@@ -75,7 +75,7 @@ describe("the checks", () => {
 
   it("gives full marks to a good answer and none to nonsense", () => {
     for (const [id, answer] of Object.entries(GOOD)) {
-      if (/^py_|repair_python/.test(id) && !findPython()) continue;
+      if (/^(?:py_|repair_python$)/.test(id) && !findPython()) continue;
       const c = test(id).check(answer);
       expect(c.score, `${id}: ${c.note}`).toBe(1);
       if (!["tool_none", "search_skip"].includes(id)) expect(test(id).check("lorem ipsum").score, `${id} nonsense`).toBeLessThan(0.5); // those two reward saying nothing special

@@ -48,7 +48,7 @@ export function parseOutline(reply: string): XOutline {
       // a small model that copies one description onto every line, repeats a name or writes its instructions back is not given a drawing per line
       const aboutText = (dim ? about.join(" ") : [size, ...about].filter(Boolean).join(" ")).trim().toLowerCase();
       if (!name || out.art.some((a) => a.name === slug(name)) || name.split(/\s+/).length > 4 || /\b(repeat|closing|file|tag|message)\b/i.test(name) || (aboutText && out.art.some((a) => a.about.trim().toLowerCase() === aboutText))) continue;
-      if (name && /[a-z]/i.test(name)) out.art.push({ name: slug(name), w: dim ? Math.min(512, +dim[1]) : 32, h: dim ? Math.min(512, +dim[2]) : 32, about: (dim ? about.join(" ") : [size, ...about].filter(Boolean).join(" ")).trim() || name });
+      if (/[a-z]/i.test(name)) out.art.push({ name: slug(name), w: dim ? Math.min(512, +dim[1]) : 32, h: dim ? Math.min(512, +dim[2]) : 32, about: (dim ? about.join(" ") : [size, ...about].filter(Boolean).join(" ")).trim() || name });
     }
     else {
       const parts = m[2].split("|").map((p) => p.trim());

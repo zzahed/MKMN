@@ -46,6 +46,7 @@ import { routeVisual } from "./visualRoute";
 import { templateChart } from "./chartTemplates";
 import { settleCharts, mendLeakedFormulas, chartBlocks, chartFlaw } from "./chart";
 import { settleBlocks } from "./blocks";
+import type { CheckReport } from "./codecheck";
 import { prepareTurn } from "./chatPrepare";
 import { chooseEffort } from "./chatRoute";
 import { readDocumentQuestion } from "./chatRetrieve";
@@ -116,7 +117,8 @@ export interface ChatHost {
   /** One slide's page drawn in a hidden window, with what is wrong in it. Absent when this host cannot draw slides: the deck build then judges every slide by the app's own layout measure only and says so, it never claims a render. */
   renderSlide?(html: string): Promise<RenderResult>;
   lookAtShot(id: string, shot: string, question: string, signal: AbortSignal): Promise<string | null>;
-  checkArtifact(a: any, all: any, o?: any): Promise<any>;
+  /** Runs a file (a page is played) and reports what went wrong; `probe` asks which controls changed nothing. */
+  checkArtifact(a: unknown, all: unknown, o?: { probe?: boolean; scenarios?: unknown }): Promise<CheckReport & { wired?: number }>;
   /** Keeps the PC awake during a long improve loop; returns the stopper. */
   keepAwake?(): () => void;
   notify?(title: string, body: string): void;
@@ -1352,111 +1354,109 @@ export async function runChatOrchestrator(host: ChatHost, id: string, entryId: s
     }
     if (ac.signal.aborted) throw ac.signal.reason;
     if (!done) throw new Error("The response ended before the model reported completion.");
-    if (done) {
-      if (done.type === "done") {
-        const prepSec = sentAt === null ? null : Math.round(((sentAt - t0) / 1000) * 100) / 100;
-        done = { ...done, stats: { ...done.stats, prepSec, prep: laps } };
-        // with the wait before the request counted, the word the person saw first is the answer's, not the model's first thought
-        if (knowledgeNote) console.log(`[knowledge] ${id}: ${knowledgeNote}; request ${promptTokens(lean)} tokens; first token ${done.stats.ttftSec ?? "?"} s; turn ${Math.round((Date.now() - t0) / 10) / 100} s`);
-        if (prepSec !== null && done.stats.answerSec != null && done.stats.answerSec > 2) console.log(`[chat] ${prepSec}s before the request (${laps.map((l) => `${l.name} ${l.sec}s`).join(", ") || "nothing slow"}), then ${done.stats.answerSec}s to the first word (first token ${done.stats.ttftSec}s)`);
+    if (done.type === "done") {
+      const prepSec = sentAt === null ? null : Math.round(((sentAt - t0) / 1000) * 100) / 100;
+      done = { ...done, stats: { ...done.stats, prepSec, prep: laps } };
+      // with the wait before the request counted, the word the person saw first is the answer's, not the model's first thought
+      if (knowledgeNote) console.log(`[knowledge] ${id}: ${knowledgeNote}; request ${promptTokens(lean)} tokens; first token ${done.stats.ttftSec ?? "?"} s; turn ${Math.round((Date.now() - t0) / 10) / 100} s`);
+      if (prepSec !== null && done.stats.answerSec != null && done.stats.answerSec > 2) console.log(`[chat] ${prepSec}s before the request (${laps.map((l) => `${l.name} ${l.sec}s`).join(", ") || "nothing slow"}), then ${done.stats.answerSec}s to the first word (first token ${done.stats.ttftSec}s)`);
+    }
+    if (!onCommand) await nameChat();
+    const steps: ReviewStep[] = [];
+    const edits = settleEdits(host, id, answer, base, entry, srv, opts.effort, ac.signal, steps);
+    for (let r = await edits.next(); ; r = await edits.next()) {
+      if (r.done) { answer = r.value; break; }
+      host.send(r.value);
+    }
+    // the app's own instructions copied into the reply are cut out
+    const leak = stripPromptLeak(answer);
+    if (leak.stripped) { answer = leak.text; host.send({ id, type: "replace", text: answer }); }
+    // the citations stand: markers the request never carried are dropped, the
+    // Sources line names what stands (the streamed words went out live; this
+    // corrects the message as a whole)
+    const cited = citeAnswer(answer, loadedSections);
+    if (cited.text !== answer) { answer = cited.text; host.send({ id, type: "replace", text: answer }); }
+    // a cited sentence whose figures its cited passage does not hold is named, never rewritten
+    const unsupported = unsupportedNotice(unsupportedFigures(answer, loadedSections));
+    if (unsupported) host.send({ id, type: "notice", text: unsupported });
+    // a known calculator (compound interest, a loan) is drawn from a tested chart when the model wrote none that draws: small models fail at this JSON
+    try {
+      const lastAsk = [...base].reverse().find((m) => m.role === "user");
+      const askText = typeof lastAsk?.content === "string" ? lastAsk.content : (lastAsk?.content ?? []).map((p) => (p.type === "text" ? p.text : "")).join("");
+      const route = routeVisual(askText);
+      const tpl = !onCommand && route && (route.kind === "calculator" || route.kind === "chart" || route.kind === "diagram") ? templateChart(askText) : null;
+      if (tpl && !chartBlocks(answer).some((b) => chartFlaw(b.raw) === null)) {
+        answer = `${tpl.intro}\n\n${tpl.block}`;
+        host.send({ id, type: "replace", text: answer });
+        host.send({ id, type: "notice", text: "The model's own drawing could not be used, so a tested calculator was drawn instead." });
       }
-      if (!onCommand) await nameChat();
-      const steps: ReviewStep[] = [];
-      const edits = settleEdits(host, id, answer, base, entry, srv, opts.effort, ac.signal, steps);
-      for (let r = await edits.next(); ; r = await edits.next()) {
-        if (r.done) { answer = r.value; break; }
-        host.send(r.value);
-      }
-      // the app's own instructions copied into the reply are cut out
-      const leak = stripPromptLeak(answer);
-      if (leak.stripped) { answer = leak.text; host.send({ id, type: "replace", text: answer }); }
-      // the citations stand: markers the request never carried are dropped, the
-      // Sources line names what stands (the streamed words went out live; this
-      // corrects the message as a whole)
-      const cited = citeAnswer(answer, loadedSections);
-      if (cited.text !== answer) { answer = cited.text; host.send({ id, type: "replace", text: answer }); }
-      // a cited sentence whose figures its cited passage does not hold is named, never rewritten
-      const unsupported = unsupportedNotice(unsupportedFigures(answer, loadedSections));
-      if (unsupported) host.send({ id, type: "notice", text: unsupported });
-      // a known calculator (compound interest, a loan) is drawn from a tested chart when the model wrote none that draws: small models fail at this JSON
+    } catch { /* the usual correction below still runs */ }
+    // a chart that cannot be drawn is mended before the person sees a red box
+    if (!onCommand && /```chart/.test(answer)) {
       try {
-        const lastAsk = [...base].reverse().find((m) => m.role === "user");
-        const askText = typeof lastAsk?.content === "string" ? lastAsk.content : (lastAsk?.content ?? []).map((p) => (p.type === "text" ? p.text : "")).join("");
-        const route = routeVisual(askText);
-        const tpl = !onCommand && route && (route.kind === "calculator" || route.kind === "chart" || route.kind === "diagram") ? templateChart(askText) : null;
-        if (tpl && !chartBlocks(answer).some((b) => chartFlaw(b.raw) === null)) {
-          answer = `${tpl.intro}\n\n${tpl.block}`;
-          host.send({ id, type: "replace", text: answer });
-          host.send({ id, type: "notice", text: "The model's own drawing could not be used, so a tested calculator was drawn instead." });
+        // a chart beyond the usual slips goes to the model the benchmark found best for JSON (the pack's structured-output pick), when the pack has one installed
+        const jsonModel = (team ? pickModel(team.pack, "tool_use", team.installed, { loaded: host.lastLoaded() })?.entry : undefined) ?? entry;
+        const charts = await settleCharts(answer, async (system, user) => {
+          await bring(jsonModel);
+          return collect(host, jsonModel, jsonModel === entry ? srv : await host.ensureServer(jsonModel), [{ role: "system", content: system }, { role: "user", content: user }], `${id}:chart`, ac.signal, "off");
+        });
+        await bring(entry);
+        if (charts.text !== answer) { answer = charts.text; host.send({ id, type: "replace", text: answer }); }
+        if (charts.mended) host.send({ id, type: "notice", text: `${charts.mended === 1 ? "A chart was" : `${charts.mended} charts were`} mended so that ${charts.mended === 1 ? "it draws" : "they draw"}.` });
+        if (charts.left.length) host.send({ id, type: "notice", text: `A chart still cannot be drawn: ${charts.left[0]}.` });
+        // placeholders and TeX copied into the sentences around the chart are filled and typeset
+        const leaks = mendLeakedFormulas(answer);
+        if (leaks.mended) { answer = leaks.text; host.send({ id, type: "replace", text: answer }); }
+      } catch (e) { if (ac.signal.aborted) throw e; }
+    }
+    // a quiz, a sheet, key figures, cards or a list that would not draw as written is corrected the same way
+    if (!onCommand && /```(quiz|qcm|mcq|sheet|spreadsheet|kpi|figures|cards|flashcards|checklist|todo)\b/i.test(answer)) {
+      try {
+        const blocks = await settleBlocks(answer, (system, user) => collect(host, entry, srv, [{ role: "system", content: system }, { role: "user", content: user }], `${id}:block`, ac.signal, "off"));
+        if (blocks.text !== answer) { answer = blocks.text; host.send({ id, type: "replace", text: answer }); }
+        if (blocks.mended) host.send({ id, type: "notice", text: `${blocks.mended === 1 ? "A block was" : `${blocks.mended} blocks were`} corrected so that ${blocks.mended === 1 ? "it shows" : "they show"} everything.` });
+        if (blocks.left.length) host.send({ id, type: "notice", text: `A block still does not show everything: ${blocks.left[0]}.` });
+      } catch (e) { if (ac.signal.aborted) throw e; }
+    }
+    if (useLoop && artifactsIn(answer).length) {
+      const stopAwake = host.keepAwake?.(); // the PC may be left alone for a while
+      try {
+        const lastUser = [...base].reverse().find((m) => m.role === "user");
+        const request = typeof lastUser?.content === "string" ? lastUser.content : (lastUser?.content ?? []).map((p) => (p.type === "text" ? p.text : "")).join("");
+        const loopSettings = host.settings();
+        for await (const ev of improve({
+          id, answer, request, signal: ac.signal, direction: loopSettings.agentGoal,
+          rounds: Math.min(50, Math.max(1, readNum(loopSettings, "agentRounds"))), endsAt: Date.now() + Math.min(600, Math.max(1, readNum(loopSettings, "agentMinutes"))) * 60_000,
+          maxChars: Math.floor(ctxTokens * 2.8 * 0.5),
+          check: (a, all) => host.checkArtifact(a, mergeFiles(latestArtifacts(base), all)), askWriter: (msgs) => collect(host, entry, srv, msgs, `${id}:loop`, ac.signal, opts.effort)
+        })) {
+          if (ev.type === "replace") answer = ev.text;
+          host.send(ev);
         }
-      } catch { /* the usual correction below still runs */ }
-      // a chart that cannot be drawn is mended before the person sees a red box
-      if (!onCommand && /```chart/.test(answer)) {
-        try {
-          // a chart beyond the usual slips goes to the model the benchmark found best for JSON (the pack's structured-output pick), when the pack has one installed
-          const jsonModel = (team ? pickModel(team.pack, "tool_use", team.installed, { loaded: host.lastLoaded() })?.entry : undefined) ?? entry;
-          const charts = await settleCharts(answer, async (system, user) => {
-            await bring(jsonModel);
-            return collect(host, jsonModel, jsonModel === entry ? srv : await host.ensureServer(jsonModel), [{ role: "system", content: system }, { role: "user", content: user }], `${id}:chart`, ac.signal, "off");
-          });
-          await bring(entry);
-          if (charts.text !== answer) { answer = charts.text; host.send({ id, type: "replace", text: answer }); }
-          if (charts.mended) host.send({ id, type: "notice", text: `${charts.mended === 1 ? "A chart was" : `${charts.mended} charts were`} mended so that ${charts.mended === 1 ? "it draws" : "they draw"}.` });
-          if (charts.left.length) host.send({ id, type: "notice", text: `A chart still cannot be drawn: ${charts.left[0]}.` });
-          // placeholders and TeX copied into the sentences around the chart are filled and typeset
-          const leaks = mendLeakedFormulas(answer);
-          if (leaks.mended) { answer = leaks.text; host.send({ id, type: "replace", text: answer }); }
-        } catch (e) { if (ac.signal.aborted) throw e; }
+        host.notify?.("MKMN", "The automatic improvements are finished.");
+      } catch (e) {
+        if (ac.signal.aborted) throw e;
+        host.send({ id, type: "notice", text: `The improve loop stopped: ${(e as Error).message}` });
+      } finally {
+        stopAwake?.();
       }
-      // a quiz, a sheet, key figures, cards or a list that would not draw as written is corrected the same way
-      if (!onCommand && /```(quiz|qcm|mcq|sheet|spreadsheet|kpi|figures|cards|flashcards|checklist|todo)\b/i.test(answer)) {
-        try {
-          const blocks = await settleBlocks(answer, (system, user) => collect(host, entry, srv, [{ role: "system", content: system }, { role: "user", content: user }], `${id}:block`, ac.signal, "off"));
-          if (blocks.text !== answer) { answer = blocks.text; host.send({ id, type: "replace", text: answer }); }
-          if (blocks.mended) host.send({ id, type: "notice", text: `${blocks.mended === 1 ? "A block was" : `${blocks.mended} blocks were`} corrected so that ${blocks.mended === 1 ? "it shows" : "they show"} everything.` });
-          if (blocks.left.length) host.send({ id, type: "notice", text: `A block still does not show everything: ${blocks.left[0]}.` });
-        } catch (e) { if (ac.signal.aborted) throw e; }
+    }
+    if (useCheck) {
+      try {
+        for await (const ev of reviewAnswer(host, id, answer, base, entry, srv, opts.effort, ac.signal, steps)) host.send(ev);
+      } catch (e) {
+        if (ac.signal.aborted) throw e;
+        host.send({ id, type: "review", review: { status: "done", steps: [{ kind: "error", text: `The code check failed: ${(e as Error).message}` }] } });
       }
-      if (useLoop && artifactsIn(answer).length) {
-        const stopAwake = host.keepAwake?.(); // the PC may be left alone for a while
-        try {
-          const lastUser = [...base].reverse().find((m) => m.role === "user");
-          const request = typeof lastUser?.content === "string" ? lastUser.content : (lastUser?.content ?? []).map((p) => (p.type === "text" ? p.text : "")).join("");
-          const loopSettings = host.settings();
-          for await (const ev of improve({
-            id, answer, request, signal: ac.signal, direction: loopSettings.agentGoal,
-            rounds: Math.min(50, Math.max(1, readNum(loopSettings, "agentRounds"))), endsAt: Date.now() + Math.min(600, Math.max(1, readNum(loopSettings, "agentMinutes"))) * 60_000,
-            maxChars: Math.floor(ctxTokens * 2.8 * 0.5),
-            check: (a, all) => host.checkArtifact(a, mergeFiles(latestArtifacts(base), all)), askWriter: (msgs) => collect(host, entry, srv, msgs, `${id}:loop`, ac.signal, opts.effort)
-          })) {
-            if (ev.type === "replace") answer = ev.text;
-            host.send(ev);
-          }
-          host.notify?.("MKMN", "The automatic improvements are finished.");
-        } catch (e) {
-          if (ac.signal.aborted) throw e;
-          host.send({ id, type: "notice", text: `The improve loop stopped: ${(e as Error).message}` });
-        } finally {
-          stopAwake?.();
-        }
-      }
-      if (useCheck) {
-        try {
-          for await (const ev of reviewAnswer(host, id, answer, base, entry, srv, opts.effort, ac.signal, steps)) host.send(ev);
-        } catch (e) {
-          if (ac.signal.aborted) throw e;
-          host.send({ id, type: "review", review: { status: "done", steps: [{ kind: "error", text: `The code check failed: ${(e as Error).message}` }] } });
-        }
-      }
-      host.send(done);
-      // the fold the NEXT send would need is prepared in the background now, while the person reads:
-      // the next send starts with a request that already fits, and never waits for a summary. The model
-      // already loaded does the folding (no switch, no lease); a send that arrives mid-fold interrupts it.
-      if (readBool(settings, "autoCompact") && !ac.signal.aborted) {
-        const post = [...lean, { role: "assistant" as const, content: answer }];
-        if (wantsCompaction(stubHistory(post), srv.status().nctx ?? 4096, (loaded ?? entry).sampling.max_tokens)) {
-          startBackgroundCompaction(host, id, opts.convId ?? id, loaded ?? entry, srv, post, memoTurnsNow);
-        }
+    }
+    host.send(done);
+    // the fold the NEXT send would need is prepared in the background now, while the person reads:
+    // the next send starts with a request that already fits, and never waits for a summary. The model
+    // already loaded does the folding (no switch, no lease); a send that arrives mid-fold interrupts it.
+    if (readBool(settings, "autoCompact") && !ac.signal.aborted) {
+      const post = [...lean, { role: "assistant" as const, content: answer }];
+      if (wantsCompaction(stubHistory(post), srv.status().nctx ?? 4096, (loaded ?? entry).sampling.max_tokens)) {
+        startBackgroundCompaction(host, id, opts.convId ?? id, loaded ?? entry, srv, post, memoTurnsNow);
       }
     }
   } catch (e) {
@@ -1483,8 +1483,10 @@ export async function runChatOrchestrator(host: ChatHost, id: string, entryId: s
       let dropped = "";
       if (bad && settings.loadProfiles?.[bad]) {
         dropped = ` The setting kept for this model (${settings.loadProfiles[bad].label}) crashed and was removed.`;
-        const { [bad]: _gone, ...rest } = settings.loadProfiles;
-        const { [bad]: _b, ...badges } = readObj<Record<string, ComputeTarget>>(settings, "placements");
+        const rest = { ...settings.loadProfiles };
+        delete rest[bad];
+        const badges = { ...readObj<Record<string, ComputeTarget>>(settings, "placements") };
+        delete badges[bad];
         host.patchSettings({ loadProfiles: rest, placements: badges });
       }
       let err = last ?? (e instanceof ServerLostError

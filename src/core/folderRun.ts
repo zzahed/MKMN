@@ -44,12 +44,29 @@ export function listDir(root: string, rel: string): string {
   return `${shown(root, dir)}:\n${rows.join("\n")}${all.length > MAX_ENTRIES ? `\n[… ${all.length - MAX_ENTRIES} more entries not shown]` : ""}`;
 }
 
+/**
+ * A file read through one open handle: what is checked (a folder, its size) is the file that is read, even if the path
+ * is swapped or the file grows in between. A folder gives null; a file over `max` bytes throws `tooBig(size)`.
+ */
+export function readCapped(file: string, max: number, tooBig: (size: number) => Error): { buf: Buffer; st: fs.Stats } | null {
+  let fd: number;
+  try { fd = fs.openSync(file, "r"); } catch (e) { if ((e as NodeJS.ErrnoException).code === "EISDIR") return null; throw e; }
+  try {
+    const st = fs.fstatSync(fd);
+    if (st.isDirectory()) return null;
+    if (st.size > max) throw tooBig(st.size);
+    const buf = Buffer.alloc(st.size);
+    let got = 0;
+    while (got < st.size) { const n = fs.readSync(fd, buf, got, st.size - got, got); if (!n) break; got += n; }
+    return { buf: got < st.size ? buf.subarray(0, got) : buf, st };
+  } finally { fs.closeSync(fd); }
+}
+
 export function readFile(root: string, rel: string, maxChars: number): string {
   const file = resolveInside(root, rel);
-  const st = fs.statSync(file);
-  if (st.isDirectory()) throw new Error("That is a folder, not a file. Use listdir.");
-  if (st.size > 20_000_000) throw new Error(`The file is ${kb(st.size)}, too big to read.`);
-  const buf = fs.readFileSync(file);
+  const read = readCapped(file, 20_000_000, (size) => new Error(`The file is ${kb(size)}, too big to read.`));
+  if (!read) throw new Error("That is a folder, not a file. Use listdir.");
+  const { buf } = read;
   if (!isText(buf)) throw new Error("This is not a text file (binary content), so it cannot be read.");
   const text = buf.toString("utf8");
   if (text.length <= maxChars) return text || "[empty file]";
@@ -75,7 +92,7 @@ export function searchFiles(root: string, needle: string): string {
       if (!e.isFile()) continue;
       if (++scanned > MAX_SEARCH_FILES) { capped = true; return; }
       let buf: Buffer;
-      try { if (fs.statSync(full).size > MAX_SEARCH_BYTES) continue; buf = fs.readFileSync(full); } catch { continue; }
+      try { const read = readCapped(full, MAX_SEARCH_BYTES, () => new Error("too big")); if (!read) continue; buf = read.buf; } catch { continue; }
       if (!isText(buf)) continue;
       const lines = buf.toString("utf8").split(/\r?\n/);
       for (let i = 0; i < lines.length; i++) {
@@ -94,11 +111,12 @@ const MAX_DOC_BYTES = 30 * 1024 ** 2;
 const docCache = new Map<string, { mtime: number; text: string }>();
 /** A Word, Excel, PowerPoint, OpenDocument or RTF file of the folder as text (kept until the file changes). */
 async function documentOf(file: string): Promise<string> {
-  const st = fs.statSync(file);
   const hit = docCache.get(file);
-  if (hit && hit.mtime === st.mtimeMs) return hit.text;
-  if (st.size > MAX_DOC_BYTES) throw new Error(`The file is ${kb(st.size)}, too big to read.`);
-  const { text } = await documentText(path.basename(file), new Uint8Array(fs.readFileSync(file)));
+  if (hit && hit.mtime === fs.statSync(file).mtimeMs) return hit.text;
+  const read = readCapped(file, MAX_DOC_BYTES, (size) => new Error(`The file is ${kb(size)}, too big to read.`));
+  if (!read) throw new Error("That is a folder, not a file. Use listdir.");
+  const { buf, st } = read;
+  const { text } = await documentText(path.basename(file), new Uint8Array(buf));
   docCache.set(file, { mtime: st.mtimeMs, text });
   if (docCache.size > 30) docCache.delete(docCache.keys().next().value as string);
   return text;

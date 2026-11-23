@@ -18,11 +18,6 @@ export type FetchLike = (url: string, init?: { headers?: Record<string, string>;
 
 const HF = "https://huggingface.co";
 
-/** A row of /api/models (search). */
-type HfSearchRow = { id: string; modelId?: string; downloads?: number; likes?: number; lastModified?: string | null };
-/** A row of /api/models/{repo}/tree (an LFS file reports its size under lfs). */
-type HfTreeRow = { type: string; path: string; size?: number; lfs?: { size?: number } };
-
 export class HfClient {
   constructor(private fetchFn: FetchLike, private token?: string) {}
 
@@ -36,7 +31,7 @@ export class HfClient {
     const url = `${HF}/api/models?search=${encodeURIComponent(query)}&filter=gguf&sort=downloads&direction=-1&limit=${limit}`;
     const r = await this.fetchFn(url, { headers: this.headers() });
     if (!r.ok) throw new Error(`Hugging Face search failed (${r.status})`);
-    const rows = (await r.json()) as HfSearchRow[];
+    const rows = (await r.json()) as { id: string; modelId?: string; downloads?: number; likes?: number; lastModified?: string }[];
     return rows.map((m) => ({
       repo: m.id ?? m.modelId,
       downloads: m.downloads ?? 0,
@@ -59,7 +54,7 @@ export class HfClient {
     const r = await this.fetchFn(`${HF}/api/models?${params.join("&")}`, { headers: this.headers() });
     if (!r.ok) throw new Error(`Hugging Face could not be browsed (${r.status})`);
     const rows = await r.json();
-    return Array.isArray(rows) ? (rows as RawHfModel[]) : [];
+    return Array.isArray(rows) ? rows : [];
   }
 
   /** All files with sizes (the tree endpoint reports LFS sizes). */
@@ -67,7 +62,7 @@ export class HfClient {
     const r = await this.fetchFn(`${HF}/api/models/${repo}/tree/main?recursive=true`, { headers: this.headers() });
     if (r.status === 404) throw new Error(`Repo "${repo}" was not found on Hugging Face.`);
     if (!r.ok) throw new Error(`Could not list files for ${repo} (${r.status})`);
-    const rows = (await r.json()) as HfTreeRow[];
+    const rows = (await r.json()) as { type?: string; path?: string; size?: number; lfs?: { size?: number } }[];
     return rows
       .filter((x) => x.type === "file")
       .map((x) => ({ path: x.path as string, sizeBytes: (x.lfs?.size ?? x.size ?? 0) as number }));

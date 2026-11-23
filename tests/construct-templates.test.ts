@@ -142,6 +142,13 @@ describe("the pictures of a program are kept coherent by code", () => {
     expect(normalizeSvg("<svg viewBox='0 0 4 4'></svg>", art, [4, 4])).toBeNull();
     expect(normalizeSvg("no picture here", art, [4, 4])).toBeNull();
   });
+  it("a colour or a size the model wrote cannot add an attribute to the drawing", () => {
+    const raw = `<svg><rect width='4' height='4' fill="nope'onload='x()" stroke='#000000'/></svg>`;
+    const out = normalizeSvg(raw, art, [4, 4])!;
+    expect(out).not.toMatch(/'onload/);
+    expect(out).toContain("fill='nope&#39;onload=&#39;x()'");
+    expect(normalizeSvg("<svg><rect width='4' height='4'/></svg>", art, ["4' onload='x()" as unknown as number, 4])).toBeNull();
+  });
   it("puts every sprite of a state right (a model drawing at another size and colour), and leaves a state without art alone", () => {
     const t = TEMPLATES.find((x) => x.id === "platformer")!;
     const o = JSON.parse(t.code.S);

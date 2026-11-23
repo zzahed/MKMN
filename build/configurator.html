@@ -189,7 +189,7 @@ function tokens(mode) {
 }
 
 function logoSvg(t, size, opts = {}) {
-  const dark = !opts.light, tile = opts.tile, mono = opts.mono;
+  const tile = opts.tile, mono = opts.mono;
   const ink = mono ? t.text : t.text, base = mono ? ink : t.text;
   const blockFill = mono ? ink : base, blockOp = mono ? .34 : .3;
   const rect = (x, y, w, h, hot) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="1.6" fill="${hot && !mono ? t.accent : blockFill}" ${hot ? "" : `fill-opacity="${blockOp}"`}/>`;
@@ -239,7 +239,6 @@ function cssOut() {
 }
 
 $("pals").innerHTML = PRESETS.map((p) => {
-  const d = (m) => { const o = state; const keep = { h: o.h, s: o.s }; return hsl(p.h, p.s, m); };
   return `<button type="button" class="pal" data-id="${p.id}" aria-pressed="false"><div class="sw"><i style="background:${hsl(p.h, p.s, 68)}"></i><i style="background:${hsl(p.h, p.s + 8, 36)}"></i><i style="background:${hsl(p.h, p.s * .5, 22)}"></i></div><b>${p.name}</b><span>${p.note}</span></button>`;
 }).join("");
 $("pals").addEventListener("click", (e) => {

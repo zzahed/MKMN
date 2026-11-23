@@ -228,15 +228,18 @@ const PLACEHOLDER = /\[\[\s*([^\]]+?)\s*\]\]|\{\{\s*([^}]+?)\s*\}\}/g;
 /** A formula that came wrapped in the placeholder marks ("[[=P*r]]") is the formula itself. */
 const unwrapFormula = (s: string) => s.trim().replace(/^(?:\[\[|\{\{)\s*=?\s*([^\]}]+?)\s*(?:\]\]|\}\})$/, "$1");
 
-/** A chart as a model wrote it: nothing is trusted until it is checked. */
-type RawChart = { type?: unknown; params?: unknown; labels?: unknown; x?: unknown; xLabel?: unknown; series?: unknown; [key: string]: unknown };
-type RawParam = { id?: unknown; label?: unknown; min?: unknown; max?: unknown; value?: unknown; step?: unknown; unit?: unknown } | null;
+/** A chart as a model may write it: nothing is trusted, every field is checked before it is used. */
+type RawChart = {
+  type?: unknown; title?: unknown; note?: unknown; labels?: unknown; params?: unknown; series?: unknown; outputs?: unknown; formulas?: unknown;
+  x?: unknown; xLabel?: unknown; y?: { label?: unknown }; yLabel?: unknown; stack?: unknown; stacked?: unknown;
+};
 type RawAxis = { min?: unknown; max?: unknown; step?: unknown; label?: unknown; yLabel?: unknown };
-type RawSeries = { name?: unknown; y?: unknown; points?: unknown; data?: unknown } | null;
+type RawParam = { id?: unknown; label?: unknown; min?: unknown; max?: unknown; value?: unknown; step?: unknown; unit?: unknown };
+type RawSeries = { name?: unknown; y?: unknown; points?: unknown; data?: unknown };
 
 /** The JSON a model wrote as a chart, or why it cannot be drawn. Lenient about what is optional, strict about what cannot be guessed. */
 export function parseChartSpec(raw: string): ChartSpec | string {
-  let j: RawChart | null;
+  let j: RawChart;
   const body = raw.trim().replace(/^```\w*\n?|```$/g, "");
   try { j = JSON.parse(body); } catch (e) {
     const mended = repairJson(body);
@@ -245,17 +248,18 @@ export function parseChartSpec(raw: string): ChartSpec | string {
   }
   if (!j || typeof j !== "object" || Array.isArray(j)) return "it must be a JSON object";
   const alias: Record<string, ChartType> = { histogram: "bar", column: "bar", columns: "bar", stackedbar: "bar", doughnut: "donut", spline: "line", curve: "line", spider: "radar", bubble: "scatter", points: "scatter" };
-  const wanted = typeof j.type === "string" ? j.type.toLowerCase().replace(/[\s_-]+/g, "") : j.type;
-  const type: ChartType | null = (CHART_TYPES as readonly unknown[]).includes(wanted) ? (wanted as ChartType) : alias[String(wanted)] ?? (j.type === undefined ? "line" : null);
+  // a type that is not a string matches nothing: it is "line" only when it is missing
+  const wanted = typeof j.type === "string" ? j.type.toLowerCase().replace(/[\s_-]+/g, "") : undefined;
+  const type: ChartType | null = wanted === undefined ? (j.type === undefined ? "line" : null) : CHART_TYPES.includes(wanted as ChartType) ? (wanted as ChartType) : alias[wanted] ?? null;
   if (!type) return `unknown type "${String(j.type).slice(0, 20)}" (use ${CHART_TYPES.join(", ")})`;
-  const params: ChartParam[] = (Array.isArray(j.params) ? (j.params as RawParam[]) : []).slice(0, 6).flatMap((p) => {
+  const params: ChartParam[] = (Array.isArray(j.params) ? j.params : []).slice(0, 6).flatMap((p: RawParam | null) => {
     if (!p || typeof p.id !== "string" || !/^[A-Za-z_]\w*$/.test(p.id)) return [];
     const min = num(p.min, 0), max = num(p.max, Math.max(min + 1, num(p.value, 1) * 2)), value = Math.min(max, Math.max(min, num(p.value, min)));
     return [{ id: p.id, label: text(p.label, p.id), min, max: max > min ? max : min + 1, value, step: num(p.step, (max - min) / 100) || 1, unit: typeof p.unit === "string" ? p.unit.slice(0, 8) : undefined }];
   });
   const ids = params.map((p) => p.id);
   const labels: string[] | undefined = Array.isArray(j.labels) ? j.labels.slice(0, 60).map((l: unknown) => String(l).slice(0, 30)) : undefined;
-  const xs: RawAxis = j.x && typeof j.x === "object" ? (j.x as RawAxis) : {};
+  const xs: RawAxis = j.x && typeof j.x === "object" ? j.x : {};
   const defaults: Record<string, number> = Object.fromEntries(params.map((p) => [p.id, p.value]));
   // an end of the axis written as a formula ("t", "years*12") follows the params
   const edge = (v: unknown, d: number): { n: number; expr?: string } => {
@@ -270,7 +274,7 @@ export function parseChartSpec(raw: string): ChartSpec | string {
   const noAxis = type === "pie" || type === "donut" || type === "radar" || type === "scatter" || !!labels;
   if (!(x.max > x.min) && !noAxis) return "x.max must be above x.min";
   if (x.step <= 0) x.step = 1;
-  const series: ChartSeries[] = (Array.isArray(j.series) ? (j.series as RawSeries[]) : []).slice(0, 6).flatMap((s, k): ChartSeries[] => {
+  const series: ChartSeries[] = (Array.isArray(j.series) ? j.series : []).slice(0, 6).flatMap((s: RawSeries | null, k: number): ChartSeries[] => {
     if (!s || typeof s !== "object") return [];
     const name = text(s.name, `Series ${k + 1}`);
     if (typeof s.y === "string" && s.y.trim()) {
@@ -281,7 +285,7 @@ export function parseChartSpec(raw: string): ChartSpec | string {
     }
     const pairs: unknown[] | null = Array.isArray(s.points) ? s.points : Array.isArray(s.data) && s.data.length && s.data.every((d: unknown) => Array.isArray(d) || (d && typeof d === "object" && "x" in (d as object))) ? s.data : null;
     if (pairs) {
-      const pts = pairs.slice(0, 300).map((d): [number, number] => (Array.isArray(d) ? [num(d[0], NaN), num(d[1], NaN)] : [num((d as { x?: unknown } | null)?.x, NaN), num((d as { y?: unknown } | null)?.y, NaN)])).filter((d) => isFinite(d[0]) && isFinite(d[1]));
+      const pts = pairs.slice(0, 300).map((d): [number, number] => { const o = d as { x?: unknown; y?: unknown } | null; return Array.isArray(d) ? [num(d[0], NaN), num(d[1], NaN)] : [num(o?.x, NaN), num(o?.y, NaN)]; }).filter((d) => isFinite(d[0]) && isFinite(d[1]));
       return pts.length ? [{ name, points: pts }] : [];
     }
     if (Array.isArray(s.data)) return [{ name, data: s.data.slice(0, 200).map((d: unknown) => num(d, NaN)) }];
@@ -314,7 +318,7 @@ export function parseChartSpec(raw: string): ChartSpec | string {
     }
     formulas.push({ label: typeof f === "object" && typeof f.label === "string" ? f.label.slice(0, 60) : undefined, tex: tex.trim().slice(0, 300) });
   }
-  const spec: ChartSpec = { type, title: text(j.title), note: typeof j.note === "string" ? j.note.slice(0, 240) : undefined, x, yLabel: text(xs.yLabel ?? (j.y as RawAxis | undefined)?.label ?? j.yLabel), labels, params, series };
+  const spec: ChartSpec = { type, title: text(j.title), note: typeof j.note === "string" ? j.note.slice(0, 240) : undefined, x, yLabel: text(xs.yLabel ?? j.y?.label ?? j.yLabel), labels, params, series };
   if (j.stack === true || j.stacked === true || /stack/.test(String(j.type).toLowerCase())) spec.stack = true;
   if (outputs.length) spec.outputs = outputs;
   if (formulas.length) spec.formulas = formulas;
