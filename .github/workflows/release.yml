@@ -1,8 +1,11 @@
 name: MKMN Windows ARM64 verification
 
-# Manual only. Builds and uploads an artifact; never pushes tags or publishes a release.
+# Manual or restricted candidate-branch build. Uploads an unsigned installer + SHA-256 artifact;
+# never pushes tags or publishes a GitHub release automatically.
 on:
   workflow_dispatch:
+  push:
+    branches: [release/v0.0.3-rc.1]
 
 permissions:
   contents: read
@@ -74,8 +77,23 @@ jobs:
         run: |
           powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\Validate-Installer.ps1"
           exit $LASTEXITCODE
+      - name: Write SHA-256 and build provenance
+        shell: pwsh
+        run: |
+          $version = (node -p "require('./package.json').version").Trim()
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $installer = "dist/MKMN-$version-arm64-Setup.exe"
+          if (-not (Test-Path -LiteralPath $installer)) { throw "No installer: $installer" }
+          $sha = (Get-FileHash -Algorithm SHA256 -LiteralPath $installer).Hash.ToLowerInvariant()
+          "$sha  $(Split-Path $installer -Leaf)" | Set-Content -Path "$installer.sha256" -Encoding ascii
+          "commit=$env:GITHUB_SHA" | Set-Content -Path "dist/MKMN-$version-build.txt" -Encoding ascii
+          "version=$version" | Add-Content -Path "dist/MKMN-$version-build.txt" -Encoding ascii
+          "installer_sha256=$sha" | Add-Content -Path "dist/MKMN-$version-build.txt" -Encoding ascii
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: MKMN-Windows-ARM64-unsigned
-          path: dist/MKMN-*-arm64-Setup.exe
+          path: |
+            dist/MKMN-*-arm64-Setup.exe
+            dist/MKMN-*-arm64-Setup.exe.sha256
+            dist/MKMN-*-build.txt
           if-no-files-found: error

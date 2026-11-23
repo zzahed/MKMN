@@ -1,6 +1,6 @@
 [package]
 name = "mkmn"
-version = "0.0.2"
+version = "0.0.3-rc.1"
 description = "MKMN | مَكمَن - Sovereign Local AI Studio"
 authors = ["MKMN"]
 edition = "2024"
