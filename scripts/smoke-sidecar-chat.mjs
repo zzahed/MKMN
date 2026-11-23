@@ -2,9 +2,14 @@
 // driver plays the Rust host (`startChatServer` spawns geniex serve and polls /v1/models
 // until the data array is non-empty — the same readiness rule the supervisor applies).
 // Prints the answer, then stops the server and the sidecar.
-const { spawn, execFileSync } = require("child_process");
-const path = require("path");
-const fs = require("fs");
+import { spawn, execFileSync } from "node:child_process";
+import path from "node:path";
+import fs from "node:fs";
+import { createRequire } from "node:module";
+
+const __dirname = import.meta.dirname;
+// the compiled sidecar in dist/ is CommonJS
+const require = createRequire(import.meta.url);
 
 const PORT = 18199; // not the app's 18181: a stray smoke server must never collide with the app
 const ENDPOINT = `http://127.0.0.1:${PORT}/v1`;
@@ -46,7 +51,11 @@ child.stdout.on("data", (d) => {
       } else console.log(`EVENT ${m.name}:`, JSON.stringify(m.payload).slice(0, 120));
     } else if (m.t === "res") {
       const w = waiters.get(m.id);
-      if (w) { waiters.delete(m.id); if (m.ok) w.res(m.result); else w.rej(new Error(m.error)); }
+      if (w) {
+        waiters.delete(m.id);
+        if (m.ok) w.res(m.result);
+        else w.rej(new Error(m.error));
+      }
     } else if (m.t === "req") {
       void handleHostRequest(m);
     }

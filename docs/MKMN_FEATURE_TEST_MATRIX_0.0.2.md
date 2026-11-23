@@ -436,7 +436,7 @@ node scripts/generate-feature-matrix.mjs --check
 | SCP009 | `scripts/audit-context.mjs` | audit the context sent to a model | tests/audit-context.test.ts | CONTRACT |
 | SCP010 | `scripts/bench-probe-spawns.ts` | list the processes a benchmark spawns | manual check (diagnostic only) | MANUAL |
 | SCP011 | `scripts/bench-save-path.ts` | print the benchmark save path | tests/bench.test.ts | CONTRACT |
-| SCP012 | `scripts/build-xblocks.js` | build the page-block runtime | tests/gameBlocks.test.ts; tests/xbuild.test.ts | CONTRACT |
+| SCP012 | `scripts/build-xblocks.mjs` | build the page-block runtime | tests/gameBlocks.test.ts; tests/xbuild.test.ts | CONTRACT |
 | SCP013 | `scripts/check-language.mjs` | reject non-English, non-Arabic copy outside the allowlist | tests/language.test.ts | CONTRACT |
 | SCP014 | `scripts/feature-matrix.mjs` | script | manual check | CONTRACT |
 | SCP015 | `scripts/generate-brand-assets.mjs` | generate the brand image set | tests/brandAssets.test.ts | CONTRACT |
@@ -446,10 +446,10 @@ node scripts/generate-feature-matrix.mjs --check
 | SCP019 | `scripts/lib/BuildResult.ps1` | write the one build result and its exit code | tests/powershell-native.test.ts | CONTRACT |
 | SCP020 | `scripts/lib/NativeCommand.ps1` | run one native command with a UTF-8 log and a real exit code | tests/powershell-native.test.ts | CONTRACT |
 | SCP021 | `scripts/lib/lifecycle-scan.mjs` | find every lifecycle in the source for the state-machine inventory | tests/state-machines.test.ts | CONTRACT |
-| SCP022 | `scripts/licenses.cjs` | collect third-party licence texts | tests/brandAssets.test.ts | CONTRACT |
+| SCP022 | `scripts/licenses.mjs` | collect third-party licence texts | tests/brandAssets.test.ts | CONTRACT |
 | SCP023 | `scripts/nsis_extract.py` | extract the NSIS installer for inspection | release Installer check | MANUAL |
 | SCP024 | `scripts/setup-arm64-libs.ps1` | place the ARM64 native libraries | manual check (native library setup) | MANUAL |
-| SCP025 | `scripts/smoke-sidecar-chat.js` | smoke the sidecar chat path | ran live (test profile: chat with qwen3-1.7b-native on the NPU); PASS | CONTRACT |
+| SCP025 | `scripts/smoke-sidecar-chat.mjs` | smoke the sidecar chat path | ran live (test profile: chat with qwen3-1.7b-native on the NPU); PASS | CONTRACT |
 | SCP026 | `scripts/smoke-sidecar-devtools.js` | smoke the sidecar developer tools | needs an NPU and the app host; BLOCKED | BLOCKED |
 | SCP027 | `scripts/smoke-sidecar-humain.js` | smoke HUMAIN Fuse and Node end to end | ran live (saved keys, copies only): Fuse chat through the pipeline, chart block, web search with sources, named model error, embeddings, rerank, limits, voices, speech, transcription, image, files, batches; Node chat, healthz, realtime refusal named; PASS 21/21 | CONTRACT |
 | SCP028 | `scripts/smoke-sidecar-sandbox.js` | smoke the sandboxed code runner | ran live (test profile: runTask/runCode/runCommand/media/launchSite); PASS | CONTRACT |

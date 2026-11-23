@@ -4,10 +4,10 @@
 // DEBT lists the rules the code broke when linting began, many times over. They warn instead of
 // failing, so the lint gate can start at zero errors; each is a clean-up of its own (see the
 // roadmap's follow-ups). Every other recommended rule is an error.
-const js = require("@eslint/js");
-const globals = require("globals");
-const tseslint = require("typescript-eslint");
-const reactHooks = require("eslint-plugin-react-hooks");
+import js from "@eslint/js";
+import globals from "globals";
+import tseslint from "typescript-eslint";
+import reactHooks from "eslint-plugin-react-hooks";
 
 const DEBT = [
   "@typescript-eslint/no-explicit-any",
@@ -26,7 +26,7 @@ const DEBT = [
   "require-yield",
 ];
 
-module.exports = tseslint.config(
+export default tseslint.config(
   {
     ignores: [
       "node_modules/", "dist/", "build/", "target/", "src-tauri/target/", "src-tauri/gen/",
@@ -52,7 +52,7 @@ module.exports = tseslint.config(
   {
     // Node scripts written as CommonJS (package.json sets no "type", so scripts/*.js are CJS too):
     // require() is their import, not a style lapse.
-    files: ["**/*.cjs", "scripts/**/*.js", "eslint.config.js"],
+    files: ["**/*.cjs", "scripts/**/*.js"],
     rules: { "@typescript-eslint/no-require-imports": "off" },
   },
   {

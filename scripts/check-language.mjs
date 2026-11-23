@@ -93,7 +93,7 @@ export function scanText(text, path = "text") {
     }
     // an accent is a fault in code lines too: the app reads and writes English and Arabic only
     const withoutNames = line.replace(ACCENTED_ENGLISH, " ");
-    const accented = withoutNames.match(/\P{ASCII}/gu) ?? [];
+    const accented = withoutNames.match(/[^\p{ASCII}]/gu) ?? [];
     const latinAccent = accented.filter((ch) => /\p{Script=Latin}/u.test(ch));
     if (latinAccent.length) {
       faults.push(`${path}:${i + 1}: accent outside the English/Arabic allowlist (${[...new Set(latinAccent)].join("")}): ${line.trim().slice(0, 120)}`);
