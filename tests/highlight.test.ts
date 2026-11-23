@@ -18,7 +18,7 @@ describe("highlight", () => {
     for (const [code, lang] of samples) expect(highlight(code, lang).map((t) => t.v).join("")).toBe(code);
   });
   it("highlights script and style inside a page, and json keys apart from values", () => {
-    expect(kinds("<script>const a = 1</script>", "html")).toEqual(expect.arrayContaining(["tag:<script>".replace(">", ""), "kw:const", "num:1"]));
+    expect(kinds("<script>const a = 1</script>", "html")).toEqual(expect.arrayContaining(["tag:<script","kw:const", "num:1"]));
     expect(kinds('{"k": "v"}', "json")).toEqual(["attr:\"k\"", "op::", "str:\"v\""]);
   });
 });

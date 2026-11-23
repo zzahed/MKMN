@@ -3,6 +3,7 @@ import { allCharts, PLACEMENT_LABEL, WarmupInfo } from "./benchCharts";
 import { BENCH_SECTIONS, SECTION_INFO } from "./benchSections";
 import { BenchStats, computeStats, pct } from "./benchStats";
 import type { RunsOn } from "./placement";
+import { mdCell } from "./escape";
 
 /**
  * The results as something to publish: a Markdown report that reads on GitHub and, tables and text bars only, on Reddit; the same
@@ -27,7 +28,7 @@ export function driftPct(w: WarmupInfo | null | undefined): number | null {
 }
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-const cell = (s: string) => s.replace(/\|/g, "\\|").replace(/\n/g, " ");
+const cell = (s: string) => mdCell(s).replace(/\n/g, " ");
 const n1 = (n: number | null | undefined, d = 1) => (n === null || n === undefined ? "n/a" : n.toFixed(d));
 const dur = (sec: number) => (sec >= 3600 ? `${Math.floor(sec / 3600)} h ${String(Math.floor((sec % 3600) / 60)).padStart(2, "0")} min` : `${Math.floor(sec / 60)} min`);
 const on = (r: ModelResult): RunsOn => r.placement?.runsOn ?? "unknown";

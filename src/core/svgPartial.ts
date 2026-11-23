@@ -3,6 +3,8 @@
  * Colours given as `var(--name)` are filled from the palette of the page, because a picture shown on its own has no page around it.
  * Nothing that runs is kept (script, event attributes), so the result can be shown as an image.
  */
+import { stripActive } from "./escape";
+
 const VOID = /^(?:path|rect|circle|ellipse|line|polyline|polygon|stop|use|image|feBlend|feOffset|feFlood)$/i;
 
 export function paletteOf(css: string): Record<string, string> {
@@ -17,9 +19,7 @@ export function partialSvg(text: string, palette: Record<string, string> = {}): 
   let s = text.slice(from);
   const cut = s.lastIndexOf(">");
   if (cut < 0) return null;
-  s = s.slice(0, cut + 1)
-    .replace(/<script[\s\S]*?<\/script\s*>/gi, "")
-    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*')/gi, "")
+  s = stripActive(s.slice(0, cut + 1))
     .replace(/var\(\s*(--[\w-]+)\s*(?:,\s*([^)]*))?\)/g, (_m, name: string, fallback?: string) => palette[name] ?? fallback?.trim() ?? "#888");
   const stack: string[] = [];
   for (const m of s.matchAll(/<!--[\s\S]*?-->|<(\/?)([a-zA-Z][\w:-]*)([^<>]*?)(\/?)>/g)) {

@@ -69,7 +69,7 @@ describe("the stages of a build", () => {
 
   it("runs the page, mends what it shows, runs it again, and says each of those steps", async () => {
     const good = SKELETONS[0].html;
-    const slow = good.replace("var SPEED = 120", "var SPEED = 120").replace("timer = setInterval(step, SPEED);", "timer = null;");
+    const slow = good.replace("timer = setInterval(step, SPEED);", "timer = null;");
     let checks = 0;
     const m = fake((name) => (name.startsWith("write") ? slow : name.startsWith("fix") ? good : name === "explain" ? "Done." : ""));
     const check = async () => (++checks === 1 ? { errors: [], notes: ["The canvas never changed after load: nothing moves or reacts."], shot: "data:image/jpeg;base64,AAAA" } : { errors: [], notes: [] });

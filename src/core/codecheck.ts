@@ -3,6 +3,7 @@ import { STORAGE_SHIM, previewDocument } from "./artifacts";
 import { missingElements } from "./bundle";
 import { usesBlocks } from "./gameBlocks";
 import { xFlaws } from "./xcheck";
+import { escapeRe, removeElements } from "./escape";
 
 /** What running one artifact found. `ran`: page = executed in a hidden window, syntax = parsed only, none = nothing could be checked. */
 export interface CheckReport {
@@ -268,7 +269,7 @@ export function describeHidden(h: HiddenBy | null | undefined, sheets: { title: 
   if (!h) return [];
   const named = h.el.match(/[.#][\w-]+/g);
   const tokens = named ?? h.el.match(/^[a-z][a-z0-9]*/i) ?? [];
-  const sheet = sheets.find((f) => tokens.some((t) => new RegExp(`${t.replace(/[.#]/g, "\\$&")}(?![\\w-])[^{}]*\\{[^}]*\\b(?:opacity|display|visibility)\\s*:`, "i").test(f.content)));
+  const sheet = sheets.find((f) => tokens.some((t) => new RegExp(`${escapeRe(t)}(?![\\w-])[^{}]*\\{[^}]*\\b(?:opacity|display|visibility)\\s*:`, "i").test(f.content)));
   return [`${sheet ? `${sheet.title}: ` : ""}Everything on the page is invisible: ${h.el} has ${h.why}, so the page looks blank. Remove that rule, or show it again (a fade-in needs the code that does it).`];
 }
 
@@ -318,7 +319,7 @@ export const isPython = (language: string) => /^(py|python|python3)$/i.test(lang
 /** The scripts written inside a page (no src), with the line of the page each one starts on. */
 export function inlineScripts(html: string): { code: string; line: number }[] {
   const out: { code: string; line: number }[] = [];
-  for (const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)) {
+  for (const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\b[^>]*>/gi)) {
     if (/\bsrc\s*=/i.test(m[1]) || /\btype\s*=\s*["'](?!text\/javascript|module)/i.test(m[1]) || !m[2].trim()) continue;
     const bodyAt = (m.index ?? 0) + m[0].indexOf(">") + 1;
     out.push({ code: m[2], line: html.slice(0, bodyAt).split("\n").length });
@@ -348,7 +349,7 @@ export function quickErrors(f: { title: string; kind: string; language: string; 
     if (!/<body[\s>]/i.test(f.content)) out.push("The page has no <body>.");
     // a page that carries its own script (one file for a whole game) is held to the same standard as a script file:
     // it must parse, and every element it looks for must exist in the page
-    const markup = f.content.replace(/<script\b[\s\S]*?<\/script\s*>/gi, "");
+    const markup = removeElements(f.content, ["script"]);
     for (const s of inlineScripts(f.content)) {
       const e = jsSyntaxError(s.code, s.line - 1);
       if (e) out.push(`In the page's script: ${e}`);

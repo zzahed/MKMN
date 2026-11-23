@@ -8,7 +8,7 @@ import { featureInventory } from "./feature-matrix.mjs";
 
 const OUT = "docs/MKMN_FEATURE_TEST_MATRIX_0.0.2.md";
 
-const cell = (value) => String(value).replace(/\|/g, "\\|");
+const cell = (value) => String(value).replace(/[\\|]/g, "\\$&");
 const row = (id, name, area, evidence, result) => `| ${id} | ${cell(name)} | ${cell(area)} | ${cell(evidence)} | ${result} |`;
 const acceptanceRow = (id, check, how, result) => `| ${id} | ${cell(check)} | ${cell(how)} | ${cell(result)} |`;
 const table = (head, lines) => [`| ${head.join(" | ")} |`, `|${head.map(() => "---").join("|")}|`, ...lines].join("\n");

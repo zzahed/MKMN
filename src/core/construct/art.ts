@@ -7,6 +7,8 @@
  *   - every colour is a colour of the palette (the nearest one), written `var(--name, #hex)` so a new palette restyles every picture
  *   - nothing that draws no shape: no text, script, image or foreign object
  */
+import { stripActive } from "../escape";
+
 export interface Art {
   stroke: number;
   palette: Record<string, string>;
@@ -40,10 +42,7 @@ export function nearest(colour: string, palette: Record<string, string>): [strin
 export function normalizeSvg(svg: string, art: { stroke: number; palette: Record<string, string> }, size: [number, number]): string | null {
   const m = /<svg\b[\s\S]*<\/svg>/i.exec(svg);
   if (!m) return null;
-  let body = m[0]
-    .replace(/<(script|text|image|foreignObject|style)\b[\s\S]*?<\/\1>/gi, "")
-    .replace(/<(script|text|image|foreignObject)\b[^>]*\/>/gi, "")
-    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*')/gi, "");
+  let body = stripActive(m[0], ["script", "text", "image", "foreignObject", "style"]);
   const inner = /<svg\b[^>]*>([\s\S]*)<\/svg>/i.exec(body)?.[1] ?? "";
   if (!/<(rect|circle|ellipse|path|polygon|polyline|line|g)\b/i.test(inner)) return null;
   // colours: the nearest palette colour, written so that a new palette restyles it

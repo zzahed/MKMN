@@ -32,7 +32,7 @@ const EPS = 1e-6;
 /** The page's scripts, in order, with the escaped closing tags the bundler writes undone. */
 export function pageScripts(html) {
   const out = [];
-  for (const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) {
+  for (const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\b[^>]*>/gi)) {
     out.push(m[1].replace(/<\\\/script/gi, "</script"));
   }
   return out;

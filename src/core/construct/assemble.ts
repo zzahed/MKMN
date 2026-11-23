@@ -5,6 +5,7 @@
 import { markOf } from "./marks";
 import type { Scenario } from "./scenarios";
 import type { Accepted, Plan, Unit } from "./types";
+import { escapeRe } from "../escape";
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const safeScript = (code: string) => code.replace(/<\/script/gi, "<\\/script");
@@ -25,7 +26,7 @@ export function canvasIds(codes: string[]): string[] {
   for (const code of codes) {
     for (const m of code.matchAll(/getElementById\(\s*["']([\w-]+)["']\s*\)\s*\.getContext\b/g)) ids.add(m[1]);
     for (const m of code.matchAll(/(?:const|let|var)\s+([\w$]+)\s*=\s*(?:document\.)?getElementById\(\s*["']([\w-]+)["']\s*\)/g)) {
-      if (new RegExp(`\\b${m[1].replace(/\$/g, "\\$")}\\s*\\.getContext\\b`).test(code)) ids.add(m[2]);
+      if (new RegExp(`\\b${escapeRe(m[1])}\\s*\\.getContext\\b`).test(code)) ids.add(m[2]);
     }
   }
   return [...ids];
@@ -36,7 +37,7 @@ export function asCanvases(html: string, ids: string[]): { html: string; made: s
   const made: string[] = [];
   let out = html;
   for (const id of ids) {
-    const re = new RegExp(`<(div|section|span|main|article)\\b([^>]*\\bid\\s*=\\s*["']${id.replace(/[-]/g, "\\-")}["'][^>]*)>\\s*</\\1>`, "i");
+    const re = new RegExp(`<(div|section|span|main|article)\\b([^>]*\\bid\\s*=\\s*["']${escapeRe(id)}["'][^>]*)>\\s*</\\1>`, "i");
     if (re.test(out)) { out = out.replace(re, (_m, _t, attrs) => `<canvas${attrs}></canvas>`); made.push(id); }
   }
   return { html: out, made };

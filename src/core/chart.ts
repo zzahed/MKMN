@@ -34,7 +34,7 @@ type Tok = { t: "num"; v: number } | { t: "id"; v: string } | { t: "op"; v: stri
 
 function tokenize(src: string): Tok[] | string {
   const out: Tok[] = [];
-  const s = src.replace(/×/g, "*").replace(/÷/g, "/").replace(/−/g, "-").replace(/²/g, "^2").replace(/³/g, "^3").replace(/,(?=\d{1,2}(?!\d))/g, ",");
+  const s = src.replace(/×/g, "*").replace(/÷/g, "/").replace(/−/g, "-").replace(/²/g, "^2").replace(/³/g, "^3");
   let i = 0;
   while (i < s.length) {
     const c = s[i];

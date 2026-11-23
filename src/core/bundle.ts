@@ -85,7 +85,7 @@ export function bundleHtml(source: string, files: FileLike[]): Bundled {
     const body = inlineBody(f, "script");
     used.push({ file: f, body, tag: "script" });
     const type = attr(m, "type");
-    const open = type ? `<script type="${type}">` : "<script>";
+    const open = type ? `<script type="${type.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}">` : "<script>";
     const block = `${open}\n${body}\n</script>`;
     // `defer` and modules wait for the page to be read; an inline script does not, so it moves to the end of the body
     if (/\bdefer\b/i.test(m) || /^module$/i.test(type ?? "") || inHead) { tail += `${block}\n`; return ""; }
