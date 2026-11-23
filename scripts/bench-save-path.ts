@@ -15,7 +15,7 @@ import type { Conversation } from "../src/renderer/store.ts";
 
 // a localStorage stand-in with a realistic setItem cost (the copy, not a quota refusal)
 const store = new Map<string, string>();
-const g: any = globalThis;
+const g = globalThis as unknown as { localStorage: Pick<Storage, "getItem" | "setItem" | "removeItem"> };
 g.localStorage = {
   getItem: (k: string) => store.get(k) ?? null,
   setItem: (k: string, v: string) => { store.set(k, v); },

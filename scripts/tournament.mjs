@@ -314,7 +314,7 @@ function startSidecar() {
         }
       } else if (m.t === "res") {
         const w = waiters.get(m.id);
-        if (w) { waiters.delete(m.id); m.ok ? w.res(m.result) : w.rej(new Error(m.error)); }
+        if (w) { waiters.delete(m.id); if (m.ok) w.res(m.result); else w.rej(new Error(m.error)); }
       } else if (m.t === "req") void handleHostRequest(m);
     }
   });
@@ -348,14 +348,6 @@ while ($true) {
   return () => { try { s.kill(); } catch { /* gone */ } };
 }
 
-/** NPU utilization, the same counters the app reads. One reading takes ~2s. */
-function npuSample() {
-  try {
-    const r = spawnSync("powershell", ["-NoProfile", "-Command", NPU_UTIL_SCRIPT], { encoding: "utf8", timeout: 15000 });
-    return parseNpuCounters(r.stdout ?? "");
-  } catch { return null; }
-}
-
 /** Persistent NPU sampler: the counter discovery runs ONCE, then each round
  * re-enumerates the instance paths (GPU Engine instances are PID-scoped — a
  * candidate's geniex process does not exist at discovery time, so fixed paths
@@ -364,7 +356,7 @@ function npuSample() {
  * utilization is a RATE counter, a single read always cooks to 0), and appends
  * one JSON line. ~2.5 s per reading. */
 function startNpuSampler(file) {
-  const loop = NPU_UTIL_SCRIPT.replace(/\$out = \@\(\)[\s\S]*$/, `$out = @()
+  const loop = NPU_UTIL_SCRIPT.replace(/\$out = @\(\)[\s\S]*$/, `$out = @()
 while ($true) {
   if ($found.Count -gt 0) {
     $paths = @()

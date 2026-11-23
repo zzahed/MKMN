@@ -46,16 +46,9 @@ const OTHER_SCRIPTS = /[\p{Script=Cyrillic}\p{Script=Greek}\p{Script=Han}\p{Scri
 
 const CODE_LINE = /^\s*(?:```|~~~|\/\/|\/\*|\*|#|<!--|import |export |const |let |var |function |class |interface |type |return |if \(|for \(|while \(|switch \(|case |default:|[{}[\]();,]+$)/;
 
-const reasons = new Map(ALLOWED.map((entry) => [entry.path, entry.why]));
-
 export function allowlistReason(path) {
   for (const entry of ALLOWED) if (path === entry.path || path.startsWith(entry.path)) return entry.why;
   return null;
-}
-
-/** A line that carries another language on purpose inside an otherwise English file. */
-function allowedLine(path, line) {
-  return false;
 }
 
 function excluded(path) {
@@ -89,7 +82,7 @@ export function scanText(text, path = "text") {
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
     if (line.trim() === "") continue;
-    if (reason || allowedLine(path, line)) continue;
+    if (reason) continue;
     if (OTHER_SCRIPTS.test(line)) {
       faults.push(`${path}:${i + 1}: another script is not allowed: ${line.trim().slice(0, 120)}`);
       continue;
@@ -100,7 +93,7 @@ export function scanText(text, path = "text") {
     }
     // an accent is a fault in code lines too: the app reads and writes English and Arabic only
     const withoutNames = line.replace(ACCENTED_ENGLISH, " ");
-    const accented = withoutNames.match(/[^\x00-\x7F]/g) ?? [];
+    const accented = withoutNames.match(/\P{ASCII}/gu) ?? [];
     const latinAccent = accented.filter((ch) => /\p{Script=Latin}/u.test(ch));
     if (latinAccent.length) {
       faults.push(`${path}:${i + 1}: accent outside the English/Arabic allowlist (${[...new Set(latinAccent)].join("")}): ${line.trim().slice(0, 120)}`);

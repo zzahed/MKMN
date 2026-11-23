@@ -20,7 +20,7 @@ child.stdout.on("data", (d) => {
     if (m.t === "event") { events.push(m); console.log(`EVENT ${m.name}:`, JSON.stringify(m.payload).slice(0, 160)); }
     else if (m.t === "res") {
       const w = waiters.get(m.id);
-      if (w) { waiters.delete(m.id); m.ok ? w.res(m.result) : w.rej(new Error(m.error)); }
+      if (w) { waiters.delete(m.id); if (m.ok) w.res(m.result); else w.rej(new Error(m.error)); }
     }
   }
 });

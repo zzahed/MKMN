@@ -5,7 +5,7 @@ const { spawn } = require("child_process");
 
 const child = spawn(process.execPath, ["dist/sidecar/main.js"], { stdio: ["pipe", "pipe", "pipe"] });
 let buf = ""; let nextId = 1; const waiters = new Map();
-const runEvents = []; let confirmRuns = 0; let confirmScript = [];
+const runEvents = []; let confirmScript = [];
 child.stdout.on("data", (d) => {
   buf += d.toString();
   let nl;
@@ -17,7 +17,7 @@ child.stdout.on("data", (d) => {
       if (m.name === "run") { runEvents.push(m.payload); console.log(`RUN ${m.payload.runId} ${m.payload.type}:`, String(m.payload.text ?? m.payload.error ?? "").trim().slice(0, 100)); }
       else if (m.name === "tasks") console.log("EVENT tasks:", JSON.stringify(m.payload).slice(0, 120));
       else console.log(`EVENT ${m.name}:`, JSON.stringify(m.payload).slice(0, 120));
-    } else if (m.t === "res") { const w = waiters.get(m.id); if (!m.ok) console.log("RES-ERR:", m.id, m.error); if (w) { waiters.delete(m.id); m.ok ? w.res(m.result) : w.rej(new Error(m.error)); } }
+    } else if (m.t === "res") { const w = waiters.get(m.id); if (!m.ok) console.log("RES-ERR:", m.id, m.error); if (w) { waiters.delete(m.id); if (m.ok) w.res(m.result); else w.rej(new Error(m.error)); } }
     else if (m.t === "req") void handleHostRequest(m);
   }
 });
@@ -25,7 +25,7 @@ child.stderr.on("data", (d) => console.error("STDERR:", d.toString().trim().slic
 
 async function handleHostRequest(m) {
   const reply = (ok, result, error) => child.stdin.write(JSON.stringify({ t: "res", id: m.id, ok, ...(ok ? { result } : { error }) }) + "\n");
-  if (m.method === "confirmRun") { confirmRuns++; const v = confirmScript.length ? confirmScript.shift() : false; console.log(`HOST confirmRun (${m.args?.[3]}): ${v}`); return reply(true, v); }
+  if (m.method === "confirmRun") { const v = confirmScript.length ? confirmScript.shift() : false; console.log(`HOST confirmRun (${m.args?.[3]}): ${v}`); return reply(true, v); }
   if (m.method === "openPath") { console.log("HOST openPath:", m.args?.[0]); return reply(true, true); }
   if (m.method === "notify") { console.log("HOST notify:", JSON.stringify(m.args)); return reply(true, true); }
   return reply(false, null, `the smoke host does not offer "${m.method}"`);
