@@ -271,7 +271,7 @@
       Array.prototype.forEach.call(el.attributes, function (a) {
         if (a.name === "save" || a.name === "id" || a.name === "class" || a.name === "style") return;
         var n = a.name.replace(/-/g, "_"), v = a.value;
-        if (/^\s*[\[{]/.test(v)) { try { S[n] = JSON.parse(v.replace(/'/g, '"')); return; } catch (e) { problems.push("bad list in " + a.name); } }
+        if (/^\s*[[{]/.test(v)) { try { S[n] = JSON.parse(v.replace(/'/g, '"')); return; } catch (e) { problems.push("bad list in " + a.name); } }
         var f = parseFloat(v); S[n] = String(f) === v.trim() ? f : v;
       });
       var slot = el.getAttribute("save");

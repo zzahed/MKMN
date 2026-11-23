@@ -92,7 +92,7 @@ export function nameRefs(sheet: Sheet): void {
   const heads = (sheet.rows[0] ?? []).map(plainLabel);
   sheet.rows.forEach((r, y) => r.forEach((cell, x) => {
     if (!isFormula(cell) || !cell.includes("[")) return;
-    sheet.rows[y][x] = cell.replace(/\[([^\]\[]+)\]/g, (all, inner: string) => {
+    sheet.rows[y][x] = cell.replace(/\[([^\][]+)\]/g, (all, inner: string) => {
       const [name, head] = inner.split("@");
       const row = labels.get(plainLabel(name));
       if (row === undefined) return all;

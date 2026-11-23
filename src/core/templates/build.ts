@@ -134,7 +134,7 @@ export async function* makeFromTemplate(o: TemplateOptions): AsyncGenerator<Chat
   const reply = await collect(o.stream, `${o.id}:template`, [{ role: "system", content: `You choose the template that fits a request for ${WHAT[kind]}. Reply with one JSON object {"template": "<id>"}; use "none" when no template fits.\n${list.map((t) => `- ${t.id}: ${t.summary}`).join("\n")}` }, { role: "user", content: request.slice(0, 1500) }], add, o.signal,
     { type: "object", additionalProperties: false, required: ["template"], properties: { template: { type: "string", enum: [...list.map((t) => t.id), "none"] } } }).catch((e) => { if (o.signal?.aborted) throw e; return ""; });
   const id = (firstJson(reply) as { template?: string } | null)?.template;
-  let tpl: Template | undefined, why = "";
+  let tpl: Template | undefined, why: string;
   if (id === "none") why = "the model found none that fits";
   else if (id && templateById(id, kind)) { tpl = templateById(id, kind); why = "chosen by the model from the list"; }
   else { tpl = matchTemplates(request, kind)[0]; why = tpl ? "the words of the request (the model did not answer)" : ""; }
@@ -305,7 +305,7 @@ export async function* makeFromTemplate(o: TemplateOptions): AsyncGenerator<Chat
 
   // 3 ---- the file
   const building = begin("build", "Build", "turning it into the file", "Builder");
-  let source = "", title = tpl.name;
+  let source: string, title: string;
   try { ({ source, title } = tpl.render(d)); } catch (e) { end(building, "error", (e as Error).message.slice(0, 120)); yield run(); return yield* freeWay(); }
   end(building, "done", `${source.split("\n").length} lines`);
   steps[0].status = "done";

@@ -329,14 +329,14 @@ export async function* editXPage(request: string, html: string, host: XHost, opt
         return out;
       };
 
-      let produced = yield* attempt("");
+      const produced = yield* attempt("");
       if (!produced) { failed = "no usable answer came back"; break; }
       let after = splice(produced);
       let problems = wrongWith(after);
       if (problems.length) {
         // once more, with exactly what was wrong
         const again = yield* attempt(`\n\nYour last answer made these problems in the page, correct them:\n${problems.map((p) => `- ${p}`).join("\n")}`);
-        if (again) { const a2 = splice(again); const p2 = wrongWith(a2); if (p2.length <= problems.length) { after = a2; problems = p2; produced = again; } }
+        if (again) { const a2 = splice(again); const p2 = wrongWith(a2); if (p2.length <= problems.length) { after = a2; problems = p2; } }
       }
       if (problems.length) { failed = problems[0]; break; }
       working = after;

@@ -122,7 +122,7 @@ export function parseSegments(text: string): Segment[] {
     }
     pushText(text.slice(pos, i));
     const gt = text.indexOf(">", i);
-    if (gt < 0) { segs.push({ t: "artifact", index: n++, title: "", kind: "code", language: "text", content: "", open: true }); break; }
+    if (gt < 0) { segs.push({ t: "artifact", index: n, title: "", kind: "code", language: "text", content: "", open: true }); break; }
     const a = attrs(text.slice(i, gt));
     const { kind, language } = kindOf(a);
     const end = text.indexOf(CLOSE, gt + 1);

@@ -54,7 +54,7 @@
   function cleanSvg(text) {
     var s = String(text == null ? "" : text);
     if (s.length > MAX_SVG || /<!DOCTYPE|<!ENTITY/i.test(s)) return "";
-    var a = s.search(/<svg[\s>\/]/i), b = s.toLowerCase().lastIndexOf("</svg>");
+    var a = s.search(/<svg[\s>/]/i), b = s.toLowerCase().lastIndexOf("</svg>");
     if (a < 0 || b < a) return "";
     s = s.slice(a, b + 6);
     var head = /^<svg\b[^>]*>/i.exec(s)[0], fixed = head;

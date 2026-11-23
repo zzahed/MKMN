@@ -65,7 +65,7 @@ async function turn(name, text, timeoutMs = 240_000) {
   await sleep(1500);
   for (const provider of ["fuse", "node"]) {
     console.log(`\n===== ${provider} =====`);
-    let models = [];
+    let models;
     try {
       models = await call("humainModels", provider);
       record(`${provider}: list models`, models.length > 0, `${models.length} models`);

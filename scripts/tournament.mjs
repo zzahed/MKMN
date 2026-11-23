@@ -364,7 +364,7 @@ function npuSample() {
  * utilization is a RATE counter, a single read always cooks to 0), and appends
  * one JSON line. ~2.5 s per reading. */
 function startNpuSampler(file) {
-  const loop = NPU_UTIL_SCRIPT.replace(/\$out = \@\(\)[\s\S]*$/, `$out = @()
+  const loop = NPU_UTIL_SCRIPT.replace(/\$out = @\(\)[\s\S]*$/, `$out = @()
 while ($true) {
   if ($found.Count -gt 0) {
     $paths = @()

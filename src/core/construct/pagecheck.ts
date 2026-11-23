@@ -54,7 +54,7 @@ export function derivePlayEvents(html: string, script: string): { ticks: string[
   for (const m of script.matchAll(/document\.addEventListener\("(keydown|keyup)", function \(e\) \{ if \(([\s\S]*?)\) \{ e\.preventDefault\(\); __run\(([\w$]+), e\);/g)) {
     // the key the wiring tests: the space test (e.key === " " || e.code === "Space") is the engine's convention for "Space"; a hand-written page's e.key literal stands for itself
     const lit = /e\.code === "Space"/.test(m[2]) ? null : /e\.key === ("(?:[^"\\]|\\.)*")/.exec(m[2])?.[1];
-    let key: string | null = null;
+    let key: string | null;
     try { key = lit !== undefined && lit !== null ? JSON.parse(lit) as string : (/e\.code === "Space"/.test(m[2]) ? "Space" : null); } catch { key = null; }
     if (!key) continue;
     (m[1] === "keydown" ? down : up).push({ name: m[3], key });

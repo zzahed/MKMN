@@ -958,7 +958,6 @@ export class BenchRunner {
           this.log(`Removing ${t.name} to free the space…`);
           const u = await this.d.uninstall(entry).catch((e) => ({ ok: false, message: (e as Error).message }));
           if (!u.ok) this.log(`Could not remove ${t.name}: ${u.message}`);
-          ownedEntry = null;
         }
       } else if (!r.wasInstalled && !r.inventoryKnown && !signal.aborted) {
         // Inventory was unreadable and this run provably downloaded nothing: destruction

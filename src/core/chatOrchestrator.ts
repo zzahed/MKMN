@@ -989,7 +989,7 @@ export async function runChatOrchestrator(host: ChatHost, id: string, entryId: s
               { role: "system", content: "You write search words. You are given a question and the files it may be answered from, each file named with the script its words are written in. Reply with only 3 to 8 search words that would find the answer in those files, written in the script of the file that holds the answer — the question may be written in another script, so do not copy the question's language. No explanation, no quotes." },
               { role: "user", content: `Files: ${fileScripts.map((f) => `${f.name} (${scriptName(f.script)})`).join(", ")}\n\nQuestion: ${question}\n\nSearch words:` },
             ], `${id}:knowq`, rac.signal, "off", REWRITE_TOKENS);
-            const wordsClean = words.replace(/^[\"'\s]+|[\"'\s]+$/g, "").split("\n")[0].slice(0, 200);
+            const wordsClean = words.replace(/^["'\s]+|["'\s]+$/g, "").split("\n")[0].slice(0, 200);
             // A rewrite counts only when its words FIND something: words that match nothing
             // (or that are in none of the files' scripts on a crossing) must not suppress
             // the titles fallback below.

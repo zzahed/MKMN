@@ -264,7 +264,7 @@ export async function* streamChat(opts: StreamOptions, id: string): AsyncGenerat
     } catch (e) {
       if (!(e instanceof ServerLostError) || opts.signal?.aborted || n > 0 || !opts.recover) throw e;
       yield { id, type: "notice", text: "The model server stopped serving mid-call. Restarting it before retrying." };
-      let back = false;
+      let back: boolean;
       try { back = (await opts.recover()) === true; } catch { back = false; }
       if (opts.signal?.aborted) throw opts.signal.reason;
       if (!back) throw new ServerLostError(`${e.message}; the model server could not be brought back, so the call was not retried`);

@@ -3,7 +3,7 @@
  * watching") or a tag ("[BLANK_AUDIO]"). Those are dropped so they never reach the chat.
  */
 const ALWAYS = [
-  /^[\[(*♪\s]*(blank[_ ]audio|silence|music|applause|noise|inaudible)[\])*♪\s.]*$/i,
+  /^[[(*♪\s]*(blank[_ ]audio|silence|music|applause|noise|inaudible)[\])*♪\s.]*$/i,
   /amara\.org|subtitles? by/i,
   /thanks? for watching|thank you for watching/i,
   /^[\s.,!?…\-–—♪*]*$/

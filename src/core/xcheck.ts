@@ -51,15 +51,15 @@ const VOID = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input"
 const ENT: Record<string, string> = { "&lt;": "<", "&gt;": ">", "&amp;": "&", "&quot;": '"', "&apos;": "'", "&#39;": "'", "&nbsp;": " " };
 const DURATION = /^\d+(\.\d+)?\s*(ms|s|m)?$/;
 
-const TAG = /<(\/?)([A-Za-z][A-Za-z0-9-]*)((?:\s+[^\s"'<>\/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'<>=`]+))?)*)\s*(\/?)>/g;
-const ATTR = /([^\s"'<>\/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'<>=`]+)))?/g;
+const TAG = /<(\/?)([A-Za-z][A-Za-z0-9-]*)((?:\s+[^\s"'<>/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'<>=`]+))?)*)\s*(\/?)>/g;
+const ATTR = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'<>=`]+)))?/g;
 /* core.js: the effect search (a name is required, so unreadable text is skipped and reported here) */
 const EFFECT = /\s*(?:([A-Za-z_][\w.]*)\s*(?::\s*([^\s;{]+\s*\{[^}]*\}|\{[^}]*\}|"[^"]*"|'[^']*'|[^\s;]+)|(\+\+|--)|(\+=|-=|=|\+|-)\s*("[^"]*"|'[^']*'|-?[^\s;]+))?)\s*;?/g;
 /* core.js: the condition tokens */
 const COND = /\s*(&&|\|\||==|!=|>=|<=|>|<|!|\(|\)|-?\d+(?:\.\d+)?|"[^"]*"|'[^']*'|[A-Za-z_][\w.]*)/g;
 const COND_CMP = /^(==|!=|>=|<=|>|<)$/;
 /* calc.js (planned block): arithmetic, functions of lists */
-const CALC = /\s*(\d+(?:\.\d+)?|"[^"]*"|'[^']*'|[A-Za-z_][\w.]*|==|!=|>=|<=|>|<|[-+*\/%(),])/g;
+const CALC = /\s*(\d+(?:\.\d+)?|"[^"]*"|'[^']*'|[A-Za-z_][\w.]*|==|!=|>=|<=|>|<|[-+*/%(),])/g;
 const CALC_FN: Record<string, [number, number]> = { min: [1, 99], max: [1, 99], round: [1, 2], floor: [1, 1], ceil: [1, 1], abs: [1, 1], count: [1, 2], sum: [2, 2] };
 
 interface El { tag: string; attrs: Map<string, string>; kids: Array<El | string>; parent: El | null }
@@ -531,7 +531,7 @@ export function xFlaws(html: string): string[] {
         declared.add(n);
         if (!/^[a-z][a-z0-9_]*$/.test(n)) add(`state name "${k}" is not plain: use letters, digits and _ (a dash becomes _)`);
         const v = val(e, k);
-        if (/^\s*[\[{]/.test(v)) {
+        if (/^\s*[[{]/.test(v)) {
           try { JSON.parse(v.replace(/'/g, '"')); } catch { add(`state "${k}" is not valid JSON: write an array such as items='[{"name":"key"}]' with no apostrophe inside`); }
         }
         if (v !== "" && v !== "0" && v !== "false") startHave.add(n);

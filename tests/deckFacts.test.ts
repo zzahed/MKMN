@@ -49,7 +49,7 @@ describe("a deck from a rich text, with a weak model", () => {
   it("still shows the figures, the dates on a timeline and cuts nothing with an ellipsis", async () => {
     const stream = async function* (sid: string, msgs: { role: string; content: unknown }[]): AsyncGenerator<ChatEvent> {
       const user = String(msgs[msgs.length - 1].content);
-      let text = "";
+      let text: string;
       if (sid.endsWith(":deckplan")) text = "Title: Vietnam\nTheme: sunrise\nSlide: cover | Vietnam | none\nSlide: content | Introduction | none\nSlide: content | Trade agreements | none\nSlide: content | Foreign capital | none\nSlide: closing | Conclusion | none";
       else if (/:slide/.test(sid)) { const n = /slide (\d)/.exec(user)?.[1]; text = n === "1" ? "# Vietnam\n- From closed economy to global hub" : `# Topic ${n}\n- One very long line that goes on and on about nothing in particular for far too many words to fit\n- Short`; }
       else text = "Done.";

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
+import * as os from "os";
 import ts from "typescript";
 
 /**
@@ -55,7 +56,7 @@ describe("React hooks", () => {
   });
 
   it("notices one when there is one", () => {
-    const tmp = path.join(require("os").tmpdir(), "bad-hook.tsx");
+    const tmp = path.join(os.tmpdir(), "bad-hook.tsx");
     fs.writeFileSync(tmp, 'import { useState } from "react";\nexport function Bad({ a }: { a: boolean }) {\n  if (!a) return null;\n  const [x] = useState(1);\n  return <div>{x}</div>;\n}\n');
     expect(problemsIn(tmp).length).toBe(1);
   });
