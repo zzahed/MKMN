@@ -223,7 +223,7 @@ describe("the registry is complete", () => {
     WORKER_INSTRUCTIONS: "the sub-agent worker's own session prompt (64 tokens, one route)",
     PLANNER_INSTRUCTIONS: "the construction engine's planner (own session)",
     IMPROVER_INSTRUCTIONS: "the file improver's own session",
-    SPEC_INSTRUCTIONS: "shelved",
+    SPEC_INSTRUCTIONS: "the build's rules session, which writes a program's rules before it is coded (src/core/build.ts)",
     ARTIST_INSTRUCTIONS: "the page writer's art session",
     OUTLINE_INSTRUCTIONS: "the page writer's outline session",
     WRITE_INSTRUCTIONS: "the page writer's write session",
@@ -267,7 +267,6 @@ describe("the registry is complete", () => {
     const { INSTRUCTION_BLOCKS } = await prompts();
     const walk = (dir: string): string[] =>
       readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
-        if (e.name === "shelved") return [];
         const p = join(dir, e.name);
         return e.isDirectory() ? walk(p) : e.name.endsWith(".ts") ? [p] : [];
       });

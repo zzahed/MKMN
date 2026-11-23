@@ -9,7 +9,7 @@ export default defineConfig({
   // An unhandled rejection fails the run: it can hide a failing assertion.
   test: {
     include: ["tests/**/*.test.{ts,tsx}"],
-    exclude: ["tests/shelved/**", "node_modules/**"],
+    exclude: ["node_modules/**"],
     dangerouslyIgnoreUnhandledErrors: false,
     testTimeout: 20000,
     setupFiles: ["tests/setup-model-guard.ts"],
