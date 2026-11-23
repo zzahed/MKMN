@@ -27,7 +27,7 @@ import { hashText } from "../memo";
 import { filesHashOf, sectionsOf, tokenize, type KnowledgeFileLike } from "./index";
 import type { Embedder } from "./embed";
 import { nextState } from "../../shared/stateMachines";
-import { forgetCountOf, markKnowledgeForgotten, safeIdOf } from "./ids";
+import { forgetCountOf, knowledgeOffloadName, markKnowledgeForgotten, safeIdOf } from "./ids";
 import { forgetVectorProject, openVectorIndex, type VectorIndex } from "./vectors";
 
 export { safeIdOf };
@@ -426,7 +426,7 @@ export function removeKnowledgeFiles(knowledgeDir: string, offloadDir: string, p
   const targets: Array<[string, string]> = [
     [knowledgeDir, `${id}.json`],
     [knowledgeDir, `${id}.vectors`],
-    [offloadDir, `knowledge-${id}.txt`],
+    [offloadDir, `${knowledgeOffloadName(projectId)}.txt`],
   ];
   const removed: string[] = [];
   for (const [dir, name] of targets) {

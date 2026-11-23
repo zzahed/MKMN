@@ -50,6 +50,7 @@ import { diagramFixInstructions } from "./diagram";
 import { prepareTurn } from "./chatPrepare";
 import { chooseEffort } from "./chatRoute";
 import { readDocumentQuestion } from "./chatRetrieve";
+import { knowledgeOffloadName } from "./knowledge/ids";
 import { orchestrate } from "./orchestrate";
 import { makeDeck, wantsDeck } from "./deckBuild";
 import { changeDeck } from "./deckEdit";
@@ -1119,7 +1120,7 @@ export async function runChatOrchestrator(host: ChatHost, id: string, entryId: s
             const foldDir = foldDirOf(host);
             if (foldDir) {
               const full = sections.map((s) => `- ${s.file} — ${s.title} (${placeOf(s)})`).join("\n");
-              const ref = offloadPayload(foldDir, `knowledge-${String(opts.projectId).replace(/[^A-Za-z0-9._-]/g, "_")}`, full);
+              const ref = offloadPayload(foldDir, knowledgeOffloadName(String(opts.projectId)), full);
               rest += `\n[${outline.overflow > 0 ? `${outline.overflow} more sections are listed` : "the sections left out"} in the offload store: ${ref.file}]`;
               knowlOffload = offloadSection(ref);
             }

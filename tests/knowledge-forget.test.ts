@@ -9,6 +9,8 @@ import * as path from "node:path";
 import { buildKnowledgeIndexNow, knowledgeIndexStatus, openKnowledgeIndex, prepareProjectVectors, removeKnowledgeFiles, safeIdOf } from "../src/core/knowledge/store";
 import { openVectorIndex } from "../src/core/knowledge/vectors";
 import type { Embedder } from "../src/core/knowledge/embed";
+import { knowledgeOffloadName } from "../src/core/knowledge/ids";
+import { readFileSync as readSource } from "node:fs";
 import { offloadPayload } from "../src/core/harness/offload";
 import type { KnowledgeFileLike } from "../src/core/knowledge/index";
 
@@ -154,3 +156,28 @@ The ${tag} heron count is ${i}.` }));
     expect(await prepareProjectVectors(d.knowledge, "p1", many("a"), async () => null)).toBeNull();
   });
 });
+
+// The final review: the chat wrote the offloaded knowledge text under a name it built itself
+// (an inline copy of the sanitiser) while the delete built its own; a change to one would have
+// left the text behind. Both now take the name from one function.
+describe("the offloaded knowledge text has one name, for the writer and the delete", () => {
+  it("the name is the sanitised id behind 'knowledge-', and an id with a path in it stays a file name", () => {
+    expect(knowledgeOffloadName("p1")).toBe("knowledge-p1");
+    expect(knowledgeOffloadName("../x y")).toBe("knowledge-.._x_y");
+  });
+
+  it("what the chat writes under that name is what the delete removes", () => {
+    const d = folders();
+    const id = "../odd id";
+    offloadPayload(d.offload, knowledgeOffloadName(id), "- notes.md - Notes");
+    expect(removeKnowledgeFiles(d.knowledge, d.offload, id)).toEqual([`${knowledgeOffloadName(id)}.txt`]);
+    expect(fs.readdirSync(d.offload)).toEqual([]);
+  });
+
+  it("the chat builds the name with that function, never with its own copy of the sanitiser", () => {
+    const src = readSource("src/core/chatOrchestrator.ts", "utf8");
+    expect(src).toContain("offloadPayload(foldDir, knowledgeOffloadName(");
+    expect(src).not.toMatch(/`knowledge-\$\{/);
+  });
+});
+

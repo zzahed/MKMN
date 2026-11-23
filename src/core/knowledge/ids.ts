@@ -4,6 +4,10 @@
 // (knowledge-<id>.txt) all use it, so removing a project finds exactly the files it wrote.
 export const safeIdOf = (projectId: string): string => projectId.replace(/[^A-Za-z0-9._-]/g, "_");
 
+/** The name the chat offloads a project's full knowledge text under (".txt" is added by the
+ *  offload store); the delete removes the file of the same name. */
+export const knowledgeOffloadName = (projectId: string): string => `knowledge-${safeIdOf(projectId)}`;
+
 // How many times each project's knowledge was deleted in this process. A build or a vector job
 // notes the count when it is asked for and checks it again before each write: a project deleted
 // while its index was still being built, or its vectors still being made, gets nothing written
