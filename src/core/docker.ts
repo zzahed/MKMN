@@ -32,7 +32,7 @@ export class DockerClient {
     while (url && out.length < max) {
       const r = await this.fetchFn(url, { headers: { "User-Agent": "MKMN" } });
       if (!r.ok) throw new Error(`Docker Hub could not be browsed (${r.status})`);
-      const j = await r.json();
+      const j = (await r.json()) as { results?: unknown; next?: unknown } | null;
       out.push(...((j?.results as RawDockerRepo[]) ?? []));
       url = typeof j?.next === "string" ? j.next : null;
     }
@@ -47,7 +47,7 @@ export class DockerClient {
       const r = await this.fetchFn(url, { headers: { "User-Agent": "MKMN" } });
       if (r.status === 404) throw new Error(`"${namespace}/${name}" was not found on Docker Hub.`);
       if (!r.ok) throw new Error(`Docker Hub could not list the versions of ${name} (${r.status})`);
-      const j = await r.json();
+      const j = (await r.json()) as { results?: unknown; next?: unknown } | null;
       out.push(...((j?.results as RawDockerTag[]) ?? []));
       url = typeof j?.next === "string" ? j.next : null;
     }

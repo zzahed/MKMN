@@ -8,6 +8,7 @@ import { parse } from "acorn";
 import { editDistance, plainWord, slack } from "../fuzzy";
 import { declaredIn } from "./bind";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- an acorn AST node: the walk reads whichever fields each node type has
 type Node = { type: string; start: number; end: number; [key: string]: any };
 export interface Edit { start: number; end: number; text: string }
 

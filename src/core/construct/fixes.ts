@@ -6,6 +6,7 @@ import { parse } from "acorn";
 import { closestName, GLOBALS } from "./mend";
 import { declaredIn } from "./bind";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- an acorn AST node: the walk reads whichever fields each node type has
 type Node = { type: string; start: number; end: number; [key: string]: any };
 interface Edit { start: number; end: number; text: string }
 const skip = new Set(["type", "start", "end", "loc", "range"]);
@@ -552,7 +553,7 @@ export function argKindProblems(units: { name: string; code: string }[], planned
   for (const u of units) {
     const ast = parseIt(u.code);
     if (!ast || !want.has(u.name)) continue;
-    const fn = (ast.body ?? []).find((n: Node) => isFn(n) && (n as any).id?.name === u.name) as Node | undefined;
+    const fn = (ast.body ?? []).find((n: Node) => isFn(n) && n.id?.name === u.name) as Node | undefined;
     const params = (fn?.params ?? []) as Node[];
     if (!params.length) continue;
     for (const c of calls) {

@@ -68,13 +68,21 @@ export class ThinkSplitter {
   }
 }
 
+/** One streamed chunk as a server may send it: every field is checked before it is used. */
+type SseDelta = { content?: unknown; reasoning_content?: unknown; reasoning?: unknown };
+type SseChunk = {
+  choices?: { delta?: SseDelta; finish_reason?: string | null }[];
+  usage?: { completion_tokens?: unknown; prompt_tokens?: unknown; prompt_tokens_details?: { cached_tokens?: unknown } };
+  timings?: { prompt_n?: unknown };
+};
+
 /** Parse one SSE `data:` payload; returns null for [DONE] / keep-alives. */
 export function parseSseData(data: string): { content?: string; reasoning?: string; usageTokens?: number; promptTokens?: number; cachedTokens?: number; promptEvaluated?: number; finish?: string } | null {
   const d = data.trim();
   if (!d || d === "[DONE]") return null;
-  let j: any;
+  let j: SseChunk;
   try { j = JSON.parse(d); } catch { return null; }
-  const delta = j.choices?.[0]?.delta ?? {};
+  const delta: SseDelta = j.choices?.[0]?.delta ?? {};
   return {
     content: typeof delta.content === "string" ? delta.content : undefined,
     reasoning: typeof delta.reasoning_content === "string" ? delta.reasoning_content : typeof delta.reasoning === "string" ? delta.reasoning : undefined,
