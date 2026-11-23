@@ -14,6 +14,18 @@ export const scriptJson = (v: unknown): string =>
   JSON.stringify(v).replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
 
 /**
+ * HTML without the named elements (with what they hold), removed until nothing changes, so a tag split around a removed one
+ * (`<scr<script></script>ipt>`) cannot come back together.
+ */
+export function removeElements(html: string, tags: string[]): string {
+  const names = tags.join("|");
+  const pair = new RegExp(`<(${names})\\b[\\s\\S]*?<\\/\\1\\b[^>]*>`, "gi");
+  let out = html;
+  for (let prev = ""; prev !== out;) { prev = out; out = out.replace(pair, ""); }
+  return out;
+}
+
+/**
  * An SVG with nothing that runs: the named elements (with what they hold) and every event attribute are removed, and the
  * removal is repeated until nothing changes, so a tag split around a removed one (`<scr<script></script>ipt>`) cannot come back together.
  */

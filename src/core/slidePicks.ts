@@ -55,7 +55,7 @@ export function partsNote(picks: SlidePick[]): string {
 
 /** The parts a message points at, in their order, and the message without the note. */
 export function takeParts(text: string): { parts: { n: number; label: string; info: PickInfo }[]; rest: string; file: string } {
-  const m = /^\s*\[The user pointed at these parts of "([^"]*)"[^\n]*\n((?:\d+\. [^\n]* \| \{[^\n]*\}\n)+)\]\n\n/.exec(text);
+  const m = /^\s*\[The user pointed at these parts of "([^"]*)"[^\n]*\n((?:\d+\. [^\n]*\n)+)\]\n\n/.exec(text);
   if (!m) return { parts: [], rest: text, file: "" };
   const parts: { n: number; label: string; info: PickInfo }[] = [];
   for (const line of m[2].split("\n")) {

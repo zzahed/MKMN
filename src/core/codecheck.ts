@@ -3,7 +3,7 @@ import { STORAGE_SHIM, previewDocument } from "./artifacts";
 import { missingElements } from "./bundle";
 import { usesBlocks } from "./gameBlocks";
 import { xFlaws } from "./xcheck";
-import { escapeRe } from "./escape";
+import { escapeRe, removeElements } from "./escape";
 
 /** What running one artifact found. `ran`: page = executed in a hidden window, syntax = parsed only, none = nothing could be checked. */
 export interface CheckReport {
@@ -349,7 +349,7 @@ export function quickErrors(f: { title: string; kind: string; language: string; 
     if (!/<body[\s>]/i.test(f.content)) out.push("The page has no <body>.");
     // a page that carries its own script (one file for a whole game) is held to the same standard as a script file:
     // it must parse, and every element it looks for must exist in the page
-    const markup = f.content.replace(/<script\b[\s\S]*?<\/script\b[^>]*>/gi, "");
+    const markup = removeElements(f.content, ["script"]);
     for (const s of inlineScripts(f.content)) {
       const e = jsSyntaxError(s.code, s.line - 1);
       if (e) out.push(`In the page's script: ${e}`);

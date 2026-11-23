@@ -37,9 +37,9 @@ describe("hardened parsers", () => {
   it("takeParts reads the note and stays fast on a hostile message", () => {
     const note = `[The user pointed at these parts of "a.html" in the preview:\n1. Title | {"part":"x"}\n]\n\nmake it red`;
     expect(takeParts(note).parts).toHaveLength(1);
-    const bad = `[The user pointed at these parts of ""\n9. ${" | {}0. ".repeat(5000)}`;
     const t = Date.now();
-    takeParts(bad);
+    takeParts(`[The user pointed at these parts of ""\n9. ${" | {}0. ".repeat(5000)}`);
+    takeParts(`[The user pointed at these parts of ""\n9. ${" | { | {}}\n9. ".repeat(40)}`);
     expect(Date.now() - t).toBeLessThan(1000);
   });
 

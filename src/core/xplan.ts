@@ -6,6 +6,7 @@
  */
 import { xMend } from "./xcheck";
 import { X_DOCS } from "./xdocs";
+import { removeElements } from "./escape";
 
 export interface XSection { id: string; title: string; kind: "screen" | "overlay"; blocks: string[]; topics: string[] }
 export interface XArt { name: string; w: number; h: number; about: string }
@@ -182,7 +183,7 @@ export function cleanFragment(reply: string): { body: string; css: string } {
   else t = t.replace(/^```[a-z]*\n?/i, "").replace(/```\s*$/i, "");
   let css = "";
   t = t.replace(/<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi, (_, c: string) => { css += `${c.trim()}\n`; return ""; });
-  t = t.replace(/<script\b[\s\S]*?<\/script\b[^>]*>/gi, "").replace(/<!doctype[^>]*>/gi, "").replace(/<\/?(?:html|head|body)\b[^>]*>/gi, "").replace(/<title\b[\s\S]*?<\/title\s*>/gi, "").replace(/<meta\b[^>]*>/gi, "");
+  t = removeElements(t, ["script"]).replace(/<!doctype[^>]*>/gi, "").replace(/<\/?(?:html|head|body)\b[^>]*>/gi, "").replace(/<title\b[\s\S]*?<\/title\s*>/gi, "").replace(/<meta\b[^>]*>/gi, "");
   t = t.replace(/<\/?x-scene\b[^>]*>/gi, "").replace(/<\/?game-scene\b[^>]*>/gi, "");
   return { body: t.trim(), css: css.trim() };
 }
