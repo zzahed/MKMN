@@ -43,7 +43,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.65.1",
-    "@tauri-apps/cli": "^2.12.4",
+    "@tauri-apps/cli": "^2.12.6",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.8",
@@ -60,10 +60,10 @@
     "eslint": "^10.15.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.14.0",
-    "jsdom": "^31.0.0",
+    "jsdom": "^31.0.1",
     "katex": "^0.19.0",
     "lucide-static": "^1.62.0",
-    "mermaid": "^11.4.1",
+    "mermaid": "^12.3.0",
     "prettier": "^3.10.1",
     "typescript": "^5.6.0",
     "typescript-eslint": "^8.73.0",
@@ -87,7 +87,7 @@
     "ws": "^8.23.0"
   },
   "optionalDependencies": {
-    "sherpa-onnx-win-arm64": "1.13.8",
+    "sherpa-onnx-win-arm64": "2.0.2",
     "sherpa-onnx-win-x64": "1.13.8"
   },
   "pnpm": {
