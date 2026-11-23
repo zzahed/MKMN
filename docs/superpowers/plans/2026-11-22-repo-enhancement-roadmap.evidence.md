@@ -549,3 +549,14 @@ All jobs pass, CodeQL too (0 open alerts). `windows-arm64-tests` ran the suite w
 
 CI run 45120842689 (e30978a): every job passes, `e2e` (3 passed in Chromium) and `windows-arm64-tests` (2871 tests, lines 78.46%, thresholds met) included. Task 20 is green.
 
+CI run 45122524519 (89de7c6, Task 21): `windows-arm64-tests` ran the nine new `commands::tests` (all ok; 273 + 10 Rust tests). `unit (1)` failed on `tests/computerUsePanel.test.tsx` "lets the person type BEFORE choosing a window" (focus timing), the third failure in CI of that file's focus tests, already a follow-up; Task 21 changed only Rust code. Every other job passed.
+
+## Task 22 self-review (before Task 23)
+
+- Moved lines: the lines removed from `src/sidecar/main.ts` and the bodies of the seven area files, with the two-space indent taken off, are the same multiset. The only differences are the import edits, the seven `registerX` calls, and three named rewrites (`bench?.running` and `bench?.stop()` as getters, the inline `import("../../core/manifest")` path).
+- Strings: no multi-line template literal in any area file (TypeScript scanner), so the re-indent changed no string.
+- Deps: every one passed by value is a `const` or a function declaration never reassigned; the one reassigned variable, `bench`, is passed as a getter. The free names that resolve to globals in the area files are the built-ins and `process` only; none was a `main.ts` variable before.
+- Order: every registration still runs during the module's load, before `main()` reads the first request and before the `--ask` mode starts.
+- Found and fixed: `docs/design/doc-edit-copy.md` said `main.ts` registers `agentDocEdit` (now `register/agent.ts`, the run in `main.ts`); the safety test's comment still said the split was under way.
+- CI run for 3d98d86: every job passes, CodeQL too.
+

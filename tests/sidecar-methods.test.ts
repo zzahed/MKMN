@@ -1,6 +1,6 @@
-// The sidecar's methods, as registered on its dispatcher. src/sidecar/main.ts is being split
-// into one file per area (src/sidecar/register/*.ts); a move must not lose, rename or add a
-// method. Importing main.ts would start the sidecar, so the registrations are read from the
+// The sidecar's methods, as registered on its dispatcher. src/sidecar/main.ts keeps start-up
+// and registers seven areas from their own files (src/sidecar/register/*.ts); moving a method
+// between files must not lose, rename or add one. Importing main.ts would start the sidecar, so the registrations are read from the
 // source: every `dispatcher.register("<name>"` under src/sidecar, and every area's
 // `registerX` must be called from main.ts, or its methods would never be registered.
 import { describe, expect, it } from "vitest";
