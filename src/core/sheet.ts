@@ -118,6 +118,9 @@ export function sheetsText(sheets: Sheet[]): string {
  * What starts with = stays a formula; the other cells keep what they hold.
  */
 export function setCell(src: string, sheet: number, row: number, col: number, value: string): string {
+  // the position comes in a message from the preview frame, where the generated page runs: only whole
+  // numbers index the sheets, rows and cells (a name such as "__proto__" would reach an object's prototype)
+  if (![sheet, row, col].every((n) => Number.isInteger(n))) return src;
   const sheets = parseSheets(src);
   const s = sheets[sheet];
   if (!s || row < 0 || col < 0 || row > 2000 || col > 200) return src;
