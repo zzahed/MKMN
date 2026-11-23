@@ -108,13 +108,13 @@ describe("pinnedGet reads a public address", () => {
 
 describe("pinnedGet follows redirects one checked hop at a time", () => {
   it("follows a relative and an absolute redirect, looking each host up at its own connection", async () => {
-    handler = (q, r, n) => {
+    handler = (_q, r, n) => {
       if (n === 1) { r.statusCode = 302; r.setHeader("location", "/b.js"); return r.end("ignored"); }
       if (n === 2) { r.statusCode = 301; r.setHeader("location", "http://cdn.test/c.js"); return r.end(); }
-      r.end(`final ${q.url}`);
+      r.end("final"); // a fixed body: the server never echoes the request (the path is checked through hits)
     };
     const res = await pinnedGet("http://pub.test/a.js", opts());
-    expect(res.body.toString()).toBe("final /c.js");
+    expect(res.body.toString()).toBe("final");
     expect(res.status).toBe(200);
     expect(hits).toEqual(["pub.test/a.js", "pub.test/b.js", "cdn.test/c.js"]);
     expect(lookups).toEqual(["pub.test", "pub.test", "cdn.test"]);
