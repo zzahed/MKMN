@@ -580,11 +580,11 @@ Verdict: ready after fixes. Review Focus 1-5: no problem found (the Windows skip
 
 - Final: fixed deleting a project while its index or vectors are still being built wrote `<id>.json` and `<id>.vectors` back (Important): `removeKnowledgeFiles` marks the project forgotten first; builds (running and queued), `openVectorIndex` and the post-build vector job (`prepareProjectVectors`) check the mark before writing. `tests/knowledge-forget.test.ts`: four race tests RED→GREEN (the running build, the queued build, the vectors, the search model still loading; the last also shown failing with the function present but no check), two controls; suite 284/284.
 - Final: Ruling: the reviewer's Minor 5 (one failed probe turns generated code off until restart, blaming the runtime) is re-graded Important — a person whose first start is slow (antivirus, load) loses generated code for the whole session and is told the wrong cause; only a restart helps. Fixed: the probe answers proven blocked, proven open, or could not tell (`probeVerdict`); only a definite answer is remembered, "could not tell" refuses that run with its own message and is asked again. `tests/isolation.test.ts`: four tests RED→GREEN (verified against the old code), suite 284/284. Cost if wrong: a PC whose probe never answers spawns one probe per generated-code run (10 s at most each).
-- Final: minor (deferred): `src/core/server.ts` and `tests/npu-runtime-safety.test.ts` were committed with CRLF in Task 7 (whole-file diffs, `git blame` lost); renormalise to LF and add a `.gitattributes` with `* text=auto eol=lf`.
-- Final: minor (deferred): `src/renderer/pdf.ts` says "PDF reading needs Node.js 26 or later" in the window too, where the missing `Promise.try`/`toHex` belong to WebView2; word it by environment.
-- Final: minor (deferred): the offloaded knowledge file name (`src/core/chatOrchestrator.ts`, `knowledge-<id>`) uses an inline copy of the sanitiser regex instead of `safeIdOf`; identical today, but a later change to one would make deletion miss the file.
-- Final: minor (deferred): `docs/design/BRAND.md` still says the `opennpu` IPC bridge name is kept; the bridge is `window.mkmn` since Task 16, only the storage keys keep the old name.
-- Final: minor (deferred): `@vitest/coverage-v8` is `^5.1.0` in `package.json`; a relock could take 5.1.1 against `vitest` 5.1.0. Use an exact version, or move both together.
+- Final: minor (deferred, then fixed at the owner's request): `src/core/server.ts` and `tests/npu-runtime-safety.test.ts` were committed with CRLF in Task 7 (whole-file diffs, `git blame` lost); renormalise to LF and add a `.gitattributes` with `* text=auto eol=lf`.
+- Final: minor (deferred, then fixed at the owner's request): `src/renderer/pdf.ts` says "PDF reading needs Node.js 26 or later" in the window too, where the missing `Promise.try`/`toHex` belong to WebView2; word it by environment.
+- Final: minor (deferred, then fixed at the owner's request): the offloaded knowledge file name (`src/core/chatOrchestrator.ts`, `knowledge-<id>`) uses an inline copy of the sanitiser regex instead of `safeIdOf`; identical today, but a later change to one would make deletion miss the file.
+- Final: minor (deferred, then fixed at the owner's request): `docs/design/BRAND.md` still says the `opennpu` IPC bridge name is kept; the bridge is `window.mkmn` since Task 16, only the storage keys keep the old name.
+- Final: minor (deferred, then fixed at the owner's request): `@vitest/coverage-v8` is `^5.1.0` in `package.json`; a relock could take 5.1.1 against `vitest` 5.1.0. Use an exact version, or move both together.
 - Final: Ruling: the reviewer set aside the Task 5 and 6 Linux-only failures — they are resolved (CI run 45064583668) and waived to that job; nothing to add.
 - Final: Ruling: the reviewer set aside generate and post-process in `runChatOrchestrator` — the owner chose three stages; a follow-up row stands.
 - Final: Ruling: the reviewer set aside artifact-version retention and the missing Settings control for `privacy.retentionDays` — both follow-up rows stand.
@@ -597,3 +597,13 @@ Verdict: ready after fixes. Review Focus 1-5: no problem found (the Windows skip
 - Final: Ruling: the reviewer set aside whether gitleaks-action needs a licence for an organisation-owned repository — the repository is personal today; the owner checks this if it moves to an organisation.
 - Final: Ruling: the reviewer set aside the Prettier reformat and raising the 14 DEBT lint rules — follow-up rows stand.
 - Final: Ruling: the reviewer set aside the CodeQL and Dependabot cadence and `cancel-in-progress` on pushes to `main` — a policy the owner may change; no defect.
+
+## The deferred minors, fixed (owner's request, 2026-11-23)
+
+- Line endings: `src/core/server.ts` and `tests/npu-runtime-safety.test.ts` renormalised to LF (content unchanged, `git diff -w` empty; their diff against the branch base fell from about 1 200 lines to 37). `.gitattributes` keeps text files LF (`* text=auto eol=lf`); no other file changed, all were already LF (3a3b0d8).
+- PDF message: `pdfRuntimeMessage` names WebView2 in the window and Node.js 26 under Node; two tests RED→GREEN (e1e4f76).
+- Offload name: `knowledgeOffloadName` (knowledge/ids.ts) is the one name the chat writes and the delete removes; three tests RED→GREEN, including a pin that the chat uses it (719758f).
+- `docs/design/BRAND.md` names the window bridge `window.mkmn`; only the `opennpu.*` storage keys keep the old name (780014d).
+- `vitest` and `@vitest/coverage-v8` are both exactly 5.1.0, and Dependabot updates them as one group (4ba36ec).
+- Suite with coverage: 284 files, 2919 passed, 1 skipped, lines 78.54%; lint 0 errors; both builds pass.
+
