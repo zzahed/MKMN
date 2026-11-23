@@ -436,7 +436,7 @@ node scripts/generate-feature-matrix.mjs --check
 | SCP009 | `scripts/audit-context.mjs` | audit the context sent to a model | tests/audit-context.test.ts | CONTRACT |
 | SCP010 | `scripts/bench-probe-spawns.ts` | list the processes a benchmark spawns | manual check (diagnostic only) | MANUAL |
 | SCP011 | `scripts/bench-save-path.ts` | print the benchmark save path | tests/bench.test.ts | CONTRACT |
-| SCP012 | `scripts/build-xblocks.js` | build the page-block runtime | tests/gameBlocks.test.ts; tests/xbuild.test.ts | CONTRACT |
+| SCP012 | `scripts/build-xblocks.mjs` | build the page-block runtime | tests/gameBlocks.test.ts; tests/xbuild.test.ts | CONTRACT |
 | SCP013 | `scripts/check-language.mjs` | reject non-English, non-Arabic copy outside the allowlist | tests/language.test.ts | CONTRACT |
 | SCP014 | `scripts/feature-matrix.mjs` | script | manual check | CONTRACT |
 | SCP015 | `scripts/generate-brand-assets.mjs` | generate the brand image set | tests/brandAssets.test.ts | CONTRACT |

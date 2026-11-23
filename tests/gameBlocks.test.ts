@@ -34,7 +34,7 @@ describe("pages of blocks", () => {
   it("carry every block that exists", () => {
     expect(X_BLOCK_NAMES).toEqual(expect.arrayContaining(["core", "art", "map", "platformer", "battle", "dialog", "timer", "calc"]));
   });
-  it("use the runtime built from the block files (run `node scripts/build-xblocks.js` after changing one)", () => {
+  it("use the runtime built from the block files (run `node scripts/build-xblocks.mjs` after changing one)", () => {
     const dir = join(__dirname, "..", "src", "core", "xblocks");
     for (const n of X_BLOCK_NAMES) expect(X_RUNTIME).toContain(readFileSync(join(dir, `${n}.js`), "utf8").replace(/\r\n/g, "\n").trim()); // a checkout on Windows may carry \r\n
   });
