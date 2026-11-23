@@ -8,7 +8,6 @@
  */
 import { journalDir } from "../core/harness/journal";
 import { pruneForSettings } from "../core/retention";
-import { forgetConversation } from "../core/harness/forget";
 import { taskProjectView } from "../core/taskKnowledge";
 import { raceAbort } from "../core/abortable";
 import { HostSettingsWriter } from "../core/settingsWriter";
@@ -78,7 +77,6 @@ import { runnerFor, withPip } from "../core/runcode";
 import { launchSite } from "./siteLaunch";
 import { JsonStore } from "../core/library";
 import { Scheduler } from "../core/scheduler";
-import { nextRun, validateSchedule } from "../core/schedule";
 import { composeInstructions } from "../core/instructions";
 import { artifactsIn, stripArtifacts } from "../core/artifacts";
 import { buildSystemPrompt, knowledgeBudget } from "../core/projects";
@@ -91,6 +89,7 @@ import type { BrowseQuery, BrowseResult, CatalogEntry, ChatMessage, ChatOptions,
 import { registerHumain, fuseConnection, fuseSearchContext, sourcesBlock } from "./humain";
 import { registerVoice } from "./register/voice";
 import { registerKnowledge } from "./register/knowledge";
+import { registerTasks } from "./register/tasks";
 import { CLOUD_CHAT_ID, fuseEntry, fuseServed } from "../core/cloudChat";
 import { installedOnlyEntries, parseInstalledJson } from "../core/installedEntries";
 import { checkOutcome, clearLoadFailure, failuresOfThisGeniex, verdictOf, withLoadFailure } from "../core/loadFailures";
@@ -3146,50 +3145,7 @@ const scheduler = new Scheduler({
 });
 scheduler.start();
 
-dispatcher.register("tasks", () => taskStore.list());
-
-dispatcher.register("saveTask", (t: ScheduledTask) => {
-  const now = Date.now();
-  const prev = taskStore.get(t.id);
-  const changed = !prev || JSON.stringify(prev.schedule) !== JSON.stringify(t.schedule) || (t.enabled && !prev.enabled);
-  const bad = t.enabled && changed ? validateSchedule(t.schedule, now) : null;
-  if (bad) throw new Error(bad);
-  taskStore.upsert({
-    ...t, created: prev?.created ?? now, runs: prev?.runs ?? [], running: prev?.running ?? false,
-    nextRun: !t.enabled ? null : changed ? nextRun(t.schedule, now) : prev?.nextRun ?? nextRun(t.schedule, now)
-  });
-  return taskStore.list();
-});
-
-// Deleting a chat deletes the run journals and payloads it left in Workspace\harness (harness/forget.ts).
-dispatcher.register("forgetConversation", (convId: string) => {
-  if (typeof convId !== "string" || !convId || convId.length > 200) return { journals: 0, payloads: 0 };
-  const r = forgetConversation(convId, journalDir());
-  if (r.journals || r.payloads) console.error(`[harness] a deleted chat's records were removed: ${r.journals} journal(s), ${r.payloads} payload(s)`);
-  return r;
-});
-dispatcher.register("deleteTask", (id: string) => { taskStore.remove(String(id)); return taskStore.list(); });
-
-dispatcher.register("runTask", (id: string) => {
-  const t = taskStore.get(String(id));
-  if (!t) return;
-  if (chatCount() > 0 || bench?.running || runtimeLease.isBusy()) {
-    taskStore.upsert({
-      ...t,
-      runs: [{
-        id: `${t.id}:${Date.now()}`,
-        startedAt: Date.now(),
-        finishedAt: Date.now(),
-        status: "error" as const,
-        output: "",
-        error: "NPU is currently busy with another task",
-        artifactIds: []
-      }, ...t.runs].slice(0, 20)
-    });
-    return;
-  }
-  void scheduler.execute(String(id));
-});
+registerTasks(dispatcher, { taskStore, scheduler, benchRunning: () => !!bench?.running });
 
 // ---- the stdio loop
 
