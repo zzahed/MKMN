@@ -69,10 +69,17 @@ export class ThinkSplitter {
 }
 
 /** Parse one SSE `data:` payload; returns null for [DONE] / keep-alives. */
+/** One streamed chunk of an OpenAI-style chat completion, as the server sent it. */
+type SseChunk = {
+  choices?: { delta?: { content?: unknown; reasoning_content?: unknown; reasoning?: unknown }; finish_reason?: string | null }[];
+  usage?: { completion_tokens?: unknown; prompt_tokens?: unknown; prompt_tokens_details?: { cached_tokens?: unknown } };
+  timings?: { prompt_n?: unknown };
+};
+
 export function parseSseData(data: string): { content?: string; reasoning?: string; usageTokens?: number; promptTokens?: number; cachedTokens?: number; promptEvaluated?: number; finish?: string } | null {
   const d = data.trim();
   if (!d || d === "[DONE]") return null;
-  let j: any;
+  let j: SseChunk;
   try { j = JSON.parse(d); } catch { return null; }
   const delta = j.choices?.[0]?.delta ?? {};
   return {

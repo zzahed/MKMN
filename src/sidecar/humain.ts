@@ -5,7 +5,7 @@ import { HUMAIN_ORIGINS, humainEvents, HumainError, humainRequest } from "../cor
 import { humainVault } from "./humainVault";
 import type { SidecarDispatcher } from "./protocol";
 
-export function registerHumain(dispatcher: SidecarDispatcher, configDir: string, readConfig: () => Record<string, unknown> = () => ({})) {
+export function registerHumain(dispatcher: SidecarDispatcher, configDir: string, readConfig: () => Partial<Settings> = () => ({})) {
   const vault = humainVault(configDir);
   const requireFeature = (feature: HumainFeature) => {
     if (!featureEnabled(readConfig().humainDisabledFeatures, feature)) throw new Error("Enable this capability in HUMAIN Settings.");
@@ -145,7 +145,7 @@ export function registerHumain(dispatcher: SidecarDispatcher, configDir: string,
     return { type: "file", mime: type || "application/octet-stream", base64: Buffer.concat(bytes, total).toString("base64") };
   });
 
-  return async (id: string, settings: Record<string, unknown>, messages: ChatMessage[], signal: AbortSignal, send: (event: ChatEvent) => void) => {
+  return async (id: string, settings: Partial<Settings>, messages: ChatMessage[], signal: AbortSignal, send: (event: ChatEvent) => void) => {
     const start = performance.now();
     let first: number | null = null;
     let finish: string | null = null;
@@ -357,7 +357,7 @@ export function operationFeature(path: string): HumainFeature | undefined {
  * What a chat on HUMAIN Fuse needs to run through the app's pipeline: the saved key, the chosen chat model
  * and its context window, read from Fuse's own model list (so a model no longer available fails here, named).
  */
-export async function fuseConnection(configDir: string, config: Record<string, unknown>, signal?: AbortSignal): Promise<{ key: string; model: string; maxModelLen: number | null }> {
+export async function fuseConnection(configDir: string, config: Partial<Settings>, signal?: AbortSignal): Promise<{ key: string; model: string; maxModelLen: number | null }> {
   const model = config.humainFuseModel;
   if (typeof model !== "string" || !model) throw new Error(`Choose a chat model for ${HUMAIN_LABEL.fuse} in Settings.`);
   const key = await humainVault(configDir).read("fuse");

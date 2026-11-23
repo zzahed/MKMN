@@ -45,7 +45,7 @@ export interface ConversationSaver {
 export function createConversationSaver(deps: ConversationSaverDeps): ConversationSaver {
   const now = deps.now ?? (() => Date.now());
   const setTimer = deps.setTimer ?? ((fn: () => void, ms: number) => setTimeout(fn, ms));
-  const clearTimer = deps.clearTimer ?? ((t: unknown) => clearTimeout(t as any));
+  const clearTimer = deps.clearTimer ?? ((t: unknown) => clearTimeout(t as ReturnType<typeof setTimeout>));
 
   let latest: Conversation[] | null = null;
   let lastWrite = -Infinity;

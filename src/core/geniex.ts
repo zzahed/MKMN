@@ -28,7 +28,7 @@ export function modelsDir(env = process.env): string {
 export function run(exe: string, args: string[], timeoutMs = 30000): Promise<{ code: number; out: string }> {
   return new Promise((resolve) => {
     execFile(exe, args, { timeout: timeoutMs, windowsHide: true, maxBuffer: 8 * 1024 * 1024 }, (err, stdout, stderr) => {
-      const code = err ? ((err as any).code as number) || 1 : 0;
+      const code = err ? (err.code as number) || 1 : 0;
       resolve({ code: typeof code === "number" ? code : 1, out: `${stdout}${stderr}` });
     });
   });
@@ -107,7 +107,7 @@ export async function listInstalled(exe: string): Promise<InstalledModel[]> {
 function runConfirmed(exe: string, args: string[], timeoutMs = 60000): Promise<{ code: number; out: string }> {
   return new Promise((resolve) => {
     const child = execFile(exe, args, { timeout: timeoutMs, windowsHide: true, maxBuffer: 8 * 1024 * 1024 }, (err, stdout, stderr) => {
-      const code = err ? ((err as any).code as number) || 1 : 0;
+      const code = err ? (err.code as number) || 1 : 0;
       resolve({ code: typeof code === "number" ? code : 1, out: `${stdout}${stderr}` });
     });
     child.stdin?.on("error", () => { /* the command did not read its input */ });
@@ -361,7 +361,7 @@ export function freeDiskGB(dir: string): number | null {
   try {
     let d = dir;
     while (!fs.existsSync(d) && path.dirname(d) !== d) d = path.dirname(d);
-    const s = (fs as any).statfsSync(d);
+    const s = fs.statfsSync(d);
     return (s.bavail * s.bsize) / 1024 ** 3;
   } catch {
     return null;

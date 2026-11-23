@@ -18,7 +18,7 @@ import { nativeRow } from "../core/native";
 import { createMockBench } from "./mockBench";
 
 export function installMockIfNeeded() {
-  if ((window as any).mkmn) return;
+  if (window.mkmn) return;
   const hw = buildProfile(
     { cpuName: "Snapdragon(R) X Plus - X1P64100 - Qualcomm(R) Oryon(TM) CPU", totalRamBytes: 16 * 1024 ** 3, npuDevices: [{ name: "Hexagon NPU", driverVersion: "30.0.220.3000" }], osArch: "ARM64" },
     "arm64"
@@ -533,5 +533,5 @@ export function installMockIfNeeded() {
     onChat: (cb) => { cl.push(cb); return () => cl.splice(cl.indexOf(cb), 1); },
     onServer: (cb) => { sl.push(cb); return () => sl.splice(sl.indexOf(cb), 1); }
   };
-  (window as any).mkmn = api;
+  window.mkmn = api;
 }

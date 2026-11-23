@@ -21,7 +21,7 @@ import { compiledContextOf } from "../../core/qairt";
 import { resolveModel } from "../../core/resolve";
 import { speedsById as mergeSpeeds } from "../../core/speeds";
 import { readBool } from "../../shared/settingsSchema";
-import type { BrowseQuery, BrowseResult, CatalogEntry, HardwareProfile, HfSearchResult, InstallProgress } from "../../shared/types";
+import type { BrowseQuery, BrowseResult, CatalogEntry, HardwareProfile, HfSearchResult, InstallProgress, Settings } from "../../shared/types";
 import type { SidecarDispatcher, SidecarMessage } from "../protocol";
 
 type InstallResult = { ok: boolean; error?: string; cancelled?: boolean; alreadyInstalled?: boolean };
@@ -32,10 +32,10 @@ export interface ModelDeps {
   nativeBundles: () => Promise<NativeBundle[]>;
   chatHardware: () => Promise<HardwareProfile>;
   hardware: (refresh?: boolean) => Promise<HardwareProfile>;
-  settings: () => any;
+  settings: () => Settings;
   /** The person's own resolved and downloaded models (custom-models.json). */
-  saveCustom: (e: any) => void;
-  customModels: () => any[];
+  saveCustom: (e: CatalogEntry) => void;
+  customModels: () => CatalogEntry[];
   refreshInstalledOnly: () => Promise<CatalogEntry[]>;
   /** The GenieX pulls and the Foundry downloads in progress, by ref, so an install can be cancelled. */
   pulls: Map<string, Pull>;
@@ -287,7 +287,7 @@ export function registerModels(dispatcher: SidecarDispatcher, deps: ModelDeps): 
     const out: Record<string, number> = {};
     for (const pack of Object.values(DYNAMIC_DATA.packs)) {
       for (const m of packParts(pack)) {
-        const e = entries.find((x) => (x as any).dynamicRef === m.ref || entryMatches(x, m.ref) || entryMatches(x, m.repo) || entryMatches(x, m.name));
+        const e = entries.find((x) => x.dynamicRef === m.ref || entryMatches(x, m.ref) || entryMatches(x, m.repo) || entryMatches(x, m.name));
         if (e && all[e.id]) out[m.ref] = all[e.id];
       }
     }

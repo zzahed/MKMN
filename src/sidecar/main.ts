@@ -80,7 +80,8 @@ import { mergedPack, pickModel, tierOf } from "../core/dynamic";
 import { spawn, spawnSync } from "child_process";
 import { createHash, randomUUID } from "crypto";
 import type { Artifact, ChatEvent, RunEvent, ScheduledTask } from "../shared/types";
-import type { CatalogEntry, ChatMessage, ChatOptions, FriendlyError, HardwareProfile, InstallProgress, InstalledModel, SpeakChunk, VoiceDownloadProgress, VoiceSettings, VoiceStatus } from "../shared/types";
+import type { CatalogEntry, ChatMessage, ChatOptions, FriendlyError, HardwareProfile, InstallProgress, InstalledModel, Settings, SpeakChunk, VoiceDownloadProgress, VoiceSettings, VoiceStatus } from "../shared/types";
+import type { HardwareConfigFile } from "../shared/api";
 import { registerHumain, fuseConnection, fuseSearchContext, sourcesBlock } from "./humain";
 import { registerVoice } from "./register/voice";
 import { registerKnowledge } from "./register/knowledge";
@@ -156,11 +157,11 @@ const settingsMtime = (): number => {
 // The cache is validated against the file's mtime on EVERY read, not trusted for a
 // fixed window: the Rust host (and the webview's save path) write this same file, and
 // a two-second blind cache made this process answer from a stale copy after they did.
-let settingsCache: { mtime: number; value: any } | null = null;
-function settings(): any {
+let settingsCache: { mtime: number; value: Settings } | null = null;
+function settings(): Settings {
   const mtime = settingsMtime();
   if (!settingsCache || settingsCache.mtime !== mtime) {
-    settingsCache = { mtime, value: readJson(settingsFile(), {}) };
+    settingsCache = { mtime, value: readJson<Settings>(settingsFile(), {} as Settings) };
   }
   return settingsCache.value;
 }
@@ -178,12 +179,12 @@ const settingsWriter = new HostSettingsWriter({
     // the host returns the full merged settings: adopt them, so nothing this
     // process reads drifts from what the one writer actually stored
     // (with what was submitted while this call was in flight on top: it is not saved yet, but it is the newest value)
-    if (result && typeof result === "object") settingsCache = { mtime: settingsMtime(), value: { ...result, ...settingsWriter.unsaved() } };
+    if (result && typeof result === "object") settingsCache = { mtime: settingsMtime(), value: { ...(result as Partial<Settings>), ...settingsWriter.unsaved() } as Settings };
   },
   log: (line) => console.error(line),
 });
 let headlessSettingsNoted = false;
-function saveSettings(patch: Record<string, unknown>): any {
+function saveSettings(patch: Record<string, unknown>): Settings {
   const merged = { ...settings(), ...patch };
   settingsCache = { mtime: settingsMtime(), value: merged };
   if (headlessMode) {
@@ -305,8 +306,8 @@ async function chatHardware(): Promise<HardwareProfile> {
 
 // ---- the clients (the same construction as the desktop main process)
 
-const hf = new HfClient((u, i) => fetch(u, i as any) as any);
-const docker = new DockerClient((u, i) => fetch(u, i as any) as any);
+const hf = new HfClient((u, i) => fetch(u, i));
+const docker = new DockerClient((u, i) => fetch(u, i));
 
 let nativeCache: { at: number; list: NativeBundle[] } | null = null;
 async function nativeBundles(): Promise<NativeBundle[]> {
@@ -321,9 +322,9 @@ async function nativeBundles(): Promise<NativeBundle[]> {
 
 // customModelsFile: the host's Config\custom-models.json, from the same mkmnPaths layout.
 const customModelsFile = PATHS.customModelsFile;
-const customModels = (): any[] => readJson(customModelsFile, []);
-const saveCustom = (e: any) => {
-  const all = customModels().filter((x: any) => x.id !== e.id);
+const customModels = (): CatalogEntry[] => readJson<CatalogEntry[]>(customModelsFile, []);
+const saveCustom = (e: CatalogEntry) => {
+  const all = customModels().filter((x) => x.id !== e.id);
   writeJson(customModelsFile, [...all, e]);
 };
 
@@ -516,14 +517,14 @@ async function installPackModel(m: BundleModel): Promise<{ done: boolean; failur
     const wantQuant = repo === m.repo ? m.quant : (m.altQuant ?? m.quant);
     const rightQuant = (e: CatalogEntry) => !wantQuant || !e.quant || e.quant.toLowerCase() === wantQuant.toLowerCase();
     try {
-      let entry = allEntries().find((e) => rightQuant(e) && ((e as any).dynamicRef === m.ref || entryMatches(e, m.ref) || entryMatches(e, repo)));
+      let entry = allEntries().find((e) => rightQuant(e) && (e.dynamicRef === m.ref || entryMatches(e, m.ref) || entryMatches(e, repo)));
       if (!entry) {
         const r = await resolveModel({ hf, docker, native: nativeBundles }, wantQuant ? `${repo}:${wantQuant}` : repo, await hardware(), { showKQuants: !!settings().showKQuants });
         if (r.type !== "model" || !r.inspection.entry) throw new Error("not found");
         entry = r.inspection.entry;
         if (!rightQuant(entry)) throw new Error(`no ${wantQuant} file (only ${entry.quant})`);
       }
-      if (customModels().some((c: any) => c.id === entry!.id) || !CATALOG.some((e) => e.id === entry!.id)) saveCustom({ ...entry, dynamicRef: m.ref });
+      if (customModels().some((c) => c.id === entry!.id) || !CATALOG.some((e) => e.id === entry!.id)) saveCustom({ ...entry, dynamicRef: m.ref });
       const r = await installEntry(entry);
       if (r.cancelled) {
         cancelled = true;
@@ -672,8 +673,10 @@ import { FoundryHost, cliRunner, findFoundry } from "../core/foundryHost";
 
 /** hardware.json lives in the host's Config dir (mkmnPaths), the file the Rust host writes after each benchmark. */
 const hardwareFile = () => PATHS.hardwareFile;
-function calibratedProfiles(): Record<string, any> {
-  const hw = readJson<any>(hardwareFile(), {});
+/** One benchmark run of a model, as hardware.json keeps it. */
+type CalibratedRun = { compute?: string; decodeTokPerSec?: number; ttftMs?: number; measuredAt?: string };
+function calibratedProfiles(): NonNullable<HardwareConfigFile["calibratedProfiles"]> {
+  const hw = readJson<HardwareConfigFile | null>(hardwareFile(), {});
   return (hw && typeof hw === "object" ? hw.calibratedProfiles : undefined) ?? {};
 }
 
@@ -684,7 +687,7 @@ function measurementsFor(serveRef: string, entryRefStr: string): Record<string, 
   for (const key of [...new Set([serveRef, entryRefStr])]) {
     const prof = calibratedProfiles()[key];
     const runs = prof?.runs ?? {};
-    for (const run of Object.values<any>(runs)) {
+    for (const run of Object.values(runs) as CalibratedRun[]) {
       const c = String(run?.compute ?? "").toLowerCase();
       if (!["npu", "hybrid", "gpu", "cpu"].includes(c)) continue;
       const id = `geniex:${c}`;
@@ -712,7 +715,7 @@ function measurementsFor(serveRef: string, entryRefStr: string): Record<string, 
 /** The candidate list + gating for a model, from facts (artifact kind, verified placements, cached variants). */
 function engineFactsFor(entry: CatalogEntry, serveRef: string): Parameters<typeof candidatesFor>[1] {
   const s = settings();
-  const isQairt = entry.engine === "qairt" || (entry as any).engine === "qairt";
+  const isQairt = entry.engine === "qairt";
   // GPU is offered only when a placement measurement verified it on this machine, or
   // (for GenieX GGUF) when the user's own hardware evidence says a GPU exists AND a
   // previous run of this model verified GPU execution. Nothing is inferred from the
@@ -754,8 +757,8 @@ async function selectForRequest(entry: CatalogEntry, serveRef: string, o?: { set
   const goal = (AUTO_GOALS.some((g) => g.id === s.autoGoal) ? s.autoGoal : "balanced") as AutoGoal;
   try {
     const facts = engineFactsFor(entry, serveRef);
-    const foundry = isFoundryEntry(entry) ? await foundryVariantsFor(String((entry as any).foundryAlias ?? entry.repo)) : [];
-    if (isFoundryEntry(entry)) (facts as any).foundryVariants = foundry.map((v) => ({ alias: String((entry as any).foundryAlias ?? entry.repo), device: v.device, modelId: v.modelId, cached: v.cached }));
+    const foundry = isFoundryEntry(entry) ? await foundryVariantsFor(String((entry as { foundryAlias?: string }).foundryAlias ?? entry.repo)) : [];
+    if (isFoundryEntry(entry)) facts.foundryVariants = foundry.map((v) => ({ alias: String((entry as { foundryAlias?: string }).foundryAlias ?? entry.repo), device: v.device, modelId: v.modelId, cached: v.cached }));
     const { candidates } = candidatesFor(entry, facts, measurementsFor(serveRef, entryRef(entry)));
     // The two readings run in PARALLEL (they used to be awaited one after the other,
     // seconds of added latency per request), and the battery is cached for 30 s: a
@@ -849,7 +852,7 @@ async function foundryEntries(): Promise<CatalogEntry[]> {
       16
     ).map((e) => {
       const onDisk = cached.find((v) => v.alias.toLowerCase() === e.repo.toLowerCase());
-      const device = (onDisk?.device || (e as any).foundryDevice) as CatalogEntry["foundryDevice"];
+      const device = (onDisk?.device || e.foundryDevice) as CatalogEntry["foundryDevice"];
       return {
         ...e,
         foundryDevice: device,
@@ -941,7 +944,7 @@ async function ensureFoundryServer(entry: CatalogEntry, o?: { setting?: LoadSett
   // one engine on the NPU (the registered machine npuOwner): the GenieX server comes down first
   const alias = foundryAliasOf(entry);
   if (!alias) throw new Error("this Foundry entry names no model alias");
-  const wanted = (entry as any).foundryDevice ?? null;
+  const wanted = entry.foundryDevice ?? null;
   const loaded = await npuOwner.run("foundry", () => f.load(alias, wanted, o?.signal));
   // the effective engine/device is what Foundry REPORTED, not what was asked
   emitEvent("adaptiveSelection", { entryId: entry.id, engine: "foundry", compute: loaded.device.toLowerCase(), modelId: loaded.modelId, device: loaded.device, variant: loaded.variant, at: Date.now(), provisional: true, reason: [`Foundry Local · ${loaded.device}${loaded.variant ? ` (${loaded.variant})` : ""} · device reported by the runtime at load`, "foundry builds are validated when first loaded on this machine; until then the device is what the runtime says"] });
@@ -1298,7 +1301,7 @@ async function routerSort(text: string, installed: CatalogEntry[], lean?: TaskCa
 }
 
 const sidecarHost: ChatHost = {
-  settings: () => settings() as any,
+  settings,
   patchSettings: (patch) => { saveSettings(patch as Record<string, unknown>); },
   allEntries,
   entryById,
@@ -1743,7 +1746,7 @@ async function recordEvidence(records: Array<{ kind: import("../core/manifest").
 
 /** The catalog entry of a Dynamic pack model: the one the app already knows, or the one worked out from Hugging Face. */
 async function entryForBundle(m: { ref: string; name: string; repo: string; quant: string | null }): Promise<CatalogEntry> {
-  const known = allEntries().find((e) => (e as any).dynamicRef === m.ref || entryMatches(e, m.ref) || entryMatches(e, m.repo));
+  const known = allEntries().find((e) => e.dynamicRef === m.ref || entryMatches(e, m.ref) || entryMatches(e, m.repo));
   if (known) return known;
   const r = await resolveModel({ hf, docker, native: nativeBundles }, m.quant ? `${m.repo}:${m.quant}` : m.repo, await hardware(), { showKQuants: !!settings().showKQuants });
   if (r.type !== "model" || !r.inspection.entry) throw new Error(`${m.repo} was not found. Search for ${m.name} in Models and install it from there.`);

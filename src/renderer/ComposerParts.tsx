@@ -22,7 +22,7 @@ export function JumpToLatest({ show, onClick }: { show: boolean; onClick: () => 
 export function StarterChips({ onPick, gone }: { onPick: (prompt: string) => void; gone?: boolean }) {
   return (
     <div className={`starters ${gone ? "gone" : ""}`} role="group" aria-label="Starter prompts" aria-hidden={gone}>
-      {STARTERS.map((s, i) => <button key={s.label} type="button" className="starter" tabIndex={gone ? -1 : 0} style={{ ["--i" as any]: i }} onClick={() => onPick(s.prompt)}>{s.label}</button>)}
+      {STARTERS.map((s, i) => <button key={s.label} type="button" className="starter" tabIndex={gone ? -1 : 0} style={{ "--i": i }} onClick={() => onPick(s.prompt)}>{s.label}</button>)}
     </div>
   );
 }
