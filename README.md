@@ -22,7 +22,9 @@
 MKMN AI is an independent project: it is not affiliated with HUMAIN or Qualcomm,
 and they do not develop, sponsor or endorse it.
 
-Release status: v0.0.2 ([release notes](docs/releases/RELEASE_NOTES_v0.0.2.md))
+Release status: v0.0.2 (latest published stable; [notes](docs/releases/RELEASE_NOTES_v0.0.2.md))
+
+Release candidate: v0.0.3-rc.1 ([candidate notes](docs/releases/RELEASE_NOTES_v0.0.3-rc.1.md)). This is for controlled testing, not production. Check the [GitHub prerelease](https://github.com/zzahed/MKMN/releases/tag/v0.0.3-rc.1) for the verified candidate installer and checksum; if the prerelease is not yet listed, continue using the published stable v0.0.2 installer.
 
 MKMN AI is a personal AI workspace built to explore and demonstrate what
 HUMAIN's Snapdragon X2 Elite laptop can do. It runs AI models directly on the
@@ -206,7 +208,7 @@ To build only the installer by hand, after `pnpm dist` has built the app once,
 pass the version from `package.json`:
 
 ```powershell
-makensis /DVERSION=0.0.2 installer.nsi
+makensis /DVERSION=0.0.3-rc.1 installer.nsi
 ```
 
 | Folder | Contents |

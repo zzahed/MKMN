@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "MKMN",
-  "version": "0.0.2",
+  "version": "0.0.3-rc.1",
   "identifier": "app.mkmn.desktop",
   "build": {
     "frontendDist": "../dist/renderer",
