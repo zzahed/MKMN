@@ -3,9 +3,7 @@
 // main.ts as they were; they need nothing from main.ts but the dispatcher.
 import * as path from "path";
 import { journalDir } from "../../core/harness/journal";
-import { filesHashOf } from "../../core/knowledge/index";
-import { buildKnowledgeIndexNow, knowledgeDirOf, knowledgeIndexStatus, openKnowledgeIndex, removeKnowledgeFiles } from "../../core/knowledge/store";
-import { openVectorIndex } from "../../core/knowledge/vectors";
+import { buildKnowledgeIndexNow, knowledgeDirOf, knowledgeIndexStatus, prepareProjectVectors, removeKnowledgeFiles } from "../../core/knowledge/store";
 import { installVectorModel, removeVectorModel, vectorEmbedder, vectorModelStatus } from "../../core/knowledge/vectorModel";
 import type { SidecarDispatcher } from "../protocol";
 
@@ -42,11 +40,10 @@ export function registerKnowledge(dispatcher: SidecarDispatcher): void {
 
   async function prepareVectors(projectId: string, files: { id: string; name: string; content: string }[]): Promise<void> {
     try {
-      const embedder = await vectorEmbedder();
-      if (!embedder || !files.length) return;
       const t = Date.now();
-      const v = await openVectorIndex(knowledgeDirOf(), projectId, filesHashOf(files), openKnowledgeIndex(knowledgeDirOf(), projectId, files).sections(), embedder);
-      if (v.source === "built") console.error(`[knowledge] vectors for ${v.count} sections made in ${Date.now() - t} ms`);
+      // a project deleted while the model loads or the vectors are made gets nothing written back (store.ts)
+      const v = await prepareProjectVectors(knowledgeDirOf(), projectId, files, vectorEmbedder);
+      if (v?.source === "built") console.error(`[knowledge] vectors for ${v.count} sections made in ${Date.now() - t} ms (the model's loading included)`);
     } catch (e) {
       console.error(`[knowledge] the vectors could not be made: ${(e as Error).message}`);
     }

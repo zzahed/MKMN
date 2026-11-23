@@ -14,7 +14,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSyn
 import * as path from "node:path";
 import { dot, type Embedder } from "./embed";
 import { placeOf } from "./retrieve";
-import { safeIdOf } from "./ids";
+import { forgetCountOf, safeIdOf } from "./ids";
 
 type SectionLike = { name: string; title: string; text: string; page?: number; slide?: number; sheet?: string; rowFrom?: number; rowTo?: number; scanned?: boolean };
 
@@ -119,8 +119,11 @@ export async function openVectorIndex(
   let vectors = file ? readStore(file, filesHash, embedder.id) : null;
   let source: VectorIndex["source"] = "store";
   if (!vectors || vectors.length !== sections.length) {
+    const generation = forgetCountOf(dir, projectId);
     vectors = await embedder.embed(sections.map(sectionText));
     source = "built";
+    // the project was deleted while its vectors were being made: they are neither kept nor written
+    if (forgetCountOf(dir, projectId) !== generation) return over(vectors, source);
     if (file) try {
       mkdirSync(dir!, { recursive: true });
       writeStore(file, filesHash, embedder.id, vectors);
