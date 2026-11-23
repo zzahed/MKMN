@@ -1,7 +1,7 @@
 /* Collect license texts from the actual installed dependency graph. No network. */
-const fs = require("node:fs");
-const path = require("node:path");
-const root = path.resolve(__dirname, "..");
+import fs from "node:fs";
+import path from "node:path";
+const root = path.resolve(import.meta.dirname, "..");
 const visited = new Set();
 const packages = new Map();
 function visit(dir) {
@@ -30,7 +30,7 @@ function visit(dir) {
     }
   }
 }
-const manifest = require(path.join(root, "package.json"));
+const manifest = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 for (const dep of Object.keys({ ...manifest.dependencies, ...manifest.optionalDependencies, ...manifest.devDependencies })) {
   visit(path.join(root, "node_modules", dep));
 }
