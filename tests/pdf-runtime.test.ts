@@ -11,7 +11,7 @@ vi.mock("pdfjs-dist/build/pdf.worker.min.mjs?url", async () => {
   return { default: pathToFileURL(req.resolve("pdfjs-dist/build/pdf.worker.min.mjs")).href };
 });
 
-const { readPdf } = await import("../src/renderer/pdf");
+const { readPdf, pdfRuntimeMessage } = await import("../src/renderer/pdf");
 
 const P = Promise as unknown as { try?: unknown };
 const U = Uint8Array.prototype as unknown as { toHex?: unknown };
@@ -35,6 +35,18 @@ describe("the PDF runtime", () => {
     await expect(readPdf(tinyFile())).rejects.toThrow(/needs Node\.js 26 or later/);
     expect(Date.now() - started).toBeLessThan(1000);
   }, 2000);
+
+  // The final review: readPdf runs in the app's window (WebView2), not in Node. There the old
+  // message sent people to install Node.js, which the app ships itself; the fix is a newer WebView2.
+  it("in the window, the message names WebView2, not Node.js", () => {
+    const m = pdfRuntimeMessage("Promise.try", false);
+    expect(m).toBe("PDF reading needs a newer Microsoft Edge WebView2 Runtime (Promise.try is missing). Update the WebView2 Runtime, then restart MKMN.");
+    expect(m).not.toMatch(/Node/);
+  });
+
+  it("in Node, the message names Node.js 26", () => {
+    expect(pdfRuntimeMessage("Uint8Array toHex", true)).toBe("PDF reading needs Node.js 26 or later (Uint8Array toHex is missing).");
+  });
 
   it("package.json declares Node 26 or later", () => {
     expect(JSON.parse(readFileSync("package.json", "utf8")).engines?.node).toBe(">=26");

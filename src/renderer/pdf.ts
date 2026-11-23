@@ -62,6 +62,15 @@ async function renderPagePng(doc: unknown, n: number): Promise<Uint8Array> {
   return new Uint8Array(await blob.arrayBuffer());
 }
 
+/** What to say when the runtime lacks a feature pdf.js calls. In the app the reader runs in the
+ *  window (WebView2), whose runtime is updated apart from MKMN; under Node (tests, tools) it is
+ *  Node.js that is too old. */
+export function pdfRuntimeMessage(missing: string, inNode: boolean): string {
+  return inNode
+    ? `PDF reading needs Node.js 26 or later (${missing} is missing).`
+    : `PDF reading needs a newer Microsoft Edge WebView2 Runtime (${missing} is missing). Update the WebView2 Runtime, then restart MKMN.`;
+}
+
 /** Reads the text of a PDF file. pdf.js is loaded only when someone adds a PDF.
  * The stop signal is checked BEFORE the library is loaded, BEFORE the file's bytes
  * are read and BEFORE the parsing task is created, and at every await in between —
@@ -74,11 +83,12 @@ export async function readPdf(file: File, o?: ReadPdfOptions): Promise<string> {
   const stopped = () => !!o?.signal?.aborted;
   if (stopped()) throw new PdfAborted();
   // pdf.js calls Promise.try and Uint8Array toHex; without them the read hangs or fails deep inside pdf.js.
+  const inNode = !!(globalThis as { process?: { versions?: { node?: string } } }).process?.versions?.node;
   if (typeof (Promise as unknown as { try?: unknown }).try !== "function") {
-    throw new Error("PDF reading needs Node.js 26 or later (Promise.try is missing).");
+    throw new Error(pdfRuntimeMessage("Promise.try", inNode));
   }
   if (typeof (Uint8Array.prototype as unknown as { toHex?: unknown }).toHex !== "function") {
-    throw new Error("PDF reading needs Node.js 26 or later (Uint8Array toHex is missing).");
+    throw new Error(pdfRuntimeMessage("Uint8Array toHex", inNode));
   }
   const pdfjsLib = await pdfjs();
   if (stopped()) throw new PdfAborted(); // the library load can take a while: the stop is honoured even there
