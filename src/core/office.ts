@@ -6,7 +6,8 @@
 // a real file the user attaches is turned into the same text. Formulas are calculated here, so results can be read.
 import { readZip, writeZip, toBytes, fromBytes, type ZipFiles } from "./zip";
 import { parseXml, elems, first, all, textOf, esc, escText, type XNode } from "./xml";
-import { Workbook, addr, colName, formulaResults, isFormula, isNumeric, parseAddr, parseSheets, sheetsText, type Sheet } from "./sheet";
+import { Workbook, addr, colName, formulaResults, isFormula, isNumeric, parseAddr, parseSheets, sheetsText, splitRow, type Sheet } from "./sheet";
+import { mdCell } from "./escape";
 import * as P from "./officeParts";
 import { buildPptx as buildDeck, deckHtml, plain, type Pics } from "./slides";
 import { figureKey } from "./figures";
@@ -50,7 +51,7 @@ export function runsOf(text: string): Run[] {
   return out.length ? out : [{ t: "" }];
 }
 
-const splitCells = (line: string): string[] => line.trim().replace(/^\|/, "").replace(/\|$/, "").split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, "|"));
+const splitCells = splitRow;
 const isRule = (cells: string[]) => cells.length > 0 && cells.every((c) => /^:?-{2,}:?$/.test(c));
 const cleanKey = (s: string) => s.replace(/ /g, " ");
 
@@ -63,7 +64,7 @@ type Block =
   | { t: "table"; rows: string[][] }
   | { t: "break" };
 
-const cellMd = (s: string) => s.replace(/\|/g, "\\|").replace(/\s+/g, " ").trim();
+const cellMd = (s: string) => mdCell(s).replace(/\s+/g, " ").trim();
 const tableMd = (rows: string[][]) => (rows.length ? [`| ${rows[0].map(cellMd).join(" | ")} |`, `|${rows[0].map(() => "---").join("|")}|`, ...rows.slice(1).map((r) => `| ${r.map(cellMd).join(" | ")} |`)].join("\n") : "");
 
 /** What the app draws from a fenced block (key figures, flashcards, a quiz, a checklist, a sheet) as the plain markdown a Word file can hold; diagrams and charts are left for the window to draw as pictures. */
@@ -251,7 +252,7 @@ export async function readDocx(files: ZipFiles): Promise<string> {
     return hasBreak ? `${text}\n\n---` : text;
   };
   const table = (t: XNode): string => {
-    const rows = elems(t, "w:tr").map((tr) => elems(tr, "w:tc").map((tc) => elems(tc, "w:p").map((p) => markdownOf(wordRuns(p))).filter(Boolean).join(" ").replace(/\|/g, "\\|")));
+    const rows = elems(t, "w:tr").map((tr) => elems(tr, "w:tc").map((tc) => mdCell(elems(tc, "w:p").map((p) => markdownOf(wordRuns(p))).filter(Boolean).join(" "))));
     const width = Math.max(1, ...rows.map((r) => r.length));
     const line = (r: string[]) => `| ${Array.from({ length: width }, (_, i) => r[i] ?? "").join(" | ")} |`;
     return rows.length ? [line(rows[0]), `|${Array(width).fill("---").join("|")}|`, ...rows.slice(1).map(line)].join("\n") : "";
@@ -418,7 +419,7 @@ export async function readPptx(files: ZipFiles): Promise<string> {
         if (type === "title" || type === "ctrTitle") lines.unshift(`# ${text.join(" ").replace(/^[-\s]+/, "").replace(/\*\*/g, "")}`);
         else lines.push(...text);
       } else if (k.name === "p:graphicFrame") {
-        const rows = all(k, "a:tr").map((tr) => elems(tr, "a:tc").map((tc) => elems(first(tc, "a:txBody") ?? tc, "a:p").map(paraText).filter(Boolean).join(" ").replace(/\|/g, "\\|")));
+        const rows = all(k, "a:tr").map((tr) => elems(tr, "a:tc").map((tc) => mdCell(elems(first(tc, "a:txBody") ?? tc, "a:p").map(paraText).filter(Boolean).join(" "))));
         if (rows.length) { const w = Math.max(...rows.map((r) => r.length)); const line = (r: string[]) => `| ${Array.from({ length: w }, (_, i) => r[i] ?? "").join(" | ")} |`; lines.push([line(rows[0]), `|${Array(w).fill("---").join("|")}|`, ...rows.slice(1).map(line)].join("\n")); }
       }
     }

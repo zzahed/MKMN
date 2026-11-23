@@ -5,6 +5,7 @@ import { readZip, fromBytes } from "./zip";
 import { parseXml, elems, first, all, textOf, type XNode } from "./xml";
 import { officeKindOf, officeForModel, readOffice } from "./office";
 import { sheetsText, type Sheet } from "./sheet";
+import { mdCell } from "./escape";
 
 export const READABLE_DOC = /\.(docx|docm|xlsx|xlsm|pptx|pptm|odt|ods|odp|rtf)$/i;
 export const LEGACY_DOC = /\.(doc|dot|xls|xlt|ppt|pot|pps)$/i;
@@ -14,7 +15,7 @@ export const LEGACY_NOTE = (name: string) => `${name}: this is an old Office for
 
 const md = (rows: string[][]) => {
   const w = Math.max(1, ...rows.map((r) => r.length));
-  const line = (r: string[]) => `| ${Array.from({ length: w }, (_, i) => (r[i] ?? "").replace(/\|/g, "\\|")).join(" | ")} |`;
+  const line = (r: string[]) => `| ${Array.from({ length: w }, (_, i) => mdCell(r[i] ?? "")).join(" | ")} |`;
   return rows.length ? [line(rows[0]), `|${Array(w).fill("---").join("|")}|`, ...rows.slice(1).map(line)].join("\n") : "";
 };
 

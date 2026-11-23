@@ -1,5 +1,6 @@
 import { iconPaths } from "./iconTable";
 import { iconFor, iconMarkup } from "./icons";
+import { scriptJson } from "../escape";
 
 /**
  * The icons offered to a page or a game written by hand: Lucide (ISC), the same set as the websites made of blocks. A page that wants them
@@ -20,7 +21,7 @@ export function iconsUsed(page: string): Record<string, string> {
 
 /** The script that gives a page its icon(name, {size, color, stroke}) (an SVG string), iconImage(name, options) (an Image for a canvas) and data-icon elements. */
 export function iconsSource(page: string): string {
-  const map = JSON.stringify(iconsUsed(page));
+  const map = scriptJson(iconsUsed(page));
   return `(function(){var I=${map};
 function svg(n,o){o=o||{};var p=I[n];if(!p)return"";var s=o.size||24;return'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="'+s+'" height="'+s+'" fill="none" stroke="'+(o.color||"currentColor")+'" stroke-width="'+(o.stroke||2)+'" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+p+'</svg>'}
 window.icon=svg;

@@ -31,7 +31,7 @@ describe("office round trip", () => {
     const back = await readOffice("xlsx", await buildOffice("xlsx", SHEET));
     expect(back).toContain("=B2*C2");
     expect(back).toContain("=AVERAGE(Budget!D2:D3)");
-    expect(officeForModel("xlsx", back)).toContain("D4 =SUM(D2:D3) = 29".replace("D4", "D4"));
+    expect(officeForModel("xlsx", back)).toContain("D4 =SUM(D2:D3) = 29");
   });
   it("pptx", async () => {
     const back = await readOffice("pptx", await buildOffice("pptx", DECK));

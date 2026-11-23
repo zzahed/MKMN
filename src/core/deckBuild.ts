@@ -17,6 +17,7 @@ import { parseStyle } from "./slides";
 import { askBrief, countFacts, infoLevel, answerOf, themeFromBrief, type Ask, type Info } from "./deckBrief";
 import { keywords } from "./websearch";
 import { enrichPlan, eventsIn, figuresIn, insightOf, partFor, slideFromPart, takeawayOf, trendTable } from "./deckFacts";
+import { mdCell } from "./escape";
 
 export const MAX_DECK_SLIDES = 20;
 const MAX_IMAGE_SLIDES = 5;
@@ -218,7 +219,7 @@ export function slideSource(s: Slide): string {
   for (const c of s.columns ?? []) out.push(`Column: ${c.head} | ${c.lines.join(" ; ")}`);
   if (s.timeline?.length) out.push(`Timeline: ${s.timeline.map((x) => `${x.when} | ${x.what}`).join(" ; ")}`);
   if (s.flow) out.push(`Flow: ${s.flow.join(" -> ")}`);
-  if (s.table) { if (s.chart) out.push(`Chart: ${s.chart}`); const w = Math.max(...s.table.map((r) => r.length)); const line = (r: string[]) => `| ${Array.from({ length: w }, (_, i) => (r[i] ?? "").replace(/\|/g, "\\|")).join(" | ")} |`; out.push(line(s.table[0]), `|${Array(w).fill("---").join("|")}|`, ...s.table.slice(1).map(line)); }
+  if (s.table) { if (s.chart) out.push(`Chart: ${s.chart}`); const w = Math.max(...s.table.map((r) => r.length)); const line = (r: string[]) => `| ${Array.from({ length: w }, (_, i) => mdCell(r[i] ?? "")).join(" | ")} |`; out.push(line(s.table[0]), `|${Array(w).fill("---").join("|")}|`, ...s.table.slice(1).map(line)); }
   if (s.figure) out.push(`\`\`\`${s.figure.lang}\n${s.figure.raw}\n\`\`\``);
   if (s.image) out.push(`![${s.image.caption.replace(/[\]\n]/g, " ")}](wikimedia:${s.image.file.replace(/\)/g, "%29")})`);
   if (s.notes) out.push(`Notes: ${s.notes.replace(/\n/g, " ")}`);

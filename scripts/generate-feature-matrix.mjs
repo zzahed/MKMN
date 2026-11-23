@@ -8,7 +8,7 @@ import { featureInventory } from "./feature-matrix.mjs";
 
 const OUT = "docs/MKMN_FEATURE_TEST_MATRIX_0.0.2.md";
 
-const cell = (value) => String(value).replace(/\|/g, "\\|");
+const cell = (value) => String(value).replace(/[\\|]/g, "\\$&");
 const row = (id, name, area, evidence, result) => `| ${id} | ${cell(name)} | ${cell(area)} | ${cell(evidence)} | ${result} |`;
 const table = (head, lines) => [`| ${head.join(" | ")} |`, `|${head.map(() => "---").join("|")}|`, ...lines].join("\n");
 
@@ -185,7 +185,7 @@ const SCRIPT_PURPOSE = {
   "scripts/audit-context.mjs": "audit the context sent to a model",
   "scripts/bench-probe-spawns.ts": "list the processes a benchmark spawns",
   "scripts/bench-save-path.ts": "print the benchmark save path",
-  "scripts/build-xblocks.js": "build the page-block runtime",
+  "scripts/build-xblocks.mjs": "build the page-block runtime",
   "scripts/check-language.mjs": "reject non-English, non-Arabic copy outside the allowlist",
   "scripts/generate-brand-assets.mjs": "generate the brand image set",
   "scripts/generate-state-machines.mjs": "generate and check the state-machine files",
@@ -230,7 +230,7 @@ const SCRIPT_EVIDENCE = {
   "scripts/audit-context.mjs": "tests/audit-context.test.ts",
   "scripts/bench-probe-spawns.ts": "manual check (diagnostic only)",
   "scripts/bench-save-path.ts": "tests/bench.test.ts",
-  "scripts/build-xblocks.js": "tests/gameBlocks.test.ts; tests/xbuild.test.ts",
+  "scripts/build-xblocks.mjs": "tests/gameBlocks.test.ts; tests/xbuild.test.ts",
   "scripts/check-language.mjs": "tests/language.test.ts",
   "scripts/generate-brand-assets.mjs": "tests/brandAssets.test.ts",
   "scripts/generate-state-machines.mjs": "tests/state-machines.test.ts",

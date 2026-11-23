@@ -1,4 +1,5 @@
 /** What every template library shares: the language, the words that stay fixed in a document, the shape of a template. */
+import { mdCell } from "../escape";
 
 export const LANGS = ["en"] as const;
 export type Lang = (typeof LANGS)[number];
@@ -65,4 +66,4 @@ export const schemaStrs = (description?: string) => ({ type: "array", items: { t
 export const asText = (v: unknown): string => (typeof v === "string" ? v.trim() : typeof v === "number" ? String(v) : "");
 export const asList = (v: unknown): string[] => (Array.isArray(v) ? v.map(asText).filter(Boolean) : typeof v === "string" && v.trim() ? [v.trim()] : []);
 export const asRows = (v: unknown): Record<string, unknown>[] => (Array.isArray(v) ? v.filter((x): x is Record<string, unknown> => !!x && typeof x === "object") : []);
-export const esc = (s: string) => s.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+export const esc = (s: string) => mdCell(s).replace(/\r?\n/g, " ");

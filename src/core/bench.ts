@@ -7,6 +7,7 @@ import { CANDIDATES, Candidate } from "./benchCandidates";
 import { TestCost } from "./benchEstimate";
 import { coverage } from "./benchStats";
 import { normalizeName } from "./foundry";
+import { mdCell } from "./escape";
 
 /**
  * The model benchmark (Settings, Developer settings): installs each candidate in turn, runs a large set of tests on the NPU,
@@ -355,7 +356,7 @@ export const slug = (s: string): string => s.toLowerCase().replace(/[^a-z0-9.]+/
 
 const pct = (n: number | null | undefined) => (n === null || n === undefined ? "–" : n.toFixed(0));
 const num = (n: number | null | undefined, d = 1) => (n === null || n === undefined ? "–" : n.toFixed(d));
-const cell = (s: string) => s.replace(/\|/g, "\\|").replace(/\n/g, " ");
+const cell = (s: string) => mdCell(s).replace(/\n/g, " ");
 const SECTION_IDS = BENCH_SECTIONS.map((s) => s.id);
 const sectionsOf = (rs: ModelResult[]) => SECTION_IDS.filter((s) => rs.some((r) => r.summary.bySection[s] !== undefined));
 

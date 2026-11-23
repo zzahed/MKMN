@@ -18,6 +18,7 @@ import type { ChatMessage } from "../shared/types";
 import { blocksFor, catalogText, docFor } from "./xdocs";
 import { XArt, XOutline, bibleOf, defaultOutline, mendFragment, parseOutline, parseTasks, slug, stateTag, statesUsed } from "./xplan";
 import { xFlaws } from "./xcheck";
+import { stripActive } from "./escape";
 
 export type XEvent =
   | { type: "note"; text: string }
@@ -107,7 +108,7 @@ const EXISTS_INSTRUCTIONS = (catalog: string) => `A block exists if one of the l
 export const cleanSvg = (text: string, w: number, h: number): string | null => {
   const m = /<svg\b[\s\S]*?<\/svg\s*>/i.exec(text.replace(/<think>[\s\S]*?<\/think>/g, " "));
   if (!m) return null;
-  let svg = m[0].replace(/<(script|foreignObject|iframe|image)\b[\s\S]*?<\/\1\s*>/gi, "").replace(/<(script|foreignObject|iframe|image)\b[^>]*\/>/gi, "").replace(/\son\w+\s*=\s*("[^"]*"|'[^']*')/gi, "");
+  let svg = stripActive(m[0], ["script", "foreignObject", "iframe", "image"]);
   svg = svg.replace(/\b(?:xlink:)?href\s*=\s*("(?!#)[^"]*"|'(?!#)[^']*')/gi, "");
   if (!/<(rect|circle|ellipse|path|polygon|polyline|line|g)\b/i.test(svg)) return null;
   if (!/\bviewBox\s*=/i.test(svg)) svg = svg.replace(/<svg\b/i, `<svg viewBox="0 0 ${w} ${h}"`);

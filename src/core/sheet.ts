@@ -1,6 +1,8 @@
 // Spreadsheet side of Office files: cell addresses, the text form of a sheet (a table whose first line is row 1)
 // and a formula evaluator, so the assistant can see the RESULT of a calculation and not only the formula.
 
+import { mdCell } from "./escape";
+
 export interface Sheet { name: string; rows: string[][] }
 export type Value = number | string | boolean | null | SheetError;
 export class SheetError { constructor(public code: string) {} toString() { return this.code; } }
@@ -19,13 +21,13 @@ export const isFormula = (s: string) => s.startsWith("=") && s.length > 1;
 
 // ---------------------------------------------------------------- text form
 
-const escCell = (s: string) => s.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
-const splitRow = (line: string): string[] => {
+const escCell = (s: string) => mdCell(s).replace(/\r?\n/g, " ");
+export const splitRow = (line: string): string[] => {
   const t = line.trim().replace(/^\|/, "").replace(/\|$/, "");
   const out: string[] = [];
   let cur = "";
   for (let i = 0; i < t.length; i++) {
-    if (t[i] === "\\" && t[i + 1] === "|") { cur += "|"; i++; } else if (t[i] === "|") { out.push(cur.trim()); cur = ""; } else cur += t[i];
+    if (t[i] === "\\" && (t[i + 1] === "|" || t[i + 1] === "\\")) { cur += t[i + 1]; i++; } else if (t[i] === "|") { out.push(cur.trim()); cur = ""; } else cur += t[i];
   }
   out.push(cur.trim());
   return out;

@@ -62,7 +62,7 @@ function fromUrl(raw: string): ModelRef {
     const name = splitTag(seg[0] === "library" ? seg[1] ?? "" : seg[1] ?? seg[0] ?? "").name;
     return { kind: "search", query: name.replace(/[-_]/g, " "), note: "Ollama's files cannot be pulled by GenieX. Looking for the same model in the other sources." };
   }
-  if (host.endsWith("aihub.qualcomm.com")) {
+  if (host === "aihub.qualcomm.com" || host.endsWith(".aihub.qualcomm.com")) {
     return { kind: "search", query: (seg[seg.length - 1] ?? "").replace(/[-_]/g, " "), note: "Looking for that model among Qualcomm's native bundles and the other sources." };
   }
   return { kind: "search", query: raw, note: `${host} is not a model source MKMN AI knows; searching for the text instead.` };
