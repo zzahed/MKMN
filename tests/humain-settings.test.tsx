@@ -9,11 +9,11 @@ afterEach(cleanup);
 
 function setup(initial: Partial<Settings>, models: unknown[]) {
   const discover = vi.fn(async (provider: string) => provider === "node" ? models : []);
-  window.opennpu = {
+  window.mkmn = {
     humainKeySaved: async () => true,
     humainSaveKey: async () => {},
     humainModels: discover,
-  } as unknown as typeof window.opennpu;
+  } as unknown as typeof window.mkmn;
   function SettingsFixture() {
     const [settings, setSettings] = useState(initial as Settings);
     return <HumainSettings provider="node" settings={settings} save={async (patch) => setSettings((value) => ({ ...value, ...patch }))} />;
@@ -62,9 +62,9 @@ it("lists only chat models (and ones of unknown kind) in the Fuse chat menu, nev
     { id: "Qwen/Qwen3-Embedding-8B", supported_reasoning_efforts: null },
     { id: "Wan-AI/Wan2.2-T2V-A14B", supported_reasoning_efforts: null },
   ];
-  window.opennpu = {
+  window.mkmn = {
     humainKeySaved: async () => true, humainSaveKey: async () => {}, humainModels: vi.fn(async () => catalog),
-  } as unknown as typeof window.opennpu;
+  } as unknown as typeof window.mkmn;
   function Fixture() {
     const [settings, setSettings] = useState({} as Settings);
     return <HumainSettings provider="fuse" settings={settings} save={async (patch) => setSettings((v) => ({ ...v, ...patch }))} />;
@@ -79,9 +79,9 @@ it("lists only chat models (and ones of unknown kind) in the Fuse chat menu, nev
 });
 
 it("tells the truth about the Fuse chat API: the app's pipeline speaks Chat Completions, so the others are not offered", async () => {
-  window.opennpu = {
+  window.mkmn = {
     humainKeySaved: async () => true, humainSaveKey: async () => {}, humainModels: vi.fn(async () => []),
-  } as unknown as typeof window.opennpu;
+  } as unknown as typeof window.mkmn;
   function Fixture() {
     const [settings, setSettings] = useState({ humainFuseChatApi: "responses" } as Settings);
     return <HumainSettings provider="fuse" settings={settings} save={async (patch) => setSettings((v) => ({ ...v, ...patch }))} />;

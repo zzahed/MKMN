@@ -15,7 +15,7 @@ afterEach(() => { cleanup(); });
 
 describe("the voice install dialog", () => {
   it("takes focus when it opens, closes on Escape, and gives focus back", async () => {
-    (window as any).opennpu = new Proxy({}, { get: (_t, p: string) => (p.startsWith("on") ? () => () => {} : async () => []) });
+    (window as any).mkmn = new Proxy({}, { get: (_t, p: string) => (p.startsWith("on") ? () => () => {} : async () => []) });
     Object.defineProperty(HTMLElement.prototype, "offsetParent", { configurable: true, get: () => document.body });
     const opener = document.createElement("button");
     document.body.appendChild(opener);

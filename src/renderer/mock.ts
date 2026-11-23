@@ -1,6 +1,6 @@
 // Browser-only stand-in for the desktop bridge, used by `npm run dev:renderer` and screenshots.
 import { DYNAMIC_DATA } from "../core/dynamic-data";
-import type { OpenNpuApi, CatalogItem } from "../shared/api";
+import type { MkmnApi, CatalogItem } from "../shared/api";
 import { CATALOG, ref } from "../core/catalog";
 import { scoreEntry } from "../core/fit";
 import { buildProfile } from "../core/hardware";
@@ -18,7 +18,7 @@ import { nativeRow } from "../core/native";
 import { createMockBench } from "./mockBench";
 
 export function installMockIfNeeded() {
-  if ((window as any).opennpu) return;
+  if ((window as any).mkmn) return;
   const hw = buildProfile(
     { cpuName: "Snapdragon(R) X Plus - X1P64100 - Qualcomm(R) Oryon(TM) CPU", totalRamBytes: 16 * 1024 ** 3, npuDevices: [{ name: "Hexagon NPU", driverVersion: "30.0.220.3000" }], osArch: "ARM64" },
     "arm64"
@@ -49,7 +49,7 @@ export function installMockIfNeeded() {
   const ll: ((l: import("../core/benchRunner").BenchLive) => void)[] = [];
   const mockBench = createMockBench((st) => bl.forEach((f) => f(st)), (l) => ll.forEach((f) => f(l)));
   const items = (): CatalogItem[] => CATALOG.map((entry) => ({ entry, verdict: scoreEntry(entry, hw), hidden: !!entry.excluded, installed: installed.has(entry.id), ref: ref(entry), custom: false }));
-  const api: OpenNpuApi = {
+  const api: MkmnApi = {
     appInfo: async () => ({ version: "0.1.0", arch: "arm64", platform: "win32", geniexPath: settings.geniexPath, geniexVersion: "preview", geniexVersionWarning: null, problems: [] }),
     knowledgeStatus: async () => null,
     knowledgeBuild: async () => null,
@@ -533,5 +533,5 @@ export function installMockIfNeeded() {
     onChat: (cb) => { cl.push(cb); return () => cl.splice(cl.indexOf(cb), 1); },
     onServer: (cb) => { sl.push(cb); return () => sl.splice(sl.indexOf(cb), 1); }
   };
-  (window as any).opennpu = api;
+  (window as any).mkmn = api;
 }

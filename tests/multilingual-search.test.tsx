@@ -14,7 +14,7 @@ const base: VectorModelStatusView = { installed: false, runtime: true, installin
 
 function withApi(over: Partial<Record<"vectorModelStatus" | "vectorModelInstall" | "vectorModelRemove", () => Promise<VectorModelStatusView | null>>>) {
   const calls = { install: 0, remove: 0 };
-  (window as unknown as { opennpu: unknown }).opennpu = {
+  (window as unknown as { mkmn: unknown }).mkmn = {
     vectorModelStatus: over.vectorModelStatus ?? (async () => base),
     vectorModelInstall: over.vectorModelInstall ?? (async () => { calls.install++; return { ...base, installed: true }; }),
     vectorModelRemove: over.vectorModelRemove ?? (async () => { calls.remove++; return base; }),

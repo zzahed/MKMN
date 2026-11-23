@@ -94,7 +94,7 @@ function install(view: FoundryAdminView, extra: Record<string, any> = {}) {
     pickFolder: async () => "D:\\foundry-cache",
     ...extra
   };
-  (window as any).opennpu = new Proxy(api, { get: (t, p: string) => (p in t ? t[p] : async () => undefined) });
+  (window as any).mkmn = new Proxy(api, { get: (t, p: string) => (p in t ? t[p] : async () => undefined) });
   return calls;
 }
 

@@ -31,20 +31,20 @@ export function sherpaBackend(): VoiceBackend {
   };
 }
 
-/** Deterministic stand-in used by tests (OPENNPU_FAKE_VOICE=1): no models, same protocol. */
+/** Deterministic stand-in used by tests (MKMN_FAKE_VOICE=1): no models, same protocol. */
 export function fakeBackend(): VoiceBackend {
   return {
     async createStt(config): Promise<SttHandle> {
-      if (JSON.stringify(config).includes('"provider":"qnn"') && process.env.OPENNPU_FAKE_QNN_CRASH) process.exit(255); // like the real library
-      if (JSON.stringify(config).includes('"provider":"qnn"') && process.env.OPENNPU_FAKE_QNN_FAIL) throw new Error("QNN provider not available");
+      if (JSON.stringify(config).includes('"provider":"qnn"') && process.env.MKMN_FAKE_QNN_CRASH) process.exit(255); // like the real library
+      if (JSON.stringify(config).includes('"provider":"qnn"') && process.env.MKMN_FAKE_QNN_FAIL) throw new Error("QNN provider not available");
       // Echo the configured recognizer language so tests can see that a changed
       // sttLanguage really rebuilt the model (and that "" stays byte-identical).
       const lang = (config as any)?.modelConfig?.whisper?.language ?? "";
       return { decode: async (s) => (lang ? `heard ${s.length} samples (${lang})` : `heard ${s.length} samples`) };
     },
     async createTts(config): Promise<TtsHandle> {
-      if (JSON.stringify(config).includes('"provider":"qnn"') && process.env.OPENNPU_FAKE_QNN_CRASH) process.exit(255);
-      if (JSON.stringify(config).includes('"provider":"qnn"') && process.env.OPENNPU_FAKE_QNN_FAIL) throw new Error("QNN provider not available");
+      if (JSON.stringify(config).includes('"provider":"qnn"') && process.env.MKMN_FAKE_QNN_CRASH) process.exit(255);
+      if (JSON.stringify(config).includes('"provider":"qnn"') && process.env.MKMN_FAKE_QNN_FAIL) throw new Error("QNN provider not available");
       return {
         sampleRate: 24000,
         async generate({ text, onChunk }) {

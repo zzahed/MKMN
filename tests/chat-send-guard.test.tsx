@@ -73,7 +73,7 @@ function boot(chatCalls: { id: string; modelId?: string }[], chatEvents: { id: s
     chat: async (id: string, modelId: string) => { chatCalls.push({ id, modelId }); },
     onChat: (cb: (e: ChatEvent) => void) => { chatEvents.push({ id: "", event: cb as any }); return () => {}; },
   };
-  (window as any).opennpu = new Proxy(api, {
+  (window as any).mkmn = new Proxy(api, {
     get: (t, p) => (p in t ? t[p as string] : (p as string).startsWith("on") ? () => () => {} : () => Promise.resolve(undefined)),
   });
   window.localStorage.setItem("opennpu.conversations", JSON.stringify([
@@ -167,7 +167,7 @@ describe("one message, one request", () => {
     expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
     fireEvent.click(retry);
     await waitFor(() => expect(calls).toHaveLength(2));
-    (window as any).opennpu.abortChat = async () => { throw new Error("Sidecar disconnected"); };
+    (window as any).mkmn.abortChat = async () => { throw new Error("Sidecar disconnected"); };
     fireEvent.click(screen.getByRole("button", { name: "Stop" }));
     expect(await screen.findByText("Couldn't confirm the response stopped.", { selector: "strong" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();

@@ -5,7 +5,7 @@
  * "Recent chats", empty states, collapsed folds), keyboard/focus behavior (chat
  * title buttons, Escape with focus return, drawer), runtime-status surfaces, and
  * the Models ↔ settings journey. These render the real `App` against a stub
- * bridge (`window.opennpu`) — no source-text assertions.
+ * bridge (`window.mkmn`) — no source-text assertions.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -121,7 +121,7 @@ function makeApi(over: Record<string, any> = {}): any {
 
 /** Sets the bridge and seeds saved chats BEFORE App's useState initializer reads them. */
 function boot(api: any, convs: any[] = []) {
-  (window as any).opennpu = api;
+  (window as any).mkmn = api;
   window.localStorage.setItem("opennpu.conversations", JSON.stringify(convs));
   return render(createElement(App));
 }

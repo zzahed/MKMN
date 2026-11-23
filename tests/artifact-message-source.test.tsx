@@ -13,7 +13,7 @@ import { ArtifactViewer } from "../src/renderer/ArtifactView";
 afterEach(() => { cleanup(); });
 
 function bridge() {
-  (window as any).opennpu = new Proxy({}, { get: (_t, p: string) => (p.startsWith("on") ? () => () => {} : async () => undefined) });
+  (window as any).mkmn = new Proxy({}, { get: (_t, p: string) => (p.startsWith("on") ? () => () => {} : async () => undefined) });
   (window as any).matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
   Element.prototype.scrollIntoView = () => {};
 }

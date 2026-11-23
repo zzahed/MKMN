@@ -78,6 +78,8 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 - Task 15: Ruling: five source lines outside the file list change so the run is 0 errors: `src/voice/backend.ts` (its disable comment named `no-var-requires`, a rule typescript-eslint 8 no longer has; now `no-require-imports`), `src/renderer/FoundryPanel.tsx` (a local helper named `usePort` was not a hook; renamed `readPort`), `scripts/smoke-sidecar-devtools.js` (`null ? true : true` is `true`), and a line disable with its reason in `src/core/speechText.ts` (the emoji class is on purpose) and `src/core/markdown.ts` (a real bug, logged as a follow-up, not fixed here: it needs its own failing test). `pnpm-lock.yaml` gains the six dev packages; `globals` is added for the Node and browser globals. `CONTRIBUTING.md` names `pnpm lint` in the `lint-type` job. Cost if wrong: small; each line is reviewed in the diff.
 - Task 15: Ruling: `pnpm format:check` runs and reports 776 files Prettier would change; it is not in CI and nothing is reformatted (the brief keeps a mass reformat for a separate, owner-approved commit). `.prettierrc` uses double quotes, semicolons and `printWidth` 120 to stay close to the code. Cost if wrong: the reformat commit is larger or smaller than it could be.
 
+- Task 16: Ruling: the code names are renamed and the saved keys are not. `OpenNpuApi` becomes `MkmnApi`, the window global `window.opennpu` becomes `window.mkmn` (set and read only by the window's own code; the host injects nothing under that name), and the voice worker's test switches `OPENNPU_FAKE_VOICE`, `OPENNPU_FAKE_QNN_CRASH` and `OPENNPU_FAKE_QNN_FAIL` become `MKMN_FAKE_*`. The five keys a profile has saved under (`opennpu.conversations`, `opennpu.draft.<chat>`, `opennpu.fold`, `opennpu.railExpanded`, `opennpu.sideW`) keep their names, so no copy is needed; `tests/storage-keys.test.ts` pins that list. The rename reaches 19 test files and `scripts/smoke-sidecar-voice.js` outside the file list, one name per line. Cost if wrong: a script outside the repo that set `OPENNPU_FAKE_VOICE` no longer gets the fake voice backend.
+
 ## Follow-ups (owner decides)
 
 | found in task | item | decision |
@@ -109,6 +111,7 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 | 12 | owner gate accepted (deleting a project removes its knowledge index, vectors and offloaded text) after CI run 45071081599 | privacy (C4) | 2026-11-23 |
 | 13 | owner gate accepted (privacy.retentionDays, default null, prunes journals and payloads at sidecar start) after CI run 45071081599 | privacy, saved data (C4) | 2026-11-23 |
 | 14 | owner gate accepted (SECURITY.md, PR template, bug and feature issue forms) | repo policy (C4) | 2026-11-23 |
+| 15 | owner gate accepted (ESLint at 0 errors with 14 rules set to warn as `DEBT`, Prettier check only, `pnpm lint` in `lint-type`) | CI (C4) | 2026-11-23 |
 
 ## CI run 45056310505 (PR 6, commit 36a4040, Node 24.22.3)
 

@@ -25,7 +25,7 @@ const send = (m: unknown) => {
 
 let engine: VoiceEngine;
 try {
-  engine = new VoiceEngine(process.env.OPENNPU_FAKE_VOICE ? fakeBackend() : sherpaBackend());
+  engine = new VoiceEngine(process.env.MKMN_FAKE_VOICE ? fakeBackend() : sherpaBackend());
 } catch (e) {
   send({ t: "fatal", message: `Could not load the speech runtime: ${(e as Error).message}` });
   process.exit(1);

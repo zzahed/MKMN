@@ -19,7 +19,7 @@ describe("Engine Comparison says what it cannot do before the click", () => {
       benchState: async () => ({ running: false, rows: [] }),
       engineCompareState: async () => ({ running: false, steps: [], unavailable: "Not in this build yet: tick pairs below and run them with the benchmark." }),
     };
-    (window as any).opennpu = new Proxy(api, { get: (t, p: string) => (p in t ? t[p] : p.startsWith("on") ? () => () => {} : async () => undefined) });
+    (window as any).mkmn = new Proxy(api, { get: (t, p: string) => (p in t ? t[p] : p.startsWith("on") ? () => () => {} : async () => undefined) });
     render(createElement(EngineCompare as any, {}));
     const btn = await screen.findByRole("button", { name: /compare/i });
     await waitFor(() => expect((btn as HTMLButtonElement).disabled).toBe(true));

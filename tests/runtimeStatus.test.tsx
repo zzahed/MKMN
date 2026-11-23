@@ -29,7 +29,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
-  delete (window as any).opennpu;
+  delete (window as any).mkmn;
 });
 
 // ------------------------------------------------------------------ fixtures
@@ -104,7 +104,7 @@ function makeApi(over: Record<string, any> = {}): any {
 
 /** Sets the bridge and seeds saved chats BEFORE App's useState initializer reads them. */
 function boot(api: any, convs: any[] = []) {
-  (window as any).opennpu = api;
+  (window as any).mkmn = api;
   window.localStorage.setItem("opennpu.conversations", JSON.stringify(convs));
   return render(createElement(App));
 }

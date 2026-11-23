@@ -1,12 +1,12 @@
-import type { OpenNpuApi } from "../shared/api";
+import type { MkmnApi } from "../shared/api";
 
 declare global {
   interface Window {
-    opennpu: OpenNpuApi;
+    mkmn: MkmnApi;
   }
 }
 
-export const api = (): OpenNpuApi => window.opennpu;
+export const api = (): MkmnApi => window.mkmn;
 
 /**
  * Whether the renderer runs inside the Tauri WebView (as opposed to the

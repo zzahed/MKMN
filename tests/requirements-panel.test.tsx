@@ -9,7 +9,7 @@ afterEach(() => { cleanup(); });
 function mount(statuses: { id: string; present: boolean; detail: string | null }[][]) {
   const installs: string[] = [];
   let round = 0;
-  (window as any).opennpu = {
+  (window as any).mkmn = {
     requirements: async () => statuses[Math.min(round++, statuses.length - 1)],
     installRequirement: async (id: string) => { installs.push(id); return { ok: true, message: "LibreOffice is installed." }; }
   };
@@ -37,7 +37,7 @@ describe("the requirements list in Settings", () => {
   it("checks for updates only when asked, and updates a package from its row", async () => {
     const calls: string[] = [];
     let geniexInstalls = 0;
-    (window as any).opennpu = {
+    (window as any).mkmn = {
       requirements: async () => ALL([]),
       requirementUpdates: async () => { calls.push("check"); return { ok: true, message: "1 update available.", updates: [{ id: "foundry", pkg: "Microsoft.FoundryLocal", current: "0.12.1.0", available: "0.14.0.0" }], geniex: { installed: "v0.10.0", newer: true } }; },
       updateRequirement: async (id: string, pkg: string) => { calls.push(`${id}:${pkg}`); return { ok: true, message: "Microsoft Foundry Local is up to date." }; },
