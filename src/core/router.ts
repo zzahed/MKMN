@@ -139,6 +139,31 @@ export class RouterWarmGate {
 }
 
 /**
+ * Runs the router's warm-up one at a time. A plain request made while one runs is dropped (that
+ * one will do), but a FORCED one is kept and run once more when it ends: the server it warms may
+ * have been stopped and replaced meanwhile (routerMissed moves the router to the GPU while the
+ * warm-up the timeout started is still out), and dropping it left the new server cold until
+ * another request came. Several forced requests made during one run still give one re-run.
+ */
+export class WarmUp {
+  private running = false;
+  private queued: (() => Promise<void>) | null = null;
+  /** True while a warm-up runs. */
+  get busy(): boolean { return this.running; }
+  /** Runs `task` now, or, when one is running and `force` is set, once that one ends. A failure is the task's own to report. */
+  start(task: () => Promise<void>, force = false): void {
+    if (this.running) { if (force) this.queued = task; return; }
+    this.running = true;
+    void task().catch(() => undefined).finally(() => {
+      this.running = false;
+      const next = this.queued;
+      this.queued = null;
+      if (next) this.start(next);
+    });
+  }
+}
+
+/**
  * What the file-kind question answered for one message text. A question without an
  * answer is NOT an outcome: the cold, gated or wedged router's null must not stand in
  * for "no file is wanted" on every later ask of the same text (the live probe of the

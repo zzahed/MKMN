@@ -67,7 +67,7 @@ import { DEFAULT_ENDPOINT, geniexVersion } from "../core/geniex";
 import { GeniexGate, parseGeniexCliVersion } from "../core/geniexGate";
 import { NPU_UTIL_SCRIPT, WINDOWS_BUILD_SCRIPT, npuReadingFromHost, parseNpuCounters, type NpuReading } from "../core/perf";
 import { BATTERY_SCRIPT, batteryFromHost, batteryPercent, createCachedPowerReader, createHostFirstBatteryReader, parseBattery } from "../core/battery";
-import { ROUTER_CTX, ROUTER_HOST, ROUTER_MODEL, ROUTER_PREFERRED, RouterPlacement, ROUTER_TIMEOUT_MS, PRODUCE_VOTES, Q, TREE, FileKindMemo, RouterBreaker, RouterWarmGate, SortMemory, parseYesNo, servesRouterModel, readSearchQuery, routerSampling, searchQueryPrompt, settled, sortByQuestions, yesNoPrompt, type Asked } from "../core/router";
+import { ROUTER_CTX, ROUTER_HOST, ROUTER_MODEL, ROUTER_PREFERRED, RouterPlacement, ROUTER_TIMEOUT_MS, PRODUCE_VOTES, Q, TREE, FileKindMemo, RouterBreaker, RouterWarmGate, SortMemory, WarmUp, parseYesNo, servesRouterModel, readSearchQuery, routerSampling, searchQueryPrompt, settled, sortByQuestions, yesNoPrompt, type Asked } from "../core/router";
 import { ServerManager } from "../core/server";
 import type { TemplateKind } from "../core/templates/kit";
 import { runnerFor, withPip } from "../core/runcode";
@@ -1091,7 +1091,7 @@ const ROUTER_PROBES: [string, string, boolean][] = [
 let routerSrv: ServerManager | null = null;
 let routerExe: string | null = null;
 const routerSortMemory = new SortMemory();
-let routerWarming = false;
+const routerWarmUp = new WarmUp();
 const routerStats = { asked: 0, lastMs: null as number | null, lastError: null as string | null };
 /**
  * One timeout per request (the rule on-device test runs broke): after a question to the
@@ -1235,13 +1235,12 @@ async function routerQuery(text: string): Promise<string | null> {
   return reply === null ? null : readSearchQuery(reply);
 }
 
-/** Starts the router in the background, so that the first request already finds it ready. */
-function warmRouter(_force = false) {
-  if (!readBool(settings(), "dynamic.router")) return;
-  if (routerWarming) return;
-  if (!findGeniex(settings().geniexPath ?? null)) return;
-  routerWarming = true;
-  void (async () => {
+/** Starts the router in the background, so that the first request already finds it ready. `force`: the
+ *  server was just stopped or replaced, so a warm-up already running (against the old one) is not enough. */
+function warmRouter(force = false) {
+  routerWarmUp.start(async () => {
+    if (!readBool(settings(), "dynamic.router")) return;
+    if (!findGeniex(settings().geniexPath ?? null)) return;
     const exe = await geniexGate.usable();
     if (!exe) return;
     const installed = await installedEntries();
@@ -1255,7 +1254,7 @@ function warmRouter(_force = false) {
       routerBreaker.close(); // the router answers again: the next request meets it fresh (a wedged one stays open)
       routerWarmGate.markWarmed();
     } catch (e) { routerStats.lastError = (e as Error).message; }
-  })().finally(() => { routerWarming = false; });
+  }, force);
 }
 
 /** What the router answered to the last request: the questions it was asked, and what it said to each. */
