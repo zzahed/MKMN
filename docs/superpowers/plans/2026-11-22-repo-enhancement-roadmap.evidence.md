@@ -85,6 +85,8 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 
 - Task 20: Ruling: the three specs (`tests/e2e/flows.spec.ts`) cover the flows the brief names and the stand-in bridge supports: a chat message with its streamed reply (Stop shows while it streams, then the reply, its speed line and the sidebar entry), Settings (Appearance set to Dark is applied to the page and still checked when Settings is opened again), and a project (created, renamed, asked before delete, kept on No, removed on Yes). Before they passed, a copy pointed at the production page (no stand-in bridge) failed all three. The CI job `e2e` runs them on Linux with Playwright's Chromium; locally on this ARM64 PC they run on the installed Edge (`PLAYWRIGHT_CHANNEL=msedge`), so no browser is downloaded here. Outside the file list: `package.json` gains `@playwright/test` and a `pnpm e2e` script, `.gitignore` gains Playwright's output folders, `CONTRIBUTING.md` lists the fifth job, and a stale comment in `ci.yml` about coverage is corrected. Cost if wrong: a flow broken only in WebView2, not in Chromium, is not caught.
 
+- Task 21: Ruling: nine tests cover the commands that need no live window, supervisor, sidecar or driver: `verify_sha256_cmd` (a missing file is named; the hash, and the expected hash compared without case or spaces), `chunk_document_text_cmd` (200 words with 50 overlap by default, explicit sizes, empty text), `set_qos_tier_cmd` (an unknown tier is refused with the valid names, before any process is touched), `get_qos_status_cmd` (this process by default, a missing process refused), `cancel_benchmark_cmd`, the shutdown refusal in normal running, and `get_power_status_cmd`. Left out: the commands that take `State` or `Window`, and the ones that read or write the app's own data (settings, hardware config, evidence, the model cache) or change this machine (sleep inhibition, applying a QoS tier, opening Task Manager), since tests must not touch `%LOCALAPPDATA%\MKMN` or the PC. They describe existing behaviour, so instead of RED first, two mutations (default chunk 100, a reworded tier error) were each caught, then reverted. Cost if wrong: the commands with state stay covered only by the TypeScript and e2e tests.
+
 ## Follow-ups (owner decides)
 
 | found in task | item | decision |
@@ -540,4 +542,6 @@ All jobs pass, CodeQL too (0 open alerts). `windows-arm64-tests` ran the suite w
 ## CI run for 92f07c0 (PR 6, Task 20)
 
 `e2e` failed on its first run: in "send a chat message", `getByRole('main').getByRole('status')` matched two elements while the reply streamed (the screen-reader announcement and the "Thinking" indicator), and Playwright's strict mode refuses an ambiguous locator. A bug in the spec, not in the app; it passed locally by timing. Reproduced locally with `--repeat-each 8 --workers 4` (failed), fixed by waiting for the one status that reads "Answer finished", then 24 of 24 passed under the same load. The other two specs passed in CI.
+
+CI run 45120842689 (e30978a): every job passes, `e2e` (3 passed in Chromium) and `windows-arm64-tests` (2871 tests, lines 78.46%, thresholds met) included. Task 20 is green.
 

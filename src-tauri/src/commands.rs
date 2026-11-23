@@ -527,3 +527,100 @@ fn refuse_work_while_shutting_down() -> Result<(), String> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    //! The commands that need no live window, supervisor or sidecar: their argument
+    //! handling and the paths they read. Nothing here writes to the app's data folders.
+    use super::*;
+
+    /// A file of its own in the temp folder, removed when the guard drops.
+    struct TempFile(std::path::PathBuf);
+    impl TempFile {
+        fn with(name: &str, bytes: &[u8]) -> Self {
+            let path = std::env::temp_dir().join(format!("mkmn-commands-test-{}-{}", std::process::id(), name));
+            std::fs::write(&path, bytes).expect("write temp file");
+            TempFile(path)
+        }
+        fn path(&self) -> String { self.0.to_string_lossy().into_owned() }
+    }
+    impl Drop for TempFile {
+        fn drop(&mut self) { let _ = std::fs::remove_file(&self.0); }
+    }
+
+    const ABC_SHA256: &str = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+
+    #[test]
+    fn verify_sha256_refuses_a_missing_file_and_names_it() {
+        let missing = std::env::temp_dir().join(format!("mkmn-commands-test-{}-absent.bin", std::process::id()));
+        let path = missing.to_string_lossy().into_owned();
+        let err = tauri::async_runtime::block_on(verify_sha256_cmd(path.clone(), None)).unwrap_err();
+        assert_eq!(err, format!("File does not exist: {}", path));
+    }
+
+    #[test]
+    fn verify_sha256_hashes_the_file_and_compares_without_case_or_spaces() {
+        let f = TempFile::with("abc.txt", b"abc");
+        let plain = tauri::async_runtime::block_on(verify_sha256_cmd(f.path(), None)).unwrap();
+        assert_eq!(plain.sha256, ABC_SHA256);
+        assert_eq!(plain.path, f.path());
+        assert_eq!(plain.matches, None, "no expected hash: no verdict");
+
+        let loose = format!("  {}\n", ABC_SHA256.to_uppercase());
+        let same = tauri::async_runtime::block_on(verify_sha256_cmd(f.path(), Some(loose))).unwrap();
+        assert_eq!(same.matches, Some(true));
+
+        let other = tauri::async_runtime::block_on(verify_sha256_cmd(f.path(), Some("0".repeat(64)))).unwrap();
+        assert_eq!(other.matches, Some(false));
+    }
+
+    #[test]
+    fn chunk_document_text_defaults_to_200_words_with_50_overlap() {
+        let text: String = (0..300).map(|i| format!("w{i}")).collect::<Vec<_>>().join(" ");
+        let chunks = chunk_document_text_cmd(text.clone(), None, None).unwrap();
+        assert_eq!(chunks, crate::qos::chunk_text_eco(&text, 200, 50));
+        assert_eq!(chunks[0].split_whitespace().count(), 200);
+        assert_eq!(chunks[1].split_whitespace().next(), Some("w150"), "the second chunk starts 50 words back");
+    }
+
+    #[test]
+    fn chunk_document_text_passes_explicit_sizes_and_returns_nothing_for_empty_text() {
+        let text = "a b c d e f g h i j";
+        assert_eq!(chunk_document_text_cmd(text.into(), Some(4), Some(1)).unwrap(), crate::qos::chunk_text_eco(text, 4, 1));
+        assert!(chunk_document_text_cmd(String::new(), None, None).unwrap().is_empty());
+        assert!(chunk_document_text_cmd("   ".into(), None, None).unwrap().is_empty());
+    }
+
+    #[test]
+    fn set_qos_tier_rejects_an_unknown_tier_before_touching_any_process() {
+        let err = set_qos_tier_cmd(Some(u32::MAX), "turbo".into()).unwrap_err();
+        assert!(err.starts_with("Invalid QoS tier 'turbo'"), "{err}");
+        assert!(err.contains("interactive, inference_critical, background_eco"), "{err}");
+    }
+
+    #[test]
+    fn get_qos_status_reads_this_process_by_default_and_refuses_a_process_that_is_not_there() {
+        let own = get_qos_status_cmd(None).expect("this process can be read");
+        assert_eq!(own.pid, std::process::id());
+        let err = get_qos_status_cmd(Some(u32::MAX)).unwrap_err();
+        assert!(err.contains("OpenProcess(PID: 4294967295)"), "{err}");
+    }
+
+    #[test]
+    fn cancel_benchmark_moves_the_generation_on() {
+        let before = crate::bench::benchmark_generation();
+        assert!(cancel_benchmark_cmd());
+        assert!(crate::bench::benchmark_generation() > before);
+    }
+
+    #[test]
+    fn work_is_admitted_while_the_app_is_not_shutting_down() {
+        assert!(!crate::shutdown::is_shutting_down());
+        assert_eq!(refuse_work_while_shutting_down(), Ok(()));
+    }
+
+    #[test]
+    fn power_status_is_always_answered() {
+        assert!(get_power_status_cmd().is_ok());
+    }
+}
