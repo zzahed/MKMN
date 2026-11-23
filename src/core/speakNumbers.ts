@@ -62,7 +62,7 @@ export function speakNumbers(text: string, _lang: SpeechLang = "en"): string {
   };
   let t = text;
   t = t.replace(/(\d{1,3})(?:,(\d{3}))+(?!\d)/g, (m) => m.replace(/,/g, "")); // 475,000
-  t = t.replace(/(\d{1,3})(?:[   ](\d{3}))+(?!\d)/g, (m) => m.replace(/[   ]/g, "")); // 475 000
+  t = t.replace(/(\d{1,3})(?:[\u202F\u00A0 ](\d{3}))+(?!\d)/g, (m) => m.replace(/[\u202F\u00A0 ]/g, "")); // 475 000
   t = t.replace(/(\d+(?:[.,]\d+)?)\s*%/g, (_, n) => ` ${num(n)} percent `);
   t = t.replace(/[$€£]\s?(\d+(?:[.,]\d+)?)(\s*(?:billion|million|thousand|trillion|millions?))?/gi, (m, n, s = "") => {
     const cur = m[0] === "$" ? "dollars" : m[0] === "€" ? "euros" : "pounds";
@@ -81,7 +81,7 @@ export function speakNumbers(text: string, _lang: SpeechLang = "en"): string {
 export function latinize(text: string, keepAccents = false): string {
   const t = text.replace(/\u0111/g, "d").replace(/\u0110/g, "D").replace(/\u00f8/g, "o").replace(/\u00d8/g, "O").replace(/\u0142/g, "l").replace(/\u0141/g, "L");
   // diacritics are taken off for the English voice; `keepAccents` keeps those of the Latin-1 range
-  const letters = keepAccents ? /[\u0100-\u024f\u1e00-\u1eff]+/g : /[^\u0000-\u007F]+/g;
+  const letters = keepAccents ? /[\u0100-\u024f\u1e00-\u1eff]+/g : /[^\p{ASCII}]+/gu;
   return t.replace(letters, (run) => run.normalize("NFD").replace(/\p{M}/gu, ""));
 }
 

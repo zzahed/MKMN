@@ -7,7 +7,6 @@
  * guard deliberately (none exists today).
  */
 declare global {
-  // eslint-disable-next-line no-var
   var __mkmnAllowModelFetch: boolean | undefined;
 }
 

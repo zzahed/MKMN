@@ -212,8 +212,8 @@ export async function readGgufHeader(fetchRange: RangeFetcher, maxBytes = 64 * 1
       return parseGgufMetadata(buf);
     } catch (e) {
       if (!(e instanceof NeedMoreData)) throw e;
-      if (buf.length < size) throw new Error("GGUF header is truncated");
-      if (size >= maxBytes) throw new Error("GGUF header too large");
+      if (buf.length < size) throw new Error("GGUF header is truncated", { cause: e });
+      if (size >= maxBytes) throw new Error("GGUF header too large", { cause: e });
       size = Math.min(size * 4, maxBytes);
     }
   }

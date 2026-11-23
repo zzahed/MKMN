@@ -13,6 +13,7 @@ function safeHref(h: string | undefined | null): string {
   const v = (h ?? "").trim();
   if (!v) return "#";
   // the scheme is read after every space and control character is gone: browsers ignore them when they read a URL, so "java\nscript:" is javascript:
+  // eslint-disable-next-line no-control-regex -- browsers ignore control characters in a URL scheme, so this check does too
   const compact = v.replace(/[\s\u0000-\u001f]+/g, "");
   if (/^(#|https?:|mailto:|tel:)/i.test(compact)) return v;
   if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(compact)) return "#";

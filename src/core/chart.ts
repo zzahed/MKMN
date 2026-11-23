@@ -378,7 +378,7 @@ export function fmt(v: number): string {
   const a = Math.abs(v);
   if (a >= 1e9) return `${+(v / 1e9).toPrecision(3)} G`;
   if (a >= 1e6) return `${+(v / 1e6).toPrecision(3)} M`;
-  if (a >= 1e4) return Math.round(v).toLocaleString("fr-FR").replace(/ | /g, " ");
+  if (a >= 1e4) return Math.round(v).toLocaleString("fr-FR").replace(/\u202F|\u00A0/g, " ");
   if (a >= 100) return String(+v.toFixed(0));
   if (a >= 1) return String(+v.toFixed(2));
   return a === 0 ? "0" : String(+v.toPrecision(2));
@@ -448,7 +448,7 @@ export function mendLeakedFormulas(text: string): { text: string; mended: boolea
       for (; j < s.length; j++) { if (s[j] === "(") depth++; else if (s[j] === ")" && --depth === 0) break; }
       if (j >= s.length) { out += s.slice(i); break; }
       const inner = s.slice(i + 1, j);
-      out += texIn(inner) ? `($${inner.replace(/\\\\(?=[A-Za-z])/g, "\\").replace(/ /g, "\\,")}$)` : `(${wrap(inner)})`;
+      out += texIn(inner) ? `($${inner.replace(/\\\\(?=[A-Za-z])/g, "\\").replace(/\u00A0/g, "\\,")}$)` : `(${wrap(inner)})`;
       i = j + 1;
     }
     return out;

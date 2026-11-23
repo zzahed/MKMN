@@ -399,7 +399,7 @@ describe("the Computer Use loop", () => {
     // The panel's Stop raced against the verify's re-observe: after the abort,
     // the loop must end without acting again and must still clear the grant.
     let gen = 0;
-    let fieldValue = "seed";
+    const fieldValue = "seed";
     const snap = (v: string): ObserveResult => ({
       window: { hwnd: 42, pid: 7, title: "Notes - Notepad", process: "Notepad.exe", className: "Notepad" },
       observeGen: ++gen,

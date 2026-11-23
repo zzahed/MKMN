@@ -10,7 +10,7 @@ child.stdout.on("data", (d) => {
     if (!line.trim()) continue;
     let m; try { m = JSON.parse(line); } catch { console.log("UNPARSEABLE:", line.slice(0, 100)); continue; }
     if (m.t === "event") console.log(`EVENT ${m.name}:`, JSON.stringify(m.payload).slice(0, 220));
-    else if (m.t === "res") { const w = waiters.get(m.id); if (w) { waiters.delete(m.id); m.ok ? w.res(m.result) : w.rej(new Error(m.error)); } }
+    else if (m.t === "res") { const w = waiters.get(m.id); if (w) { waiters.delete(m.id); if (m.ok) w.res(m.result); else w.rej(new Error(m.error)); } }
     else if (m.t === "req") { child.stdin.write(JSON.stringify({ t: "res", id: m.id, ok: true, result: null }) + "\n"); }
   }
 });

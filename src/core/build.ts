@@ -1325,7 +1325,8 @@ export async function* stepwise(o: StepwiseOptions): AsyncGenerator<ChatEvent, S
             // too long for the window: only the lines concerned are written again, and put back in the file
             const all = existing.content.split("\n");
             const spot = resolveSpots(existing.content, file.job.split(/\W+/).filter((w) => w.length > 3))[0] ?? [1, 60];
-            let a = Math.max(1, spot[0] - 12), b = Math.min(all.length, spot[1] + 12);
+            const a = Math.max(1, spot[0] - 12);
+            let b = Math.min(all.length, spot[1] + 12);
             const room = Math.max(1200, Math.floor(o.maxChars * 0.35));
             while (b > a && all.slice(a - 1, b).join("\n").length > room) b--;
             const old = all.slice(a - 1, b);

@@ -42,7 +42,7 @@ export const cleanLabel = (s: unknown): string => String(s ?? "").replace(/[[\]|
 const numberOf = (v: unknown): number | null => {
   if (typeof v === "number") return Number.isFinite(v) ? v : null;
   if (typeof v !== "string") return null;
-  const t = v.replace(/[\s  €$£]/g, "").replace(/,(\d{1,2})$/, ".$1").replace(/,/g, "");
+  const t = v.replace(/[\s\u00A0\u202F€$£]/g, "").replace(/,(\d{1,2})$/, ".$1").replace(/,/g, "");
   return /^-?\d+(\.\d+)?$/.test(t) ? Number(t) : null;
 };
 

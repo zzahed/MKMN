@@ -806,7 +806,7 @@ export class BenchRunner {
                 await this.d.stopServer().catch(() => undefined);
                 await this.waitNpuFree(signal);
                 await this.pause(this.d.loadRetryMs ?? 8000, signal);
-                if (signal.aborted) throw new Error("stopped"); // the pause is cut short by a stop: no new load may be started
+                if (signal.aborted) throw new Error("stopped", { cause: e }); // the pause is cut short by a stop: no new load may be started
                 try {
                   srv = await load(setting); last = null;
                   r.loadSetting = setting.label;
@@ -826,7 +826,7 @@ export class BenchRunner {
             this.log(`${t.name} did not load (${(e as Error).message.slice(0, 100)}): the NPU is given a few seconds, then one more try.`);
             await this.d.stopServer().catch(() => undefined);
             await this.pause(this.d.loadRetryMs ?? 8000, signal);
-            if (signal.aborted) throw new Error("stopped");
+            if (signal.aborted) throw new Error("stopped", { cause: e });
             srv = await load();
             }
           }
@@ -1218,8 +1218,8 @@ export class BenchRunner {
         } else if (ev.type === "done") stats = ev.stats;
       }
     } catch (err) {
-      if (signal.aborted) throw new Error("stopped");
-      if (ac.signal.aborted) throw new Error(`no answer after ${Math.round(timeoutMs / 1000)} s`);
+      if (signal.aborted) throw new Error("stopped", { cause: err });
+      if (ac.signal.aborted) throw new Error(`no answer after ${Math.round(timeoutMs / 1000)} s`, { cause: err });
       throw err;
     } finally {
       clearTimeout(timer);

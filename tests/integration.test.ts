@@ -33,7 +33,7 @@ describe("server manager", () => {
   it("starts the server with the compute target a model needs", async () => {
     const seen: string[][] = [];
     const spy = ((exe: string, args: string[], opts: any) => { seen.push(args); return fakeSpawn(exe, args, opts); }) as any;
-    let compute: string | undefined;
+    let compute: string | undefined = undefined;
     const m = mk({ spawnFn: spy, compute: "npu", computeFn: () => compute, extraEnv: () => ({ GGML_HEXAGON_MBUF: "128M,128M" }) }); managers.push(m);
     await m.start(4096);
     compute = "hybrid";

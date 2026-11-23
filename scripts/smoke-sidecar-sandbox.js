@@ -17,7 +17,7 @@ child.stdout.on("data", (d) => {
       if (m.name === "run") { runEvents.push(m.payload); console.log(`RUN ${m.payload.runId} ${m.payload.type}:`, String(m.payload.text ?? m.payload.error ?? "").trim().slice(0, 100)); }
       else if (m.name === "tasks") console.log("EVENT tasks:", JSON.stringify(m.payload).slice(0, 120));
       else console.log(`EVENT ${m.name}:`, JSON.stringify(m.payload).slice(0, 120));
-    } else if (m.t === "res") { const w = waiters.get(m.id); if (!m.ok) console.log("RES-ERR:", m.id, m.error); if (w) { waiters.delete(m.id); m.ok ? w.res(m.result) : w.rej(new Error(m.error)); } }
+    } else if (m.t === "res") { const w = waiters.get(m.id); if (!m.ok) console.log("RES-ERR:", m.id, m.error); if (w) { waiters.delete(m.id); if (m.ok) w.res(m.result); else w.rej(new Error(m.error)); } }
     else if (m.t === "req") void handleHostRequest(m);
   }
 });

@@ -18,6 +18,7 @@ import { parseCatalogJson, parseJsonOutput, parseModelList, type FoundryVariant 
 
 export interface FoundryExe { path: string; version: string | null }
 
+// eslint-disable-next-line no-control-regex -- strips ANSI colour codes from the console output
 const ansi = (s: string) => s.replace(/\x1b\[[0-9;]*[A-Za-z]/g, "");
 
 const asRecord = (v: unknown): Record<string, unknown> | null =>

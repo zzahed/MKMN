@@ -118,7 +118,7 @@ export function bindStateNames(code: string, keys: string[]): { code: string; bo
   const visitPatternDefaults = (p: Node, scopes: Set<string>[]) => {
     if (p.type === "AssignmentPattern") visit(p.right, p, scopes);
     else if (p.type === "ObjectPattern") for (const q of p.properties as Node[]) visitPatternDefaults(q.type === "RestElement" ? q.argument : q.value, scopes);
-    else if (p.type === "ArrayPattern") for (const q of p.elements as (Node | null)[]) q && visitPatternDefaults(q, scopes);
+    else if (p.type === "ArrayPattern") for (const q of p.elements as (Node | null)[]) if (q) visitPatternDefaults(q, scopes);
   };
 
   visit(ast, null, [top]);
