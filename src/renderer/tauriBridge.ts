@@ -1098,7 +1098,6 @@ export function createTauriApi(): MkmnApi {
     async fixBlock(kind: string, raw: string, reason: string): Promise<string | null> {
       // the mended diagram/chart JSON comes from the sidecar's chat model (the one already loaded)
       return sidecarCall<string | null>("fixBlock", kind, raw, reason);
-      return null;
     },
     async fetchLibrary(url: string): Promise<any> {
       return sidecarCall("fetchLibrary", url);

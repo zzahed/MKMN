@@ -225,7 +225,9 @@ export function applyEvidence(models, records) {
     }
     const cur = byModel.get(key);
     if (!cur) { byModel.set(key, rec); continue; }
-    if ((rec.readiness !== null) > (cur.readiness !== null) || ((rec.readiness !== null) === (cur.readiness !== null) && rec.ts >= cur.ts)) byModel.set(key, rec);
+    // a record with a readiness wins over one without; between equals, the newer one wins
+    const recReady = rec.readiness !== null, curReady = cur.readiness !== null;
+    if ((recReady && !curReady) || (recReady === curReady && rec.ts >= cur.ts)) byModel.set(key, rec);
   }
   for (const [key, rec] of byModel) {
     const r = models.get(key);

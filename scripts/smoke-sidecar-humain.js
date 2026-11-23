@@ -6,10 +6,10 @@ const fs = require("fs");
 const path = require("path");
 
 const REPO = process.argv[2] || path.join(__dirname, "..");
-const SCRATCH = path.join(require("os").tmpdir(), "mkmn-humain-e2e");
+// a new folder with a name no one can guess, made for this run alone: the copies of the keys never go where someone else prepared a place
+const SCRATCH = fs.mkdtempSync(path.join(require("os").tmpdir(), "mkmn-humain-e2e-"));
 const CONFIG = path.join(SCRATCH, "MKMN", "Config");
 const REAL_CONFIG = path.join(process.env.LOCALAPPDATA, "MKMN", "Config");
-fs.rmSync(SCRATCH, { recursive: true, force: true });
 fs.mkdirSync(path.join(CONFIG, "Humain"), { recursive: true });
 for (const f of ["fuse.dpapi", "node.dpapi"]) fs.copyFileSync(path.join(REAL_CONFIG, "Humain", f), path.join(CONFIG, "Humain", f));
 const base = JSON.parse(fs.readFileSync(path.join(REAL_CONFIG, "settings.json"), "utf8"));
