@@ -44,14 +44,14 @@ export function probeVerdict(stdout: unknown): boolean | null {
  *  network access (probeVerdict): true runs generated code, false and null refuse it. */
 export function proveNetworkDenied(nodePath: string, readDirs: string[]): Promise<boolean | null> {
   return new Promise((resolve) => {
-    execFile(nodePath, [...lockedNodeArgs(readDirs, "-e"), PROBE], { windowsHide: true, timeout: PROBE_MS, env: {} }, (_e, stdout) => resolve(probeVerdict(stdout)));
+    execFile(nodePath, [...lockedNodeArgs(readDirs, "-e"), PROBE], { windowsHide: true, timeout: PROBE_MS, env: {} }, (error, stdout) => resolve(error ? null : probeVerdict(stdout)));
   });
 }
 
 /** proveNetworkDenied for a synchronous first run. */
 export function proveNetworkDeniedSync(nodePath: string, readDirs: string[]): boolean | null {
   const r = spawnSync(nodePath, [...lockedNodeArgs(readDirs, "-e"), PROBE], { windowsHide: true, timeout: PROBE_MS, encoding: "utf8", env: {} });
-  return r.error ? null : probeVerdict(r.stdout);
+  return r.error || r.status !== 0 ? null : probeVerdict(r.stdout);
 }
 
 /** How the runner proves the runtime blocks the network (injected by tests). */

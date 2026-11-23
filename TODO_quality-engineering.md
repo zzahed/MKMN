@@ -937,37 +937,36 @@ Usage examples:
 
 *(Read each test before you edit it, and adapt the exact lines. The snippets show the pattern.)*
 
-### P-5 — Sandbox self-test at start-up (`src/core/isolate.ts`) → QE-ITEM-1.4
+### P-5 — Sandbox self-test at start-up (`src/sidecar/isolation.ts`) → QE-ITEM-1.4
 
-```ts
-import { execFile } from "node:child_process";
-import { createServer, type AddressInfo } from "node:net";
+**Implemented, with fail-closed probe validation.** The executable source of truth is
+`src/sidecar/isolation.ts`, using `lockedNodeArgs` from `src/core/isolate.ts`.
+Do **not** use the historical `stdout !== "CONNECTED"` example. It treated
+timeouts, crashes, launch failures and empty output as evidence of network isolation.
 
-/**
- * Proves the locked process cannot open a socket on THIS Node binary.
- * Call once before the first isolated run. If it connects, refuse generated code.
- */
-export async function proveNetworkDenied(nodePath: string, readDirs: string[]): Promise<boolean> {
-  const server = createServer((s) => s.destroy());
-  await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
-  const port = (server.address() as AddressInfo).port;
-  const code = `const s=require("net").connect(${port},"127.0.0.1");s.on("connect",()=>{console.log("CONNECTED");s.destroy()});s.on("error",e=>console.log(e.code))`;
-  try {
-    const out = await new Promise<string>((resolve) =>
-      execFile(nodePath, [...lockedNodeArgs(readDirs, "-e"), code], { windowsHide: true, timeout: 10_000 },
-        (_e, stdout) => resolve(String(stdout).trim())));
-    return out !== "CONNECTED";
-  } finally { server.close(); }
-}
-```
+The probe launches the exact configured Node runtime with the permission model, and
+attempts one TCP connection to `127.0.0.1:9`. A result can authorize generated
+code **only when both conditions hold**:
 
-Test to add (`tests/isolation.test.ts`):
+1. The child process completed successfully (no execution error, timeout or signal,
+   and exit status 0).
+2. Its complete trimmed stdout is exactly `ERR_ACCESS_DENIED`.
 
-```ts
-it("refuses to run generated code when the runtime cannot deny the network", async () => {
-  // inject a runner whose probe reports CONNECTED → isolation() must throw a named error, never run the code
-});
-```
+`CONNECTED` or a socket error other than `ERR_ACCESS_DENIED` means the runtime did
+not prove isolation and must refuse generated code. Empty, unexpected, partial or
+inconclusive output (including output from a failed child) returns `null` and
+must refuse the current run. A later attempt may retry an inconclusive result;
+a confirmed unsafe result is remembered for that runner session.
+
+**Regression evidence required:** `tests/isolation.test.ts` exercises the real
+permission-limited process and the `IsolationUnsafeError` gates.
+`tests/isolation-probe-contract.test.ts` deliberately mocks child-process
+failure with misleading `ERR_ACCESS_DENIED` stdout, and validates both
+asynchronous and synchronous result handling. A mocked verdict alone is not
+proof that networking is blocked on installed HUMAIN Windows ARM64 hardware.
+
+Acceptance requires independent tests on the actual packaged Node binary and
+target hardware. Successful CI tests cannot substitute for the device test.
 
 ### P-6 — Fail fast when `Promise.try` is missing (`src/core/pdf.ts`) → QE-ITEM-1.3
 
