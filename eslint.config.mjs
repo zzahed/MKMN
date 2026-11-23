@@ -18,7 +18,7 @@ export default tseslint.config(
   {
     ignores: [
       "node_modules/", "dist/", "build/", "target/", "src-tauri/target/", "src-tauri/gen/",
-      "crates/", "docs/", "coverage/", ".superpowers/",
+      "crates/", "docs/", "coverage/", ".superpowers/", ".claude/",
       "**/*.generated.ts", "**/*.min.js",
     ],
   },
