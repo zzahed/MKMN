@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as fs from "node:fs";
-import { CONFIRM, ROOT, ROUTER_BELOW, ROUTER_BREAKER_MS, ROUTER_MODEL, FileKindMemo, RouterBreaker, RouterWarmGate, SortMemory, TREE, parseYesNo, routerWanted, sortByQuestions, withRouter, yesNoPrompt } from "../src/core/router";
+import { CONFIRM, ROOT, ROUTER_BELOW, ROUTER_BREAKER_MS, ROUTER_MODEL, FileKindMemo, RouterBreaker, RouterWarmGate, SortMemory, WarmUp, TREE, parseYesNo, routerWanted, sortByQuestions, withRouter, yesNoPrompt } from "../src/core/router";
 import { CATEGORY_IDS, type TaskCategory } from "../src/core/dynamic";
 
 const KINDS = new Set<string>(CATEGORY_IDS);
@@ -196,6 +196,54 @@ describe("the router warm gate: no ask reaches a server whose model has not answ
     expect(g.open).toBe(false);
     g.markWarmed();
     expect(g.open).toBe(true);
+  });
+});
+
+describe("the router warm-up: one at a time, and a forced one is never lost", () => {
+  /** A warm-up that waits until the test lets it end, as one against a loading server does. */
+  const gate = () => { let end!: (ok: boolean) => void; const done = new Promise<boolean>((r) => { end = r; }); return { end, done }; };
+  const settle = () => new Promise((r) => setTimeout(r, 0));
+
+  it("runs one warm-up and skips a plain request made while it runs", async () => {
+    const w = new WarmUp();
+    const g = gate();
+    let runs = 0;
+    const task = async () => { runs++; await g.done; };
+    w.start(task);
+    w.start(task);
+    expect(w.busy).toBe(true);
+    g.end(true);
+    await settle();
+    expect(runs).toBe(1);
+    expect(w.busy).toBe(false);
+  });
+
+  it("runs a forced request made during a warm-up once more when it ends (the router moved to another server meanwhile)", async () => {
+    const w = new WarmUp();
+    const first = gate();
+    const servers: string[] = [];
+    let server = "npu";
+    w.start(async () => { servers.push(server); await first.done; });
+    server = "gpu"; // routerMissed: the server is stopped and restarted elsewhere while the first warm-up still runs
+    w.start(async () => { servers.push(server); }, true);
+    w.start(async () => { servers.push(server); }, true); // a second forced request while one is queued: still one re-run
+    first.end(false);
+    await settle();
+    await settle();
+    expect(servers).toEqual(["npu", "gpu"]);
+    expect(w.busy).toBe(false);
+  });
+
+  it("re-runs after a warm-up that failed, and a failure never escapes", async () => {
+    const w = new WarmUp();
+    let runs = 0;
+    w.start(async () => { runs++; await settle(); throw new Error("the server went away"); });
+    w.start(async () => { runs++; }, true);
+    await settle();
+    await settle();
+    await settle();
+    expect(runs).toBe(2);
+    expect(w.busy).toBe(false);
   });
 });
 
