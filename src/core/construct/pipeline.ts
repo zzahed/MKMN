@@ -29,6 +29,7 @@ import { playPage, runExamples, smokeRun, syntaxProblem } from "./sandbox";
 import { analyzeWiring, applyWiring, parseWiring, wiringText } from "./wiring";
 import { completePlan, groupUnits, normalizeUnits, parseLines, parseRequirements, requirementsText } from "./tasklist";
 import type { Accepted, Plan, Requirement, Unit } from "./types";
+import { escapeRe } from "../escape";
 
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n) : s);
 /** A fence the model wrote with look-alike marks (three modifier apostrophes instead of backticks) is a fence all the same. */
@@ -42,11 +43,11 @@ export function fallbackRequirements(request: string): Requirement[] {
 }
 
 const fences = (t: string) => [...t.matchAll(/```[\w-]*\n([\s\S]*?)```/g)].map((m) => m[1]);
-const declares = (code: string, name: string) => new RegExp(`(?:^|[\\n;])\\s*(?:async\\s+)?function\\s+${name.replace(/\$/g, "\\$")}\\b|(?:^|[\\n;])\\s*(?:const|let|var)\\s+${name.replace(/\$/g, "\\$")}\\s*=`).test(code);
+const declares = (code: string, name: string) => new RegExp(`(?:^|[\\n;])\\s*(?:async\\s+)?function\\s+${escapeRe(name)}\\b|(?:^|[\\n;])\\s*(?:const|let|var)\\s+${escapeRe(name)}\\s*=`).test(code);
 const topLevelNames = (code: string): string[] => [...code.matchAll(/(?:^|\n)(?:async\s+)?function\s+([\w$]+)|(?:^|\n)(?:const|let|var)\s+([\w$]+)\s*=/g)].map((m) => m[1] ?? m[2]);
 
 /** A function written as a method (`applyGravity(player, level) {`), the way a class body or an object does, is the function it means. */
-const asFunctions = (code: string, names: string[]) => names.reduce((c, n) => c.replace(new RegExp(`^([ \\t]*)(?:async\\s+)?(${n.replace(/\$/g, "\\$")})\\s*\\(([^)]*)\\)\\s*\\{`, "gm"), (_m, sp, name, args) => `${sp}function ${name}(${args}) {`), code);
+const asFunctions = (code: string, names: string[]) => names.reduce((c, n) => c.replace(new RegExp(`^([ \\t]*)(?:async\\s+)?(${escapeRe(n)})\\s*\\(([^)]*)\\)\\s*\\{`, "gm"), (_m, sp, name, args) => `${sp}function ${name}(${args}) {`), code);
 
 /** The code of one unit out of a reply: for a group, the part from its own declaration to the next unit's. */
 export function extractUnit(reply: string, u: Unit, siblings: Unit[] = [], others: string[] = []): string | null {
@@ -64,10 +65,10 @@ export function extractUnit(reply: string, u: Unit, siblings: Unit[] = [], other
   if (!siblings.length && !declares(body, u.name)) {
     // a reply that holds ONE function, written under another name (a small model copies the name of the unit before), is that unit's function
     const lone = [...body.matchAll(/(?:^|\n)(?:async\s+)?function\s+([\w$]+)\s*\(/g)].map((m) => m[1]);
-    if (lone.length === 1) return alone(body.replace(new RegExp(`function\\s+${lone[0].replace(/\$/g, "\\$")}\\s*\\(`), `function ${u.name}(`).trim());
+    if (lone.length === 1) return alone(body.replace(new RegExp(`function\\s+${escapeRe(lone[0])}\\s*\\(`), `function ${u.name}(`).trim());
   }
   if (!siblings.length) return declares(body, u.name) ? alone(body.trim()) : null;
-  const at = (n: string) => { const m = new RegExp(`(?:^|\\n)[ \\t]*(?:async\\s+)?function\\s+${n.replace(/\$/g, "\\$")}\\b|(?:^|\\n)[ \\t]*(?:const|let|var)\\s+${n.replace(/\$/g, "\\$")}\\s*=`).exec(body); return m ? m.index : -1; };
+  const at = (n: string) => { const m = new RegExp(`(?:^|\\n)[ \\t]*(?:async\\s+)?function\\s+${escapeRe(n)}\\b|(?:^|\\n)[ \\t]*(?:const|let|var)\\s+${escapeRe(n)}\\s*=`).exec(body); return m ? m.index : -1; };
   const start = at(u.name);
   if (start < 0) return null;
   const next = siblings.filter((s) => s.name !== u.name).map((s) => at(s.name)).filter((i) => i > start).sort((x, y) => x - y)[0];
@@ -218,12 +219,12 @@ export async function checkUnit(u: Unit, code: string, engine: ContextEngine, le
   if (u.kind === "fn") {
     if (/\b(document|window|localStorage)\b/.test(code)) problems.push("a fn must not touch the page");
     if (/\bS\s*[.[]/.test(code)) problems.push("a fn must not read or change S: pass what it needs as arguments");
-    const calls = engine.plan.units.filter((x) => (x.kind === "view" || x.kind === "handler") && new RegExp(`\\b${x.name.replace(/\$/g, "\\$")}\\s*\\(`).test(code)).map((x) => x.name);
+    const calls = engine.plan.units.filter((x) => (x.kind === "view" || x.kind === "handler") && new RegExp(`\\b${escapeRe(x.name)}\\s*\\(`).test(code)).map((x) => x.name);
     if (calls.length) problems.push(`a fn must not call ${calls.join(", ")}: views draw and handlers react, a function only calculates and returns a value`);
     if (!problems.length && u.examples.length) {
       // after a correction a function that runs, and gives a value of the same kind as the example's, is kept: an example from a small model is as often wrong as the code
       // a function it calls that is not written yet cannot answer: the example is judged when the page is played, not now
-      const called = engine.plan.units.filter((x) => x.kind === "fn" && x.name !== u.name && new RegExp(`\\b${x.name.replace(/\$/g, "\\$")}\\s*\\(`).test(code));
+      const called = engine.plan.units.filter((x) => x.kind === "fn" && x.name !== u.name && new RegExp(`\\b${escapeRe(x.name)}\\s*\\(`).test(code));
       const waiting = called.some((x) => !engine.codeOf(x.name));
       const res = await runExamples(depsCode(u, engine, called.map((x) => x.name)), code, u.examples);
       problems.push(...(lenient ? res.failures.filter((f) => /failed:/.test(f)) : res.failures).filter((f) => !waiting || (!/is not defined/.test(f) && !/gave/.test(f))));
@@ -397,7 +398,7 @@ export async function* buildProgram(request: string, host: XHost): AsyncGenerato
       if (plan.units.some((x) => x.name === name)) continue;
       if (gapUnits.size >= MAX_GAP_UNITS) break;
       gapUnits.add(name);
-      const call = new RegExp(`\\b${name.replace(/\$/g, "\\$")}\\s*\\(([^)]*)\\)`).exec(code);
+      const call = new RegExp(`\\b${escapeRe(name)}\\s*\\(([^)]*)\\)`).exec(code);
       const at = call ? call[0] : `${name}(...)`;
       const serves = u.serves.length ? u.serves : plan.requirements.map((r) => r.id);
       added.push({ id: name, kind: "fn", name, does: `${u.name} calls it as ${at} (${u.name} does: ${clip(u.does, 120)}): it does the step that call needs`, serves, uses: [], examples: [] });
@@ -457,7 +458,7 @@ export async function* buildProgram(request: string, host: XHost): AsyncGenerato
           const gaps = code ? fillGaps(u, code) : [];
           if (gaps.length) {
             const names = gaps.map((g) => g.name);
-            problems = problems.filter((p) => !names.some((n) => new RegExp(`(?<![\\w$])${n.replace(/\$/g, "\\$")}(?![\\w$])`).test(p)));
+            problems = problems.filter((p) => !names.some((n) => new RegExp(`(?<![\\w$])${escapeRe(n)}(?![\\w$])`).test(p)));
             for (const g of gaps) { pending.push(g); yield { type: "log", text: `${u.name} calls ${g.name}, which no unit planned: ${g.name} is added to the plan and written` }; }
           }
           let refused: string | null = null;
@@ -636,7 +637,7 @@ export async function* buildProgram(request: string, host: XHost): AsyncGenerato
   yield* show(assemblePage(plan, engine.accepted, false, scenarios, [...skippedUnits]));
   // units the problems of a test name are corrected too, each with the problems that name it
   for (const u of plan.units) {
-    const mine = (host.problems ?? []).filter((x) => new RegExp(`\\b${u.name.replace(/\$/g, "\\$")}\\b`).test(x)).slice(0, 4);
+    const mine = (host.problems ?? []).filter((x) => new RegExp(`\\b${escapeRe(u.name)}\\b`).test(x)).slice(0, 4);
     if (mine.length && u.kind !== "state" && u.kind !== "layout") redo.set(u.name, [...(redo.get(u.name) ?? []), ...mine]);
   }
   for (const u of plan.units) {

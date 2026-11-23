@@ -6,6 +6,7 @@
  */
 import { parse } from "acorn";
 import { closestName, type Edit } from "./mend";
+import { escapeRe } from "../escape";
 
 type Node = { type: string; start: number; end: number; [key: string]: any };
 const skip = new Set(["type", "start", "end", "loc", "range"]);
@@ -341,7 +342,7 @@ export function gapProblems(units: { name: string; kind: string; code: string; o
     if (!by.length) continue;
     if (!body.some((u) => reads(u.code, k))) say(`S.${k} is written by ${by.join(", ")} and read by no unit: the program records it and never uses it. The step that runs at each tick must read S.${k} and act on it (for example movement that follows the keys held), or it has no effect`);
   }
-  for (const u of body) if (u.kind === "fn" && !body.some((x) => x.name !== u.name && new RegExp(`\\b${u.name.replace(/\$/g, "\\$")}\\b`).test(x.code))) say(`${u.name} is called by no unit: the step that runs at each tick (or a handler) must call it where it is needed, or the program does without it`);
+  for (const u of body) if (u.kind === "fn" && !body.some((x) => x.name !== u.name && new RegExp(`\\b${escapeRe(u.name)}\\b`).test(x.code))) say(`${u.name} is called by no unit: the step that runs at each tick (or a handler) must call it where it is needed, or the program does without it`);
   return out;
 }
 

@@ -30,6 +30,7 @@ import { artifactsIn, replaceArtifact } from "./artifacts";
 import { stripSubagents } from "./agents";
 import { withSystem } from "./effort";
 import { parseYesNo, yesNoPrompt, Q } from "./router";
+import { escapeRe } from "./escape";
 
 /**
  * Work on files without keeping the files in the conversation. The main session talks to the user; the code is written
@@ -1696,7 +1697,7 @@ export async function* stepwise(o: StepwiseOptions): AsyncGenerator<ChatEvent, S
           const unitBlocks = [...owner.content.matchAll(/\/\* unit:([\w$]+) \*\/\n([\s\S]*?)\n\/\* end:\1 \*\//g)].map((m) => ({ name: m[1], code: m[2] }));
           const engineProblems = [...mine, ...behaviour].flatMap((msg) => {
             const id = /([\w$]+) is not defined/.exec(msg)?.[1] ?? /reading '([\w$]+)'/.exec(msg)?.[1];
-            const users = id ? unitBlocks.filter((u) => new RegExp(`(?<![\\w$.])${id.replace(/\$/g, "\\$")}\\b`).test(u.code)) : [];
+            const users = id ? unitBlocks.filter((u) => new RegExp(`(?<![\\w$.])${escapeRe(id)}\\b`).test(u.code)) : [];
             return users.length ? users.map((u) => `${u.name}: ${msg}`) : [msg];
           });
           const gen = buildProgram(request, { resume: owner.content, problems: engineProblems, change: asChange.length ? `The program does not do what it must: ${asChange.join(" | ")}` : undefined, room: o.maxChars, aborted: () => !!o.signal?.aborted, ask: (sid: string, msgs2: ChatMessage[], _label: string, schema?: object, onText?: (text: string) => void) => unitAsk(`${o.id}:fix:${round}:x:${sid}`, msgs2, R2, schema, _label, onText) });
