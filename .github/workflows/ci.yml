@@ -29,6 +29,7 @@ jobs:
       - run: pnpm typecheck
       - run: node scripts/check-language.mjs
       - run: pnpm regen:check
+      - run: pnpm lint
 
   unit:
     runs-on: ubuntu-latest

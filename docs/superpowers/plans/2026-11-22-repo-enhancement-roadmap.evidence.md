@@ -74,6 +74,10 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 - Task 13: Ruling: "files referenced by an open chat are kept" is `pruneOlderThan`'s `keep` option (a set of paths), tested. At sidecar start no chat is running yet, so the start-up pass passes none. Age is the file's last change, so a journal still being written is never old. Cost if wrong: a chat left open across a restart that reads an old payload finds it gone (the payload is a copy of text the chat already holds or can rebuild).
 - Task 13: Ruling: `privacy.retentionDays` has no Settings control: the control lives in `src/renderer/SettingsView.tsx`, not in the task's file list. The schema entry carries a `hidden` reason saying it is set in `Config/settings.json`. A missing, damaged, zero, negative or fractional value is read as null and removes nothing. `src/shared/types.ts` gains `privacy` and the generator's `expand` list names it, so the schema check covers the key. Cost if wrong: the setting is reachable only by editing the file until a control is added.
 
+- Task 15: Ruling: the first `pnpm lint` reported 1254 errors in existing code, 1007 of them under 14 rules (`no-explicit-any` 600, `no-unused-vars` 178, `no-useless-escape` 71 and others). Instead of a file-level disable in some 200 files, `eslint.config.js` lists those 14 rules in `DEBT` and sets them to warn; every other recommended rule is an error. `no-undef` is off for TypeScript files (the type check covers it), X block files get the `X` global and the audio worklet its own globals. The React hooks rules apply to the window only (`src/core/versionBook.ts` calls a `useVersion` that is not a hook). Cost if wrong: the 14 rules do not stop new breaches until they are raised back to errors one by one.
+- Task 15: Ruling: five source lines outside the file list change so the run is 0 errors: `src/voice/backend.ts` (its disable comment named `no-var-requires`, a rule typescript-eslint 8 no longer has; now `no-require-imports`), `src/renderer/FoundryPanel.tsx` (a local helper named `usePort` was not a hook; renamed `readPort`), `scripts/smoke-sidecar-devtools.js` (`null ? true : true` is `true`), and a line disable with its reason in `src/core/speechText.ts` (the emoji class is on purpose) and `src/core/markdown.ts` (a real bug, logged as a follow-up, not fixed here: it needs its own failing test). `pnpm-lock.yaml` gains the six dev packages; `globals` is added for the Node and browser globals. `CONTRIBUTING.md` names `pnpm lint` in the `lint-type` job. Cost if wrong: small; each line is reviewed in the diff.
+- Task 15: Ruling: `pnpm format:check` runs and reports 776 files Prettier would change; it is not in CI and nothing is reformatted (the brief keeps a mass reformat for a separate, owner-approved commit). `.prettierrc` uses double quotes, semicolons and `printWidth` 120 to stay close to the code. Cost if wrong: the reformat commit is larger or smaller than it could be.
+
 ## Follow-ups (owner decides)
 
 | found in task | item | decision |
@@ -90,6 +94,9 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 | 10 | The standard gate does not include `vite build`, so a Node import reaching the window bundle is caught only by the Windows CI job. Adding `pnpm run build:renderer` to `lint-type` would catch it on Linux in about 20 s | |
 | 13 | Add a Settings control for `privacy.retentionDays` (Chats & answers, advanced) in `src/renderer/SettingsView.tsx`, and drop its `hidden` reason | |
 | 13 | Artifact versions (`mkmn.versions.<id>` in the window's storage) have no retention; the window would prune them itself | |
+| 15 | `src/core/markdown.ts` `isSpecial`: the thematic-break branch uses `\2`, which names the math group, so a `---` line is not treated as a rule and a lone `-`, `*` or `_` line is. Fix with a failing test first and drop the line disable | |
+| 15 | Raise the 14 `DEBT` lint rules in `eslint.config.js` back to errors one by one, fixing each rule's warnings (1028 lint warnings in all today) | |
+| 15 | The Prettier reformat of the codebase (776 files), as one owner-approved commit, then `pnpm format:check` in CI | |
 
 ## Owner waivers and deferrals
 
@@ -101,6 +108,7 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 | 10 | owner gate accepted (network probe, refusal of generated code, probe moved into the sidecar) | security (C4) | 2026-11-22 |
 | 12 | owner gate accepted (deleting a project removes its knowledge index, vectors and offloaded text) after CI run 45071081599 | privacy (C4) | 2026-11-23 |
 | 13 | owner gate accepted (privacy.retentionDays, default null, prunes journals and payloads at sidecar start) after CI run 45071081599 | privacy, saved data (C4) | 2026-11-23 |
+| 14 | owner gate accepted (SECURITY.md, PR template, bug and feature issue forms) | repo policy (C4) | 2026-11-23 |
 
 ## CI run 45056310505 (PR 6, commit 36a4040, Node 24.22.3)
 

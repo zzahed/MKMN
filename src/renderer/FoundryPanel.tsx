@@ -146,7 +146,7 @@ export function FoundryPanel() {
     return JSON.stringify({ server: data.server, settings: data.config, cache: data.cacheLocation, status: data.status, recent: data.recent }, null, 2);
   }, [data]);
 
-  const usePort = () => {
+  const readPort = () => {
     const raw = portDraft.trim();
     if (!raw) return null;
     const n = Number(raw);
@@ -157,7 +157,7 @@ export function FoundryPanel() {
     return n;
   };
   const runServer = (action: "start" | "stop" | "restart") => {
-    const port = usePort();
+    const port = readPort();
     if (port === undefined) return;
     const idle = idleDraft.trim() === "" ? null : Number(idleDraft);
     if (idle !== null && (!Number.isInteger(idle) || idle < 0)) {

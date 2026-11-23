@@ -24,6 +24,7 @@ export function toSpeechText(md: string): string {
   t = t.replace(/\s*([—–])\s*/g, (m, d: string, off: number, all: string) => (/\d/.test(all[off - 1] ?? "") && /\d/.test(all[off + m.length] ?? "") ? d : ", "));
   t = t.replace(/(\p{L})\s+-\s+(\p{L})/gu, "$1, $2");
   t = t.replace(/[#~\\]/g, " ").replace(/,\s*,/g, ",").replace(/,\s*([.!?])/g, "$1");
+  // eslint-disable-next-line no-misleading-character-class -- on purpose: each emoji and a stray variation selector are removed one by one
   t = t.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, "");
   return t.replace(/[ \t]+/g, " ").replace(/ ?\n ?/g, "\n").replace(/\n{2,}/g, "\n").trim();
 }

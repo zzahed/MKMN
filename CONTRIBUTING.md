@@ -24,7 +24,7 @@ icon list, run `pnpm regen` to rebuild the generated files and commit them.
 
 Every pull request runs `.github/workflows/ci.yml`. It has four jobs:
 
-- `lint-type`: the type check, the plain-English check and `pnpm regen:check`
+- `lint-type`: the type check, the plain-English check, `pnpm regen:check` and `pnpm lint` (0 errors; warnings are allowed)
 - `unit`: the test suite on Linux, in three parts
 - `windows-arm64-tests`: the test suite and the Rust checks on Windows ARM64
 - `security`: the dependency audits and a secret scan

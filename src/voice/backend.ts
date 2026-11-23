@@ -2,7 +2,7 @@ import type { SttHandle, TtsHandle, VoiceBackend } from "../core/voiceEngine";
 
 /** Real backend: sherpa-onnx-node (native, ARM64 on Windows on Arm). Loaded lazily so tests never need it. */
 export function sherpaBackend(): VoiceBackend {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- loaded lazily so tests never need the native module
   const sherpa = require("sherpa-onnx-node");
   return {
     async createStt(config): Promise<SttHandle> {

@@ -1,0 +1,20 @@
+# Generated files change only through their generators.
+src/core/page/*.generated.ts
+src/shared/*.generated.ts
+src/core/xblocks.generated.ts
+src-tauri/src/settings_defaults.rs
+docs/settings-inventory.md
+docs/MKMN_FEATURE_TEST_MATRIX_*.md
+THIRD_PARTY_LICENSES.txt
+pnpm-lock.yaml
+
+# Build output, third-party code and scratch.
+node_modules/
+dist/
+build/
+target/
+src-tauri/target/
+src-tauri/gen/
+crates/
+coverage/
+.superpowers/
