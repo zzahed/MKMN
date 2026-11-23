@@ -131,6 +131,7 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 | 15 | owner gate accepted (ESLint at 0 errors with 14 rules set to warn as `DEBT`, Prettier check only, `pnpm lint` in `lint-type`) | CI (C4) | 2026-11-23 |
 | 16 | owner gate accepted (code names renamed to MKMN; the five `opennpu.*` saved keys kept) | saved data (C4) | 2026-11-23 |
 | 22 | owner gate accepted (sidecar registrations split into seven area files, after the self-review) | large refactor (C4) | 2026-11-23 |
+| 23 | owner gate accepted (prepare, the thinking decision and the quoted answers taken out; generate and post-process left as a follow-up), after the self-review | large refactor (C4) | 2026-11-23 |
 
 ## CI run 45056310505 (PR 6, commit 36a4040, Node 24.22.3)
 
@@ -565,4 +566,11 @@ CI run 45122524519 (89de7c6, Task 21): `windows-arm64-tests` ran the nine new `c
 - Order: every registration still runs during the module's load, before `main()` reads the first request and before the `--ask` mode starts.
 - Found and fixed: `docs/design/doc-edit-copy.md` said `main.ts` registers `agentDocEdit` (now `register/agent.ts`, the run in `main.ts`); the safety test's comment still said the split was under way.
 - CI run for 3d98d86: every job passes, CodeQL too.
+
+## Task 23 self-review (before the final review)
+
+- Moved lines: every line taken out of `src/core/chatOrchestrator.ts` is in `chatPrepare.ts`, `chatRoute.ts` or `chatRetrieve.ts`, but for the parameter names (`team.category`, `effort`), the notice returned instead of sent, `loadedSections` as the stage's own `sections`, and the return values.
+- Order: the quoted answer still adds its sections, files the step, logs, checks for a stop, then sends the answer and `done`; the figure is still sought only when the ownership branch did not answer. The two notices of the thinking decision need `auto` and `medium` respectively, so at most one comes back, as before. All three calls sit where the code was, inside the turn's `try`.
+- Pins: the tests that read `chatOrchestrator.ts` pin code that stays there; none of their refused patterns occurs in the three new files. No document points at the moved code.
+- Nothing found to fix.
 
