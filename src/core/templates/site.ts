@@ -13,7 +13,6 @@ import { iconNames } from "../page/icons";
  * A tool (calculator, converter, simulator) is a page too: inputs, results computed by formulas that are checked before use.
  */
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-const rich = (s: string) => esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>");
 // ---------------------------------------------------------------- tools
 const RESERVED_IDS = new Set(["constructor", "prototype", "__proto__", "eval", "Function", "window", "globalThis", "document", "this", "new", "import"]);
 const MATH = ["min", "max", "round", "floor", "ceil", "pow", "sqrt", "abs", "log", "log10", "exp", "PI"];

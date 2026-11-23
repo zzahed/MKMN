@@ -6,7 +6,7 @@ import type { CatalogEntry, ChatEvent, ChatMessage, ChatOptions, HardwareProfile
 import { runChatOrchestrator, type ChatHost, type Served } from "../src/core/chatOrchestrator";
 import { buildSystemPrompt, knowledgeBudget } from "../src/core/projects";
 import { appendInstructions, type Relevance } from "../src/core/prompts";
-import { CITATIONS_INSTRUCTIONS, citeAnswer, citationGuardStep, spokenOf, unsupportedFigures, unsupportedNotice, type CitedSection } from "../src/core/cite";
+import { citeAnswer, citationGuardStep, spokenOf, unsupportedFigures, unsupportedNotice, type CitedSection } from "../src/core/cite";
 import { packSections, type RetrSection } from "../src/core/knowledge/retrieve";
 import { identityGuardStep } from "../src/core/harness/identity";
 import { promptTokens } from "../src/core/context";

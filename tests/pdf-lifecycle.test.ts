@@ -3,7 +3,6 @@
 // so the real loading task it returns can be captured (to assert its destruction). The PDFs below are
 // built byte by byte with correct xref tables, so every test runs the genuine pdf.js path.
 import { afterAll, describe, expect, it, vi } from "vitest";
-import * as pdfjs from "pdfjs-dist";
 import { extractPdfText, type PdfDocLike } from "../src/core/pdf";
 
 const state = vi.hoisted(() => ({ tasks: [] as { destroyed: boolean }[] }));

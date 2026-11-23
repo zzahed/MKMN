@@ -113,7 +113,7 @@ export function eventsIn(part: string): { when: string; what: string }[] {
 }
 
 /** What a rise says in one line, from the numbers of the text: "×9.9 in 18 years, about 13% a year". null when it is not a clear rise. */
-export function insightOf(t: string[][] | null, part: string): string | null {
+export function insightOf(t: string[][] | null, _part: string): string | null {
   if (!t || t.length < 3) return null;
   const a = Number(t[1][1]), b = Number(t[2][1]), y = Number(t[2][0]) - Number(t[1][0]);
   if (!(a > 0) || !(b > a) || y <= 0) return null;

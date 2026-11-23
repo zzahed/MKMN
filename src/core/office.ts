@@ -9,7 +9,7 @@ import { parseXml, elems, first, all, textOf, esc, escText, type XNode } from ".
 import { Workbook, addr, colName, formulaResults, isFormula, isNumeric, parseAddr, parseSheets, sheetsText, splitRow, type Sheet } from "./sheet";
 import { mdCell } from "./escape";
 import * as P from "./officeParts";
-import { buildPptx as buildDeck, deckHtml, plain, type Pics } from "./slides";
+import { buildPptx as buildDeck, deckHtml, type Pics } from "./slides";
 import { figureKey } from "./figures";
 import { cellNumber, evalSheet, parseCards, parseChecklist, parseKpis, parseQuiz, parseSheet } from "./blocks";
 import { parseFormula } from "./chart";
@@ -337,7 +337,7 @@ export async function readXlsx(files: ZipFiles): Promise<string> {
   const relMap = new Map<string, string>();
   if (files["xl/_rels/workbook.xml.rels"]) for (const r of all(parseXml(fromBytes(files["xl/_rels/workbook.xml.rels"])), "Relationship")) relMap.set(r.attrs.Id, r.attrs.Target);
   const strings: string[] = [];
-  if (files["xl/sharedStrings.xml"]) for (const si of all(parseXml(fromBytes(files["xl/sharedStrings.xml"])), "si")) strings.push(all(si, "t").filter((t) => true).map(textOf).join(""));
+  if (files["xl/sharedStrings.xml"]) for (const si of all(parseXml(fromBytes(files["xl/sharedStrings.xml"])), "si")) strings.push(all(si, "t").map(textOf).join(""));
   const sheets: Sheet[] = [];
   for (const s of all(parseXml(fromBytes(book)), "sheet")) {
     let target = relMap.get(s.attrs["r:id"]) ?? "";

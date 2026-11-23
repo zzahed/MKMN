@@ -86,7 +86,7 @@ function refOf(user: string, role: string, name: string): string {
   return m[1];
 }
 
-function setup(over: Partial<AgentRunDeps> & { driver: AgentDriver; model: AgentModel }) {
+function setup(_over: Partial<AgentRunDeps> & { driver: AgentDriver; model: AgentModel }) {
   const events: AgentRunEvent[] = [];
   const emit = (ev: AgentRunEvent) => events.push(ev);
   return { events, emit };

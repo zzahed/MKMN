@@ -2,7 +2,7 @@ import type { ChatMessage } from "../shared/types";
 import { SEARCH_INSTRUCTIONS } from "./websearch";
 import { quickErrors } from "./codecheck";
 import { SKELETONS } from "./skeletons";
-import { Check, clamp, codeOf, cssWellFormed, englishShare, exact, htmlBalanced, jsCheck, jsonOf, lastNumber, norm, pageScriptParses, points, pythonCheck, regexOf, words } from "./benchChecks";
+import { Check, codeOf, cssWellFormed, englishShare, exact, htmlBalanced, jsCheck, jsonOf, lastNumber, norm, pageScriptParses, points, pythonCheck, regexOf, words } from "./benchChecks";
 
 import { BENCH_SECTIONS, BenchSection, SECTION_INFO } from "./benchSections";
 export { BENCH_SECTIONS, SECTION_INFO };

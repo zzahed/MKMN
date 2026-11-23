@@ -16,7 +16,6 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { createElement } from "react";
 import { App } from "../src/renderer/App";
 import { runChatOrchestrator, type ChatHost, type Served } from "../src/core/chatOrchestrator";
-import { SUBAGENT_INSTRUCTIONS, WORKER_INSTRUCTIONS } from "../src/core/agents";
 import { readJournal } from "../src/core/harness/journal";
 import type { CatalogEntry, ChatEvent, HardwareProfile, Settings } from "../src/shared/types";
 

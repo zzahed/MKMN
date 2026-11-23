@@ -455,8 +455,7 @@ describe("reliability hardening (feeds, watchdog, ordering, progressive startup)
     let hidden = false;
     Object.defineProperty(document, "visibilityState", { configurable: true, get: () => (hidden ? "hidden" : "visible") });
     let fail = false;
-    let n = 0;
-    const api = makeApi({ meters: async () => { n++; if (fail) throw new Error("bridge refused"); return { ...METERS }; } });
+    const api = makeApi({ meters: async () => { if (fail) throw new Error("bridge refused"); return { ...METERS }; } });
     boot(api, CONVS);
     await settleBoot();
     const panel = openPanel();

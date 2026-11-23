@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { BuildRun, BuildStage, BuildStep } from "../shared/types";
 import { parseSegments } from "../core/artifacts";
-import { Chevron, Spark, StatusMark, Unfold, clock, textTail } from "./Activity";
+import { Chevron, Spark, Unfold, clock, textTail } from "./Activity";
 import { WorkLog, useNow, useRotating } from "./WorkLog";
 import { StepIcon } from "./StepIcon";
 import { api } from "./api";

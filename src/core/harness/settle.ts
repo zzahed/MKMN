@@ -12,7 +12,7 @@
  * work finished but must not pass. Only every step ok and every gate passed is
  * done.
  */
-import type { RunEvent, RunState, SettledStep } from "./run";
+import type { RunEvent, SettledStep } from "./run";
 
 export type RunVerdict = "done" | "unresolved" | "failed" | "cancelled";
 

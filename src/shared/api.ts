@@ -7,9 +7,9 @@ import type { VersionAction, VersionList, VersionResult } from "../core/versionB
 import type { FoundryAdminView, FoundryActionResult, FoundryModelInfo, FoundryRegisterInput, FoundryServerActionResult } from "../core/foundryHost";
 import {
   SpeakChunk, VoiceDownloadProgress, VoiceModelView, VoiceNeed, VoiceSettings, VoiceStatus,
-  BrowseQuery, BrowseResult, BrowseVariant, ResolveResult, CatalogEntry, ChatEvent, ChatMessage, ChatOptions, FriendlyError, HardwareProfile, HfInspection, HfSearchResult,
+  BrowseQuery, BrowseResult, BrowseVariant, ResolveResult, CatalogEntry, ChatEvent, ChatMessage, ChatOptions, FriendlyError, HardwareProfile, HfSearchResult,
   InstallProgress, InstalledModel, Meters, ServerStatus, Settings, Verdict, Project, Artifact, ScheduledTask, RunEvent,
-  MemoryEstimate, PowerStatusInfo, BenchmarkResult, HardwareVerification
+  MemoryEstimate, PowerStatusInfo, BenchmarkResult
 } from "./types";
 import type { AgentGrant, AgentRunEvent, DriverWindow } from "./agent";
 

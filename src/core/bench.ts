@@ -198,9 +198,6 @@ export { coverage } from "./benchStats";
  */
 export const SUITE_VERSION = "suite-2026-11-06";
 
-/** The engine a target runs on, as the fingerprint records it. */
-const engineOfTarget = (t: { engine?: string }): string => (t.engine === "foundry" ? "foundry-local" : "geniex");
-
 /**
  * B04: what a result must match for Resume to skip the model: the suite version, the
  * requested mode, the exact artifact (repo + precision — another quant is another

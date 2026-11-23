@@ -91,7 +91,7 @@
     if (view) { viewW = parseInt(view[1], 10); viewH = parseInt(view[2], 10); }
     else if (el.hasAttribute("view")) warn("map view must look like 15x11: " + el.getAttribute("view"));
 
-    var G = [], start = null, playerDef = {}, spawns = [], grid, cellEls = [], playerEl = null, enemies = [], me = { x: 0, y: 0 }, acc = 0;
+    var G = [], playerDef = {}, spawns = [], grid, cellEls = [], playerEl = null, enemies = [], me = { x: 0, y: 0 }, acc = 0;
 
     function cellOf(ch) {
       var d = legend[ch];

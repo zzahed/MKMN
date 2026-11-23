@@ -2,7 +2,7 @@
 // variants), OpenDocument (odt, ods, odp) and RTF. The old binary formats (.doc .xls .ppt) cannot be read inside the app;
 // the caller may convert them with an office suite installed on the PC, and otherwise tells the person to save a newer one.
 import { readZip, fromBytes } from "./zip";
-import { parseXml, elems, first, all, textOf, type XNode } from "./xml";
+import { parseXml, elems, first, all, type XNode } from "./xml";
 import { officeKindOf, officeForModel, readOffice } from "./office";
 import { sheetsText, type Sheet } from "./sheet";
 import { mdCell } from "./escape";

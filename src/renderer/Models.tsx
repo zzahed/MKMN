@@ -279,7 +279,7 @@ export function currentModelLine(items: CatalogItem[], selectedId: string | null
   return { current, installed };
 }
 
-export function Models({ items, hw, onChanged, onUse, selectedId, showK, bench: benchIn, embedded }: { items: CatalogItem[]; hw: HardwareProfile | null; onChanged: () => void; onUse: (id: string) => void; selectedId: string | null; showK: boolean; bench?: BenchProps;
+export function Models({ items, hw, onChanged, onUse, selectedId, bench: benchIn, embedded }: { items: CatalogItem[]; hw: HardwareProfile | null; onChanged: () => void; onUse: (id: string) => void; selectedId: string | null; showK: boolean; bench?: BenchProps;
   /** Drawn inside the Settings page (its Models group): the group head carries the title. */
   embedded?: boolean }) {
   // every listed model rides along, so a card with no measurement of its own can show its Foundry Local variant's

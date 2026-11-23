@@ -14,7 +14,7 @@ import { UnigramTokenizer, meanPoolNormalize, type Embedder } from "../src/core/
 import { forgetVectorIndexes, openVectorIndex } from "../src/core/knowledge/vectors";
 import { installVectorModel, removeVectorModel, vectorModelInstalled, type VectorModelSpec } from "../src/core/knowledge/vectorModel";
 import { mkmnPaths } from "../src/shared/paths";
-import { BENCH_ENTRY, BENCH_NCTX, benchHost, northwindReport } from "./knowledgeBench";
+import { BENCH_ENTRY, benchHost, northwindReport } from "./knowledgeBench";
 
 /**
  * The multilingual vector path of the knowledge retrieval (measured in

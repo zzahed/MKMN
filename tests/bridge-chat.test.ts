@@ -119,7 +119,7 @@ describe("chat bridge contract (real createTauriApi, sidecar calls and events in
   it("a sidecar that cannot be reached ends the turn: a terminal error event, and sleep released", async () => {
     const core = await import("@tauri-apps/api/core");
     const invoke = core.invoke as unknown as ReturnType<typeof vi.fn>;
-    invoke.mockImplementation(async (cmd: string, args?: any) => {
+    invoke.mockImplementation(async (cmd: string, _args?: any) => {
       if (cmd === "sidecar_call") throw new Error("sidecar is not running");
       if (cmd === "inhibit_sleep") return undefined;
       throw new Error(`unexpected command ${cmd}`);

@@ -4,7 +4,7 @@ import type { CatalogItem } from "../shared/api";
 import type { Settings } from "../shared/types";
 import { readObj } from "../shared/settingsSchema";
 import { RouterPanel } from "./RouterPanel";
-import { CATEGORY_IDS, CATEGORY_INFO, DYNAMIC_NAME, LANE_INFO, LANES, entryMatches, installedOf, mergedPack, pickModel, sortRequest, wantedNote } from "../core/dynamic";
+import { CATEGORY_IDS, CATEGORY_INFO, DYNAMIC_NAME, LANE_INFO, LANES, installedOf, mergedPack, pickModel, sortRequest, wantedNote } from "../core/dynamic";
 
 type Info = Awaited<ReturnType<ReturnType<typeof api>["dynamicInfo"]>>;
 

@@ -145,7 +145,7 @@ describe("dev-tools bridge contract (sidecar-backed)", () => {
   });
 
   it("the prompt lab starts, stops and streams lab states; the engine comparison stays honestly closed", async () => {
-    const invoke = await mockSidecar({
+    await mockSidecar({
       labStart: () => ({ ok: true }),
       labStop: () => true,
       labState: () => ({ running: false, phase: "done", runs: [] })

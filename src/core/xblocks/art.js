@@ -18,7 +18,6 @@
   /* ---------- problems (each message once) ---------- */
   function warn(msg) { if (X.problems.indexOf(msg) < 0) X.problems.push(msg); }
   function own(obj, k) { return Object.prototype.hasOwnProperty.call(obj, k); }
-  function escapeText(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 
   /* ---------- cleaning: the only way a drawing reaches the page ---------- */
   var DROP = { script: 1, foreignobject: 1, iframe: 1, object: 1, embed: 1, link: 1, meta: 1, base: 1, frame: 1, frameset: 1, handler: 1, listener: 1 };

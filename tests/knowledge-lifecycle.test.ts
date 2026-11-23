@@ -4,7 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { openKnowledgeIndex, knowledgeIndexStatus } from "../src/core/knowledge/store";
 import { filesHashOf, fileKnowledgeStats } from "../src/core/knowledge/index";
-import { machineDefinition, canTransition, nextState, isMachineState, type MachineState } from "../src/shared/stateMachines";
+import { machineDefinition, canTransition, nextState, isMachineState } from "../src/shared/stateMachines";
 
 /**
  * The knowledge index's lifecycle: one machine in the shared
@@ -14,8 +14,6 @@ import { machineDefinition, canTransition, nextState, isMachineState, type Machi
  * status the Project knowledge screen shows is derived from the store and the
  * machine's names, never invented beside it.
  */
-
-type KState = MachineState<"knowledgeIndex">;
 
 describe("the knowledgeIndex machine in the registry", () => {
   const machine = machineDefinition("knowledgeIndex");

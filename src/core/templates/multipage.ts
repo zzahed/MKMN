@@ -107,7 +107,6 @@ export function sitePage(plan: SitePlan, data: Record<string, unknown>, index: n
     return o;
   });
   const page = plan.pages[index];
-  const look = { ...Object.fromEntries(STYLE_KEYS.filter((k) => (first ?? data)[k] !== undefined).map((k) => [k, (first ?? data)[k]])), ...(plan.accent ? { accent: plan.accent } : {}) };
   return {
     ...(data as PageSpec),
     language: plan.language || asText(data.language) || undefined,

@@ -392,7 +392,6 @@ async function* deckSteps(o: DeckOptions, keep: Salvage): AsyncGenerator<ChatEve
   const long = asked.length >= 500;
   const styleAsk = !long ? asked : asked.split(/\n+/).filter((l) => l.length < 220 && /\b(theme|style|look|colou?rs?|design|vibe|mood|aspect)\b/i.test(l)).join(" ");
   const wished = styleAsk ? findTheme(styleAsk) : null;
-  const subject = (long ? asked.slice(0, 700) : asked);
   const notes: string[] = [];
   let suggest: { theme: string | null; colour: string | null; setting: string | null } = { theme: null, colour: null, setting: null };
   if (count === null || !wished) {

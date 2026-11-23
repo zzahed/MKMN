@@ -91,7 +91,6 @@ export function DynamicSection({ hw, selectedId, onUse, onChanged }: { hw: Hardw
           const mine = errors[pack.id] ?? [];
           const working = !!busy[pack.id];
           const step = steps[pack.id];
-          const st = packStats(pack, info.speeds ?? {});
           return (
             <div key={lane} className={`card dyn-card ${selectedId === id ? "selected" : ""}`}>
               <div className="card-top">

@@ -83,8 +83,6 @@ const drainMicrotasks = async (): Promise<void> => {
   }
 };
 
-type Harness = ReturnType<typeof harness>;
-
 function phases(controller: PreloadController): { phase: () => string | null } {
   const seen: (string | null)[] = [];
   controller.onPhase((p) => seen.push(p));
@@ -478,7 +476,7 @@ describe("Native preload bridge contract", () => {
   it("a 'custom:' id with no saved entry resolves through the cache by its repo, never as 'custom:...'", async () => {
     const core = await import("@tauri-apps/api/core");
     const invoke = core.invoke as unknown as ReturnType<typeof vi.fn>;
-    invoke.mockImplementation(async (cmd: string, args: any) => {
+    invoke.mockImplementation(async (cmd: string, _args: any) => {
       if (cmd === "get_settings") return {};
       if (cmd === "get_installed_models_cmd") return [{ name: "unsloth/gemma-3-1b-it-GGUF:Q4_0", ref: "unsloth/gemma-3-1b-it-GGUF:Q4_0" }];
       if (cmd === "sidecar_call") return [];
