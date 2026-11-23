@@ -64,7 +64,7 @@ const activeChats = new Set<string>();
 const chatInhibits = new Set<string>();
 async function releaseChatInhibit(id: string): Promise<void> {
   if (!chatInhibits.delete(id)) return;
-  try { await invoke("inhibit_sleep", { enable: false }); } catch {}
+  try { await invoke("inhibit_sleep", { enable: false }); } catch { /* best effort, as when it was turned on */ }
 }
 const chatListeners = new Set<(e: ChatEvent) => void>();
 const shutdownListeners = new Set<() => void>();
@@ -1009,7 +1009,7 @@ export function createTauriApi(): MkmnApi {
         try {
           await invoke("inhibit_sleep", { enable: true });
           chatInhibits.add(id);
-        } catch {}
+        } catch { /* sleep inhibition is best effort: the chat runs either way */ }
         activeChats.add(id);
         await sidecarCall("chat", id, modelId, messages, withFolder);
       })();

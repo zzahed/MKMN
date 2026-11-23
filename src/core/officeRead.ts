@@ -164,7 +164,7 @@ export async function documentText(name: string, bytes: Uint8Array): Promise<Doc
     return { kind: "pptx", source, text: officeForModel("pptx", source) };
   } catch (e) {
     const m = (e as Error).message;
-    if (/Encrypted|password|not a valid Office|zip/i.test(m)) throw new Error(`${name}: ${/Encrypted|password/i.test(m) ? "protected by a password" : "damaged, protected by a password, or not an Office file"}, it cannot be read.`);
-    throw new Error(`${name}: ${m}`);
+    if (/Encrypted|password|not a valid Office|zip/i.test(m)) throw new Error(`${name}: ${/Encrypted|password/i.test(m) ? "protected by a password" : "damaged, protected by a password, or not an Office file"}, it cannot be read.`, { cause: e });
+    throw new Error(`${name}: ${m}`, { cause: e });
   }
 }

@@ -11,6 +11,7 @@ export const unesc = (s: string) => s.replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot
 });
 export const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 /** Text of a cell or run, safe in XML (control characters Word refuses are dropped). */
+// eslint-disable-next-line no-control-regex -- XML 1.0 forbids these control characters
 export const escText = (s: string) => esc(s).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "");
 
 export function parseXml(src: string): XNode {

@@ -53,7 +53,7 @@ export function runsOf(text: string): Run[] {
 
 const splitCells = splitRow;
 const isRule = (cells: string[]) => cells.length > 0 && cells.every((c) => /^:?-{2,}:?$/.test(c));
-const cleanKey = (s: string) => s.replace(/ /g, " ");
+const cleanKey = (s: string) => s.replace(/\u00A0/g, " ");
 
 type Block =
   | { t: "figure"; key: string; alt: string }

@@ -37,7 +37,7 @@ describe("the document-retrieval benchmark", () => {
       for (const c of [...frozenCases(), ...REPORT_CASES]) {
         const r = await runCase(c, c.project === "fixtures" ? fixtures : reports, passDir, embedder);
         if (pass === "warm") rows.push(r);
-        else (report.coldHostMs ??= {}) && ((report.coldHostMs as Record<string, number>)[c.id] = r.hostMs);
+        else ((report.coldHostMs ??= {}) as Record<string, number>)[c.id] = r.hostMs;
       }
     }
     const groups = [...new Set(rows.map((r) => r.group))];

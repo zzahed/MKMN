@@ -281,7 +281,7 @@ export function WindowPicker({ agent }: { agent: ComputerUse }) {
     setListing(false);
   };
 
-  useEffect(() => { void refresh(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void refresh(); }, []);
   // The keyboard contract lives or dies with focus: once the list is in, the
   // picker takes it, so Down/Up/Enter/Escape operate the list, not the task
   // textarea beneath.

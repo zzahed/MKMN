@@ -134,7 +134,7 @@ export function tweakTheme(base: Theme, line: string): Theme {
 
 export function slidesOf(src: string): Slide[] {
   const slides: Slide[] = [];
-  for (const chunk of src.replace(/ /g, " ").replace(/\r/g, "").split(/^\s*-{3,}\s*$/m)) {
+  for (const chunk of src.replace(/\u00A0/g, " ").replace(/\r/g, "").split(/^\s*-{3,}\s*$/m)) {
     if (!chunk.trim()) continue;
     const s: Slide = { title: "", lines: [], table: null, notes: "" };
     const lines = chunk.split("\n");

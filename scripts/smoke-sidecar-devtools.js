@@ -17,7 +17,7 @@ const findGeniex = () => {
 
 const child = spawn(process.execPath, ["dist/sidecar/main.js"], { stdio: ["pipe", "pipe", "pipe"] });
 let buf = ""; let nextId = 1; const waiters = new Map();
-let serveChild = null; let npuTestEvents = [];
+let serveChild = null; const npuTestEvents = [];
 child.stdout.on("data", (d) => {
   buf += d.toString();
   let nl;
@@ -28,11 +28,11 @@ child.stdout.on("data", (d) => {
     if (m.t === "event") {
       if (m.name === "npuTest") { npuTestEvents.push(m.payload); }
       else console.log(`EVENT ${m.name}:`, JSON.stringify(m.payload).slice(0, 140));
-    } else if (m.t === "res") { const w = waiters.get(m.id); if (w) { waiters.delete(m.id); m.ok ? w.res(m.result) : w.rej(new Error(m.error)); } }
+    } else if (m.t === "res") { const w = waiters.get(m.id); if (w) { waiters.delete(m.id); if (m.ok) w.res(m.result); else w.rej(new Error(m.error)); } }
     else if (m.t === "req") void handleHostRequest(m);
   }
 });
-child.stderr.on("data", (d) => { const t = d.toString().trim(); if (t && !/^\[chat\]|^- |^=|^The app expects|^NPU load test|^Machine:|^RAM:|^Server debug|^No server|^\* |^  /.test(t)) console.error("STDERR:", t.slice(0, 160)); });
+child.stderr.on("data", (d) => { const t = d.toString().trim(); if (t && !/^\[chat\]|^- |^=|^The app expects|^NPU load test|^Machine:|^RAM:|^Server debug|^No server|^\* |^ {2}/.test(t)) console.error("STDERR:", t.slice(0, 160)); });
 
 /** The host capabilities the same way sidecar.rs implements them. */
 async function handleHostRequest(m) {
@@ -41,7 +41,7 @@ async function handleHostRequest(m) {
     if (m.method === "startChatServer") {
       const [model, compute] = m.args ?? [];
       console.log(`HOST startChatServer: ${model} (${compute})`);
-      if (serveChild) { try { process.kill(serveChild.pid); } catch {} }
+      if (serveChild) { try { process.kill(serveChild.pid); } catch { /* already exited */ } }
       serveChild = spawn(findGeniex(), ["serve", "--host", `127.0.0.1:${PORT}`, "--compute", compute || "npu", "--power-mode", "burst", "--keepalive", "300", "--metrics", "--model", model], { stdio: "ignore" });
       const readyAt = Date.now() + 180_000;
       while (Date.now() < readyAt) {
@@ -49,12 +49,12 @@ async function handleHostRequest(m) {
         try {
           const j = await (await fetch(`${ENDPOINT}/models`)).json();
           if (Array.isArray(j.data) && j.data.length) { console.log(`HOST server ready (${j.data.length} models)`); return reply(true, { endpoint: ENDPOINT, state: "ready", model, lastError: null }); }
-        } catch {}
+        } catch { /* not up yet: poll again */ }
       }
       return reply(false, null, "the model server did not become ready in time");
     }
     if (m.method === "stopChatServer") {
-      if (serveChild) { try { process.kill(serveChild.pid); } catch {} serveChild = null; }
+      if (serveChild) { try { process.kill(serveChild.pid); } catch { /* already exited */ } serveChild = null; }
       console.log("HOST stopChatServer");
       return reply(true, true, undefined);
     }
@@ -66,7 +66,7 @@ const call = (method, ...args) => { const id = `t-${nextId++}`; return new Promi
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function cleanup(code) {
-  if (serveChild) { try { process.kill(serveChild.pid); } catch {} }
+  if (serveChild) { try { process.kill(serveChild.pid); } catch { /* already exited */ } }
   child.stdin.end(); child.kill(); process.exit(code);
 }
 

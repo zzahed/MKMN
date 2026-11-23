@@ -105,7 +105,7 @@ export function scoreModel(input: FitInput, hw: HardwareProfile): Verdict {
         reasons.push(`Context shrunk to ${fmtCtx(ctx)} to fit NPU memory (max ${fmtCtx(Math.min(fitMax, input.maxTestedContext ?? fitMax))}).`);
       }
       const needed = npuNeededGB(input.fileGB, input.kv, ctx);
-      if (input.engine === "llama_cpp" && needed > usable * 0.9) level = worse(level, "amber"), reasons.push(`Tight on memory: ${needed.toFixed(1)} of ${budget.toFixed(1)} GB.`);
+      if (input.engine === "llama_cpp" && needed > usable * 0.9) { level = worse(level, "amber"); reasons.push(`Tight on memory: ${needed.toFixed(1)} of ${budget.toFixed(1)} GB.`); }
     }
   }
 

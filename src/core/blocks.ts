@@ -93,7 +93,7 @@ const refOf = (ref: string): [number, number] | null => { const m = /^([A-Z])(\d
 
 /** A number as a person types it in a cell: 1 200,50 € · 12 % · -3. */
 export function cellNumber(t: string): number | null {
-  const s = t.trim().replace(/[   ]/g, "").replace(/[€$£]/g, "");
+  const s = t.trim().replace(/[\u00A0\u202F ]/g, "").replace(/[€$£]/g, "");
   if (!/^[-+]?(?:\d+(?:[.,]\d+)?|[.,]\d+)%?$/.test(s)) return null;
   const n = parseFloat(s.replace(",", "."));
   return s.endsWith("%") ? n / 100 : n;

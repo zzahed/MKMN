@@ -2151,8 +2151,8 @@ function lab(): LabRunner {
         text = a.text;
         tokens = a.stats?.tokens ?? null;
       } catch (err) {
-        if (signal.aborted) throw new Error("stopped");
-        if (ac.signal.aborted) throw new Error("no answer after 10 minutes");
+        if (signal.aborted) throw new Error("stopped", { cause: err });
+        if (ac.signal.aborted) throw new Error("no answer after 10 minutes", { cause: err });
         throw err;
       } finally { clearTimeout(timer); signal.removeEventListener("abort", onAbort); }
       return { answer: text.replace(new RegExp("<" + "think[\\s\\S]*?(?:<[/]think>|$)", "g"), "").trim(), seconds: Math.round(((performance.now() - t0) / 1000) * 10) / 10, tokens };
@@ -2307,7 +2307,7 @@ function startRun(runId: string, language: string, code: string): void {
   fs.writeFileSync(file, code);
   let stopped = false;
   let child: import("child_process").ChildProcess | null = null;
-  let timer: NodeJS.Timeout | undefined;
+  let timer: NodeJS.Timeout | undefined = undefined;
   const finish = (exit: Extract<RunEvent, { type: "exit" }>) => {
     if (timer) clearTimeout(timer);
     releaseRun(runId, handle);

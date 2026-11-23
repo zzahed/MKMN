@@ -101,6 +101,7 @@ export function mappingFailed(log: string[]): boolean {
 
 /** The lines of the server log that say why a load failed: from the last crash (a Go panic, a fatal error, an exit) on, else the lines of the latest start without the usual chatter. */
 export function serverReason(log: string[]): string[] {
+  // eslint-disable-next-line no-control-regex -- strips ANSI colour codes from the console output
   const clean = log.map((l) => l.replace(/\x1b\[[0-9;]*m/g, ""));
   const last = (re: RegExp) => clean.map((l, i) => (re.test(l) ? i : -1)).filter((i) => i >= 0).pop();
   const crash = last(/\bpanic\b|fatal error|SIGSEGV|unhandled exception|access violation/i) ?? last(/server exited/i);

@@ -18,6 +18,7 @@ export interface FoundryVariant {
   cached?: boolean;
 }
 
+// eslint-disable-next-line no-control-regex -- strips ANSI colour codes from the console output
 const strip = (s: string) => s.replace(/\x1b\[[0-9;]*[A-Za-z]/g, "");
 
 /**

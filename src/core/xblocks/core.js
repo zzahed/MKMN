@@ -275,7 +275,7 @@
         var f = parseFloat(v); S[n] = String(f) === v.trim() ? f : v;
       });
       var slot = el.getAttribute("save");
-      if (slot) { try { var saved = JSON.parse(localStorage.getItem("x-save-" + slot) || "null"); if (saved) for (var k in saved) S[k] = saved[k]; } catch (e) {} el.__slot = slot; }
+      if (slot) { try { var saved = JSON.parse(localStorage.getItem("x-save-" + slot) || "null"); if (saved) for (var k in saved) S[k] = saved[k]; } catch (e) { /* no saved state, or storage blocked: start fresh */ } el.__slot = slot; }
     });
     document.querySelectorAll("x-rule,game-rule").forEach(function (el) { rules.push({ when: el.getAttribute("when"), on: el.getAttribute("on"), do: el.getAttribute("do") || (el.getAttribute("say") ? 'say:"' + el.getAttribute("say") + '"' : ""), say: el.getAttribute("say"), was: false }); });
     rules.forEach(function (r) { if (r.do && /^(win|lose)$/.test(r.do) && r.say) r.do = r.do + ""; });
@@ -289,7 +289,7 @@
     pending.forEach(function (d) { if (d[0]) register(d[0], d[1]); else d[1](); });
     for (var key in S) initial[key] = JSON.parse(JSON.stringify(S[key]));
     for (var n in S) mark(n);
-    window.addEventListener("beforeunload", function () { document.querySelectorAll("x-state[save],game-state[save]").forEach(function (el) { try { localStorage.setItem("x-save-" + el.getAttribute("save"), JSON.stringify(S)); } catch (e) {} }); });
+    window.addEventListener("beforeunload", function () { document.querySelectorAll("x-state[save],game-state[save]").forEach(function (el) { try { localStorage.setItem("x-save-" + el.getAttribute("save"), JSON.stringify(S)); } catch (e) { /* storage full or blocked: the game goes on unsaved */ } }); });
     requestAnimationFrame(frame);
   }
   /* a game is seen whole: when the page is taller or wider than the window it is scaled down to fit (never up), so nothing is lost off screen.

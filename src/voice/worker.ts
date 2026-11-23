@@ -52,7 +52,7 @@ function handleMessage(raw: In) {
     try {
       switch (raw.t) {
         case "load": await load(raw); break;
-        case "unload": raw.kind === "stt" ? engine.unloadStt() : engine.unloadTts(); send({ t: "unloaded", kind: raw.kind }); break;
+        case "unload": if (raw.kind === "stt") engine.unloadStt(); else engine.unloadTts(); send({ t: "unloaded", kind: raw.kind }); break;
         case "transcribe": {
           const text = await engine.transcribe(raw.samples, raw.sampleRate, !!raw.partial);
           send({ t: "text", id: raw.id, text });

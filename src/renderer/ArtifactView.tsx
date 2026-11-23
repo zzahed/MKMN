@@ -276,10 +276,10 @@ export function ArtifactViewer({ artifact, files, live, unit, stage, drawing, pi
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // the frame draws in the app's own accent (the purple of every other selection), in the light and the dark theme
   const accentOf = () => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
-  useEffect(() => { toFrames({ npuInspect: inspect, accent: accentOf() }); }, [inspect]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { toFrames({ npuInspect: inspect, accent: accentOf() }); }, [inspect]);
   // the numbers on the marked parts of the frame follow the chips of the chat (the order chosen, a chip taken off, all gone after sending)
   const marksKey = (partPicks ?? []).join(",");
-  useEffect(() => { toFrames({ npuMarks: marksRef.current }); }, [marksKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { toFrames({ npuMarks: marksRef.current }); }, [marksKey]);
   // a cell written in the sheet preview goes into the text of the file
   const editRef = useRef({ onEdit, content: artifact.content });
   editRef.current = { onEdit, content: artifact.content };

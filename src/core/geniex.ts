@@ -185,6 +185,7 @@ function foldCase(dir: string, rel: string): string | null {
 
 /** Terminal control sequences (cursor, colours, "?25l") and stray control characters, so an error reads as text. */
 export function stripAnsi(s: string): string {
+  // eslint-disable-next-line no-control-regex -- strips ANSI codes and control characters from the console output
   return s.replace(/\x1b\[[0-?]*[ -\/]*[@-~]/g, "").replace(/\[\?\d+[a-z]/g, "").replace(/[\u0000-\u0008\u000b-\u001f\ufffd]/g, "").replace(/\s+/g, " ").trim();
 }
 

@@ -41,7 +41,7 @@ export function installMockIfNeeded() {
   const tkl: ((t: ScheduledTask) => void)[] = [];
   /** Local benchmark measurements, mirroring hardware.json's calibratedProfiles: kept
    *  in localStorage so a preview reload exercises the restart/reload path. */
-  let benchProfiles: Record<string, any> = (() => {
+  const benchProfiles: Record<string, any> = (() => {
     try { return JSON.parse(localStorage.getItem("mkmn.mock.benchProfiles") ?? "{}") ?? {}; } catch { return {}; }
   })();
   const persistBenchProfiles = () => { try { localStorage.setItem("mkmn.mock.benchProfiles", JSON.stringify(benchProfiles)); } catch { /* preview only */ } };

@@ -25,7 +25,7 @@
   var MUSH = { role: "powerup", name: "mushroom", look: null, effects: "", text: null, stomp: null, hurt: null, needs: null, still: false, as: null };
 
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
-  function isEmoji(s) { return /[^\x00-\x7F]/.test(s); }
+  function isEmoji(s) { return /[^\p{ASCII}]/u.test(s); }
   /* a look "art:name" draws the drawn object of the art block */
   function artName(look) { var m = /^art:(\S+)$/.exec(look || ""); return m ? m[1] : ""; }
   function typing() { var a = document.activeElement; return !!a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName); }
