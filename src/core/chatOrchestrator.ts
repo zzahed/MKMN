@@ -38,7 +38,7 @@ import { compactConversation, compacted, foldedText, isValidSummary, KEEP_SHARE,
 import { digestOf, isFilesMessage, isMemoMessage } from "./memo";
 import { promptTokens, tokensOf } from "./context";
 import { DESCRIBE_INSTRUCTIONS, describePrompt, describers, imageBlock, imageKey, imageLost, imagesOf, swapImages } from "./vision";
-import { documentSourcesOf, hasPdfDocs, locatorMessages, parseLocatorReply, questionOf, resolvePdfDocs } from "./pdfSections";
+import { hasPdfDocs, locatorMessages, parseLocatorReply, questionOf, resolvePdfDocs } from "./pdfSections";
 import { improve } from "./improve";
 import { artifactsIn, stripPromptLeak } from "./artifacts";
 import { mergeFiles } from "./bundle";
@@ -49,6 +49,7 @@ import { settleBlocks } from "./blocks";
 import { diagramFixInstructions } from "./diagram";
 import { prepareTurn } from "./chatPrepare";
 import { chooseEffort } from "./chatRoute";
+import { readDocumentQuestion } from "./chatRetrieve";
 import { orchestrate } from "./orchestrate";
 import { makeDeck, wantsDeck } from "./deckBuild";
 import { changeDeck } from "./deckEdit";
@@ -64,7 +65,7 @@ import { filesHashOf, scriptOf, tokenize } from "./knowledge/index";
 import type { Embedder } from "./knowledge/embed";
 import { openVectorIndex } from "./knowledge/vectors";
 import { vectorEmbedder } from "./knowledge/vectorModel";
-import { asksOwnership, COVERAGE_MIN, figurePassage, locatorMessagesFor, mergeByBestRank, namesPeriod, outlineLines, ownershipPassage, packSections, placeOf, QUERY_STOP, queryCoverage, STRONG_COVERAGE, STRONG_MAX, STRONG_OUTLINE_CHARS, STRONG_RATIO, type RetrSection } from "./knowledge/retrieve";
+import { COVERAGE_MIN, locatorMessagesFor, mergeByBestRank, outlineLines, packSections, placeOf, QUERY_STOP, queryCoverage, STRONG_COVERAGE, STRONG_MAX, STRONG_OUTLINE_CHARS, STRONG_RATIO, type RetrSection } from "./knowledge/retrieve";
 import { citeAnswer, citationGuardStep, unsupportedFigures, unsupportedNotice, type CitedSection } from "./cite";
 import { FOUNDRY_MIN_TOKENS } from "./benchRunner";
 import { appendInstructions, type InstructionBlock, type Relevance } from "./prompts";
@@ -756,62 +757,22 @@ export async function runChatOrchestrator(host: ChatHost, id: string, entryId: s
     const support = thinkingSupport(entry);
     const level = effortNow ? effectiveEffort(effortNow, support) : null;
     let lean = compactHistory(messages); // older versions of a file only cost context
-    const asks = messages.filter((m) => m.role === "user" && !isMemoMessage(m) && !isFilesMessage(m)).map(questionOf);
-    const latestAsk = asks.at(-1) ?? "";
-    const isVerification = (ask: string) => /^(?:please\s+)?(?:double[ -]check\b|(?:can you |could you )?(?:verify|check again)\b|is it the other way\b|(?:it|that) is wrong\b)/i.test(ask);
-    const verification = isVerification(latestAsk);
-    const priorAsk = verification ? asks.slice(0, -1).reverse().find((ask) => ask && !isVerification(ask)) : undefined;
-    const sourceAsk = priorAsk || latestAsk;
-    const knowledgeFiles = (opts.knowledge ?? []).filter((f) => f.content?.trim());
-    const ownershipLookup = asksOwnership(sourceAsk);
-    const percentageLookup = /\bpercent(?:age)?\b|%/.test(sourceAsk.toLowerCase());
-    // a question that names a reporting period (a quarter, a year, a dated day) asks for a reported figure:
-    // the period is part of the fact, so the evidence must hold it beside the entity and the value
-    const periodLookup = namesPeriod(sourceAsk);
-    const attachments = verification || ownershipLookup || percentageLookup || periodLookup ? documentSourcesOf(messages) : [];
-    const hasSources = knowledgeFiles.length > 0 || attachments.length > 0;
-    const ownership = !opts.buildWanted && hasSources && (ownershipLookup || percentageLookup)
-      ? ownershipPassage([...knowledgeFiles, ...attachments], sourceAsk) : null;
-    if (!opts.buildWanted && hasSources && (ownershipLookup || ownership)) {
-      if (ownership) loadedSections.push(ownership);
-      const text = ownership
-        ? citeAnswer(`${verification ? "I checked the source again.\n\n" : ""}> ${ownership.passage}\n\n[source 1]`, loadedSections).text
-        : "I couldn't verify the ownership percentage from an unambiguous passage in the available documents.";
+    // retrieve (src/core/chatRetrieve.ts): the question read off the conversation, and an answer quoted straight
+    // from the documents when one passage settles it (an ownership stake, a reported figure), with no model call
+    const docQuestion = readDocumentQuestion(messages, opts);
+    const { priorAsk, knowledgeFiles, verification, percentageLookup, periodLookup, hasSources } = docQuestion;
+    const quoted = docQuestion.quoted;
+    if (quoted) {
+      // the sections go in before the step: the citation hook reads them when the step settles
+      loadedSections.push(...quoted.sections);
       await run.step({
-        id: `${id}:know`, kind: "retrieve", input: { query: sourceAsk, place: ownership?.place },
-        schema: sString(), exec: () => ({ output: text, reply: text }),
+        id: `${id}:know`, kind: "retrieve", input: quoted.input,
+        schema: sString(), exec: () => ({ output: quoted.text, reply: quoted.text }),
       });
+      if (quoted.log) console.log(`[knowledge] ${id}: ${quoted.log}`);
       ac.signal.throwIfAborted();
-      host.send({ id, type: "answer", text });
-      host.send({ id, type: "done", stats: { ttftSec: null, tokPerSec: null, tokens: 0, totalSec: 0 } });
-      return;
-    }
-    // A reported figure (an amount, a percentage or a date tied to a named period) or a
-    // recheck of an earlier answer is quoted from the sentence that holds the entity, the
-    // period and the value together, cited, with no model call (the ownership answer's way,
-    // measured on the retrieval benchmark). Sentences that disagree are quoted side by side;
-    // no such sentence leaves the question to the model, told to say when the evidence is
-    // missing or conflicting.
-    let figureMs = 0;
-    const figure = !opts.buildWanted && hasSources && (periodLookup || verification)
-      ? (() => { const t = performance.now(); const f = figurePassage([...knowledgeFiles, ...attachments], sourceAsk, { anyCount: verification && !periodLookup }); figureMs = performance.now() - t; return f; })()
-      : null;
-    if (figure) {
-      const quotes = figure.kind === "one" ? [figure] : figure.quotes;
-      loadedSections.push(...quotes.map(({ file, place }) => ({ file, place })));
-      const lead = verification ? "I checked the source again.\n\n" : "";
-      const body = figure.kind === "one"
-        ? `> ${figure.passage}\n\n[source 1]`
-        : `The sources do not agree on this figure:\n\n${quotes.map((q, i) => `> ${q.passage} [source ${i + 1}]`).join("\n\n")}`;
-      const text = citeAnswer(`${lead}${body}`, loadedSections).text;
-      await run.step({
-        id: `${id}:know`, kind: "retrieve", input: { query: sourceAsk, quoted: figure.kind, places: quotes.map((q) => `${q.file} (${q.place})`), timings: { figureMs: round1(figureMs) } },
-        schema: sString(), exec: () => ({ output: text, reply: text }),
-      });
-      console.log(`[knowledge] ${id}: answered from the source (${figure.kind === "one" ? "one passage" : `${quotes.length} passages that disagree`}) in ${round1(figureMs)} ms, no model call`);
-      ac.signal.throwIfAborted();
-      host.send({ id, type: "answer", text });
-      host.send({ id, type: "done", stats: { ttftSec: null, tokPerSec: null, tokens: 0, totalSec: Math.round((Date.now() - t0) / 10) / 100 } });
+      host.send({ id, type: "answer", text: quoted.text });
+      host.send({ id, type: "done", stats: { ttftSec: null, tokPerSec: null, tokens: 0, totalSec: quoted.kind === "figure" ? Math.round((Date.now() - t0) / 10) / 100 : 0 } });
       return;
     }
     let memoTurnsNow = opts.memoTurns ?? 0; // how many turns the summary at the start of the conversation stands for
