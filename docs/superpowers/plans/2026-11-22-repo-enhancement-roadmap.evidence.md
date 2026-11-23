@@ -83,6 +83,8 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 - Task 19: Ruling: coverage is measured and enforced in the `windows-arm64-tests` job (`pnpm test --coverage`), not in the Linux `unit` job. The `unit` job runs the suite in three shards, and a threshold checked per shard sees a third of the code; the Windows job runs the whole suite once, on the platform the baseline was measured on, so its numbers compare. The job uploads `coverage-summary.json` and `lcov.info`. Cost if wrong: the Windows job, the slowest, gets slower by the coverage overhead (locally 117 s against 111 s, plus writing the reports).
 - Task 19: Ruling: the global thresholds are the baseline less 1, rounded down to whole numbers (statements 72, branches 62, functions 63, lines 77). Of the six critical files P-2 names (lines 95, branches 90), a floor is set only for each measure the baseline already meets: `src/core/approval.ts` lines and branches, `src/core/settingsWriter.ts` lines, `src/core/zip.ts` lines. The rest are follow-ups. `@vitest/coverage-v8` is pinned to 5.1.0, the installed `vitest`'s exact version (5.1.1 asked for a newer `vitest`). P-2's `src/core/shelved/**`, `tests/quarantine/**` and `tests/e2e/**` excludes are left out: none of those folders exists. `CONTRIBUTING.md` says the Windows job checks coverage. Cost if wrong: a floor set too tight fails CI on a change that does not reduce coverage (a local repeat run differed by 2 branches of 40 273).
 
+- Task 20: Ruling: the three specs (`tests/e2e/flows.spec.ts`) cover the flows the brief names and the stand-in bridge supports: a chat message with its streamed reply (Stop shows while it streams, then the reply, its speed line and the sidebar entry), Settings (Appearance set to Dark is applied to the page and still checked when Settings is opened again), and a project (created, renamed, asked before delete, kept on No, removed on Yes). Before they passed, a copy pointed at the production page (no stand-in bridge) failed all three. The CI job `e2e` runs them on Linux with Playwright's Chromium; locally on this ARM64 PC they run on the installed Edge (`PLAYWRIGHT_CHANNEL=msedge`), so no browser is downloaded here. Outside the file list: `package.json` gains `@playwright/test` and a `pnpm e2e` script, `.gitignore` gains Playwright's output folders, `CONTRIBUTING.md` lists the fifth job, and a stale comment in `ci.yml` about coverage is corrected. Cost if wrong: a flow broken only in WebView2, not in Chromium, is not caught.
+
 ## Follow-ups (owner decides)
 
 | found in task | item | decision |
@@ -530,3 +532,7 @@ All files: statements 73.18% (33878/46292), branches 63.75% (25677/40273), funct
 | `src/voice/worker.ts` | 0 | 0 | 0 | 0 |
 
 </details>
+
+## CI run 45118319810 (PR 6, commit d526c42, Task 19)
+
+All jobs pass, CodeQL too (0 open alerts). `windows-arm64-tests` ran the suite with coverage: 279 files, 2871 tests passed, 1 skipped; statements 73.2%, branches 63.77%, functions 64.73%, lines 78.46%, within 0.02 of the local baseline and above every threshold. The `coverage` artifact (summary and lcov) was uploaded. Task 18 (b247f06) passed on run 45117160589; Tasks 18 and 19 are green.

@@ -47,3 +47,8 @@ desktop.ini
 .xwin-cache/
 src-tauri/target/
 prototype-tauri/target/
+
+# Playwright output
+test-results/
+playwright-report/
+reports/

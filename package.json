@@ -36,10 +36,12 @@
     "regen": "node scripts/generate-settings-schema.mjs && node scripts/generate-state-machines.mjs && node scripts/generate-feature-matrix.mjs && node scripts/build-xblocks.js && node scripts/vendor-icons.js",
     "regen:check": "node scripts/generate-settings-schema.mjs --check && node scripts/generate-state-machines.mjs --check && node scripts/generate-feature-matrix.mjs --check",
     "lint": "eslint .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "e2e": "playwright test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.65.1",
     "@tauri-apps/cli": "^2.12.4",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",

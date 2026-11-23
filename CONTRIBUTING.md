@@ -22,10 +22,11 @@ icon list, run `pnpm regen` to rebuild the generated files and commit them.
 
 ### Continuous integration
 
-Every pull request runs `.github/workflows/ci.yml`. It has four jobs:
+Every pull request runs `.github/workflows/ci.yml`. It has five jobs:
 
 - `lint-type`: the type check, the plain-English check, `pnpm regen:check` and `pnpm lint` (0 errors; warnings are allowed)
 - `unit`: the test suite on Linux, in three parts
+- `e2e`: the main flows in a real Chromium against the browser preview (`tests/e2e`, `pnpm e2e`; on Windows without Playwright's Chromium, set `PLAYWRIGHT_CHANNEL=msedge` to use Edge)
 - `windows-arm64-tests`: the test suite with coverage and the Rust checks on Windows ARM64. Coverage must stay at or above the thresholds in `vitest.config.ts`; raise them when coverage rises (`pnpm test --coverage` shows the numbers)
 - `security`: the dependency audits and a secret scan
 
