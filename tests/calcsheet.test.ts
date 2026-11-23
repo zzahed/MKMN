@@ -137,6 +137,21 @@ describe("writing in the cells", () => {
     expect(parseSheets(setCell(src, 0, 3, 0, ""))[0].rows).toHaveLength(3);
     expect(setCell(src, 4, 0, 0, "x")).toBe(src);
   });
+  // CodeQL #97/#21: the cell to write comes in a message from the sheet preview's frame, where the
+  // generated page runs; only whole numbers within the sheet are taken, anything else changes nothing
+  it("writes a cell only for whole-number positions: names such as __proto__ never reach an object path", async () => {
+    const { setCell } = await import("../src/core/sheet");
+    const src = "## S\n| Item | Value |\n|---|---|\n| a | 1 |";
+    const odd = ["__proto__", "constructor", "1", 1.5, Number.NaN, Infinity, -1, null, undefined, {}] as unknown as number[];
+    for (const v of odd) {
+      expect(() => setCell(src, v, 1, 1, "x"), `sheet ${String(v)}`).not.toThrow();
+      expect(setCell(src, v, 1, 1, "x"), `sheet ${String(v)}`).toBe(src);
+      expect(setCell(src, 0, v, 1, "x"), `row ${String(v)}`).toBe(src);
+      expect(setCell(src, 0, 1, v, "x"), `col ${String(v)}`).toBe(src);
+    }
+    expect(({} as Record<string, unknown>).x).toBeUndefined();
+    expect(setCell(src, 0, 1, 1, "x")).not.toBe(src); // a real cell still writes
+  });
   it("puts the cell writer in the preview only when asked", async () => {
     const { officePreview } = await import("../src/core/office");
     const src = "## S\n| a | =1+1 |";
