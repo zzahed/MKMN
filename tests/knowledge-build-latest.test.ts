@@ -44,8 +44,9 @@ describe("a project with more files than the index takes", () => {
 
   it("the sidecar passes every file, never a silent slice (source pin)", async () => {
     const { readFileSync } = await import("node:fs");
-    const src = readFileSync("src/sidecar/main.ts", "utf8");
+    const src = readFileSync("src/sidecar/register/knowledge.ts", "utf8");
     const at = src.indexOf('dispatcher.register("knowledgeBuild"');
+    expect(at, "the knowledgeBuild registration is where this pin reads").toBeGreaterThan(-1);
     expect(src.slice(at, at + 600)).not.toMatch(/\.slice\(0, 200\)/);
   });
 });
