@@ -259,7 +259,6 @@ function wordmarkSvg({ color, accent, withAI = false }) {
     letters.push(`  <path d="${L.d}" transform="translate(${x} ${BASE - CAP})" stroke="${color}" stroke-width="${SW}" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`);
     x += L.w + 18;
   }
-  let ai = "";
   if (withAI) {
     const ruleX = x + 8;
     letters.push(`  <path d="M${ruleX} 40 L${ruleX} 72" stroke="${accent}" stroke-width="5" stroke-linecap="round"/>`);

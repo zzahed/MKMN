@@ -50,6 +50,12 @@ module.exports = tseslint.config(
     languageOptions: { globals: { X: "readonly" } },
   },
   {
+    // Node scripts written as CommonJS (package.json sets no "type", so scripts/*.js are CJS too):
+    // require() is their import, not a style lapse.
+    files: ["**/*.cjs", "scripts/**/*.js", "eslint.config.js"],
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
+  {
     files: ["src/renderer/public/capture-worklet.js"],
     languageOptions: { globals: globals.audioWorklet },
   },

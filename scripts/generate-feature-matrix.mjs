@@ -10,7 +10,6 @@ const OUT = "docs/MKMN_FEATURE_TEST_MATRIX_0.0.2.md";
 
 const cell = (value) => String(value).replace(/[\\|]/g, "\\$&");
 const row = (id, name, area, evidence, result) => `| ${id} | ${cell(name)} | ${cell(area)} | ${cell(evidence)} | ${result} |`;
-const acceptanceRow = (id, check, how, result) => `| ${id} | ${cell(check)} | ${cell(how)} | ${cell(result)} |`;
 const table = (head, lines) => [`| ${head.join(" | ")} |`, `|${head.map(() => "---").join("|")}|`, ...lines].join("\n");
 
 const ids = { REL: 0, UI: 0, HST: 0, SID: 0, STB: 0, SSC: 0, SRW: 0, SMF: 0, SCP: 0 };
@@ -267,7 +266,6 @@ const SCRIPT_EVIDENCE = {
 export function matrixText(root = process.cwd()) {
   const inv = featureInventory(root);
   ids.REL = ids.UI = ids.HST = ids.SID = ids.STB = ids.SSC = ids.SRW = ids.SMF = ids.CLD = ids.SCP = 0;
-  const sv = readFileSync(`${root}/src/renderer/SettingsView.tsx`, "utf8");
   const ss = readFileSync(`${root}/src/renderer/settingsSearch.ts`, "utf8");
 
   const tabMeta = [...ss.matchAll(/^\s*\{ id: "([^"]+)", label: "([^"]+)", hint: "([^"]+)"/gm)]
