@@ -10,6 +10,7 @@ import { journalDir } from "../core/harness/journal";
 import { pruneForSettings } from "../core/retention";
 import { taskProjectView } from "../core/taskKnowledge";
 import { raceAbort } from "../core/abortable";
+import { readCapped } from "../core/folderRun";
 import { HostSettingsWriter } from "../core/settingsWriter";
 import { approvalBody } from "../core/approval";
 import { npuResetLaunchCommand, npuResetOutcome } from "../core/npuReset";
@@ -2299,7 +2300,8 @@ function startRun(runId: string, language: string, code: string): void {
   const dir = runDir();
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, `${String(runId).replace(/[^\w-]/g, "").slice(0, 40)}-${randomUUID()}.${runner.ext}`);
-  fs.writeFileSync(file, code);
+  // a new file only this user can read: "wx" never writes through a file or link someone else placed at the name
+  fs.writeFileSync(file, code, { flag: "wx", mode: 0o600 });
   let stopped = false;
   let child: import("child_process").ChildProcess | null = null;
   let timer: NodeJS.Timeout | undefined = undefined;
@@ -2534,11 +2536,11 @@ dispatcher.register("readMedia", (mediaId: string) => {
     const found = fs.readdirSync(MEDIA_DIR).find((f) => f.startsWith(`${mediaId}.`));
     if (!found) return null;
     const file = path.join(MEDIA_DIR, found);
-    const stat = fs.statSync(file);
-    if (!stat.isFile() || stat.size > 32 * 1024 ** 2) return null;
+    const read = readCapped(file, 32 * 1024 ** 2, () => new Error("too big"));
+    if (!read || !read.st.isFile()) return null;
     const ext = found.slice(found.lastIndexOf(".") + 1).toLowerCase();
     const mime = ({ png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", bmp: "image/bmp" } as Record<string, string>)[ext] ?? "image/png";
-    return { dataUrl: `data:${mime};base64,${fs.readFileSync(file).toString("base64")}` };
+    return { dataUrl: `data:${mime};base64,${read.buf.toString("base64")}` };
   } catch { return null; }
 });
 

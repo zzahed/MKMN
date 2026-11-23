@@ -17,7 +17,7 @@
         lastRun = t;
         var now = queue; queue = {};
         for (var k in now) { try { now[k](t); } catch (err) { setTimeout(function () { throw err; }, 0); } }
-        for (var any in queue) { schedule(); break; }
+        if (Object.keys(queue).length) schedule();
       }
       function schedule() { if (!pumping) { pumping = true; realRaf(pump); } }
       window.requestAnimationFrame = function (cb) { var id = ++nid; queue[id] = cb; schedule(); return id; };
