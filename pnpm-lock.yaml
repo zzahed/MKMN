@@ -142,8 +142,8 @@ importers:
         version: 5.1.0(@types/node@22.20.5)(@vitest/coverage-v8@5.1.0)(jsdom@31.0.1(@napi-rs/canvas@1.1.0)(@noble/hashes@1.8.0))(vite@7.3.7(@types/node@22.20.5)(jiti@2.7.0))
     optionalDependencies:
       sherpa-onnx-win-arm64:
-        specifier: 1.13.8
-        version: 1.13.8
+        specifier: 2.0.2
+        version: 2.0.2
       sherpa-onnx-win-x64:
         specifier: 1.13.8
         version: 1.13.8
@@ -2010,8 +2010,8 @@ packages:
   sherpa-onnx-node@1.13.8:
     resolution: {integrity: sha512-MsDMBdhLFTZ1GwvcGSSQhnS7g/EA8OMH6IYysCVUOM7j8Icty9KRc0E6YT1A5fWBsZwRfKOeh88QC95aRvS8ag==}
 
-  sherpa-onnx-win-arm64@1.13.8:
-    resolution: {integrity: sha512-IfdKVT7tT5xAnlBqNkc70amt+bbn2Wkg0v3hwzKZIIyzlsWIUT0U1eQ+90pE8U4CR0SxVAN1kCmv7dmmQ4o0Qg==}
+  sherpa-onnx-win-arm64@2.0.2:
+    resolution: {integrity: sha512-vHKimJlB2j8i76ezbP/CWg0Yciuej72q3gEQqiGC+ws+3Tx5EEFZVbAGA9gDSS7QYjWycsWJQUFXZ24Ny8teOQ==}
     cpu: [arm64]
     os: [win32]
 
@@ -4159,7 +4159,7 @@ snapshots:
       sherpa-onnx-win-ia32: 1.13.8
       sherpa-onnx-win-x64: 1.13.8
 
-  sherpa-onnx-win-arm64@1.13.8:
+  sherpa-onnx-win-arm64@2.0.2:
     optional: true
 
   sherpa-onnx-win-ia32@1.13.8:
