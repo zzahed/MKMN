@@ -8,7 +8,7 @@
 import { ContextEngine, layoutElements, stateShape } from "./construct/context";
 import { WRITE_INSTRUCTIONS } from "./construct/docs";
 import type { Plan, Unit } from "./construct/types";
-import { COINS, HITS, LAND, LAYOUT, MOVE, REQS, SCENE, STATE, UNITS, UNIT_SPECS, flat, given } from "./promptLabUnits";
+import { HITS, LAND, LAYOUT, MOVE, REQS, SCENE, STATE, UNITS, UNIT_SPECS, given } from "./promptLabUnits";
 
 const U = (kind: Unit["kind"], name: string, does: string, serves: string[], extra: Partial<Unit> = {}): Unit => ({ id: name, kind, name, does, serves, uses: [], examples: [], ...extra });
 const rq = (...t: string[]) => t.map((text, i) => ({ id: `R${i + 1}`, text }));

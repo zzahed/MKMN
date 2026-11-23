@@ -22,8 +22,8 @@ const p = (key: string, h: string): Col => ({ key, h, type: "pct" });
 const d = (key: string, h: string): Col => ({ key, h, type: "date" });
 const fx = (key: string, h: string, f: string, total?: string, type: Col["type"] = "money"): Col => ({ key, h, f, total, type });
 
-const MONTHS = (lang: string) => Array.from({ length: 12 }, (_, i) => new Date(2024, i, 1).toLocaleString("en", { month: "long" }));
-const langOfData = (x: Data) => ("en");
+const MONTHS = (_lang: string) => Array.from({ length: 12 }, (_, i) => new Date(2024, i, 1).toLocaleString("en", { month: "long" }));
+const langOfData = (_x: Data) => ("en");
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 const DEFS: Def[] = [

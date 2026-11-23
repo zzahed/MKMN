@@ -158,7 +158,7 @@ describe("buildEditedCopy and verifyEdit", () => {
   it("names the fault when another part changed", async () => {
     const source = await docxBytes(SIMPLE);
     const ops = [{ find: "shared drive", replace: "Q3 archive" }];
-    const copy = await buildEditedCopy(source, ops);
+    await buildEditedCopy(source, ops);
     const tampered = writeZip({
       "word/document.xml": toBytes(applyDocEdits(SIMPLE, ops)),
       "[Content_Types].xml": toBytes(CONTENT_TYPES),
@@ -170,7 +170,7 @@ describe("buildEditedCopy and verifyEdit", () => {
   it("names the fault when the copy's text is not the proposed edit", async () => {
     const source = await docxBytes(SIMPLE);
     const ops = [{ find: "shared drive", replace: "Q3 archive" }];
-    const copy = await buildEditedCopy(source, ops);
+    await buildEditedCopy(source, ops);
     const wrong = await buildEditedCopy(source, [{ find: "shared drive", replace: "WRONG" }]);
     expect(await verifyEdit(source, wrong, ops)).toContain("does not equal the proposed edit");
   });

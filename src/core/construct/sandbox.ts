@@ -277,7 +277,6 @@ export async function playPageRunHere(input: PlayInput, units: string[]): Promis
     let clicksChanged = false, keysChanged = false;
     try {
       const fpInfo = JSON.parse(String(new Script("JSON.stringify(globalThis.__fingerprint)").runInContext(ctx, { timeout: 500 }))) as { before?: string; afterClicks?: string; after?: string };
-      const stateNow = String(new Script("(function () { try { return JSON.stringify(globalThis.S); } catch (e) { return \"\"; } })()").runInContext(ctx, { timeout: 500 }));
       // a control "changed something" against the state as it stood before the controls ran — never against the end state (which the ticks keep moving)
       clicksChanged = fpInfo.afterClicks !== undefined && fpInfo.before !== undefined && fpInfo.afterClicks !== fpInfo.before;
       keysChanged = fpInfo.after !== undefined && fpInfo.afterClicks !== undefined && fpInfo.after !== fpInfo.afterClicks;

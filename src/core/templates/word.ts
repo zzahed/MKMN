@@ -31,7 +31,6 @@ const table = (k: string, cols: [string, string][], h?: string): Block => ({ t: 
 const kv = (items: [string, string][], h?: string): Block => ({ t: "kv", items, h });
 const entries = (k: string, h?: string): Block => ({ t: "entries", k, h });
 const parts = (k: string, h?: string): Block => ({ t: "parts", k, h });
-const fixed = (l: string): Block => ({ t: "fixed", l });
 const rule: Block = { t: "rule" };
 
 const PART = { type: "object", additionalProperties: false, properties: { heading: schemaStr(), text: schemaStr(), points: schemaStrs() } } as const;

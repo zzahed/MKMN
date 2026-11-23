@@ -1,4 +1,4 @@
-import { persistableConversations, writePersistableConversations, type Conversation, type SaveConversationsResult } from "./store";
+import { persistableConversations, type Conversation, type SaveConversationsResult } from "./store";
 
 /**
  * Debounced saver for the chats. Every streamed token used to stringify and write the

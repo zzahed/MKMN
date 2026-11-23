@@ -399,7 +399,7 @@ describe("explore browser", () => {
     expect(url).toBe("https://hub.docker.com/v2/repositories/ai/?page_size=100&ordering=-pull_count");
   });
   it("opens a pasted link in any source, or turns it into a search", async () => {
-    const dockerFetch = (async (u: string) => ({ ok: true, status: 200, json: async () => ({ results: [{ name: "4B-Q4_0", full_size: 2.4e9 }, { name: "8B-Q4_0", full_size: 4.7e9 }] }), arrayBuffer: async () => new ArrayBuffer(0) })) as any;
+    const dockerFetch = (async (_u: string) => ({ ok: true, status: 200, json: async () => ({ results: [{ name: "4B-Q4_0", full_size: 2.4e9 }, { name: "8B-Q4_0", full_size: 4.7e9 }] }), arrayBuffer: async () => new ArrayBuffer(0) })) as any;
     const deps = { hf: new HfClient(dockerFetch), docker: new DockerClient(dockerFetch), native: async () => [{ name: "Qwen3-1.7B", sizeGB: 1.4 }] };
     const d = await resolveModel(deps, "https://hub.docker.com/r/ai/qwen3", hw);
     expect(d.type === "model" && d.inspection.entry).toMatchObject({ source: "docker", repo: "docker.io/ai/qwen3", quant: "4B-Q4_0", sizeGB: 2.2 });

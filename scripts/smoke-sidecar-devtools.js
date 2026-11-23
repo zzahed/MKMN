@@ -2,7 +2,7 @@
 // NPU, and a real one-model NPU load test runs end to end (the default setting only, native
 // bundle: one server start through the host capability, one real prompt). The driver plays
 // the Rust host: startChatServer spawns geniex serve, stopChatServer kills it.
-const { spawn, execFileSync } = require("child_process");
+const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 

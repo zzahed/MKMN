@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { ChatEvent, ChatMessage } from "../src/shared/types";
+import type { ChatEvent } from "../src/shared/types";
 import { stepwise, type Session } from "../src/core/build";
 import { checkArtifact } from "../src/core/construct/checkArtifact";
 
@@ -41,7 +41,7 @@ const S = { x: 0 };
 </script></body></html>`;
     const stats = { ttftSec: 0.1, tokPerSec: 10, tokens: 5, totalSec: 0.5 };
     const file = (title: string, body: string) => `<artifact type="html" title="${title}">\n${body}\n</artifact>`;
-    const stream: Session = async function* (sid, msgs) {
+    const stream: Session = async function* (sid, _msgs) {
       const text = sid.replace(/^[^:]*:/, "") === "plan"
         ? "Mode: build\nFile: index.html | new | the page"
         : sid.includes(":write") ? file("index.html", page)

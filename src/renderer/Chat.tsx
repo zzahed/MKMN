@@ -8,14 +8,14 @@ import type { CatalogItem } from "../shared/api";
 import { placementOf, preloadRefOf } from "../core/modelList";
 import { loadDevice, loadFailedLabel, loadingLabel, loadPhrases, warmingLabel } from "../core/loadWords";
 import type { ComputeTarget } from "../shared/types";
-import type { AgentRun, Artifact, Attachment, BuildRun, BuildStage, ChatEvent, ChatMessage, Effort, LoopRun, Project, ReviewRun, ReviewStep, ServerStatus, Settings, VoiceModelView, VoiceSettings, VoiceStatus } from "../shared/types";
+import type { AgentRun, Artifact, Attachment, BuildStage, ChatEvent, ChatMessage, Effort, LoopRun, Project, ReviewRun, ReviewStep, ServerStatus, Settings, VoiceModelView, VoiceSettings, VoiceStatus } from "../shared/types";
 import { Markdown } from "./Markdown";
-import { createPreloadController, isModifierOrNavKey, type PreloadController, type PreloadPhase } from "./preloadController";
+import { createPreloadController, type PreloadController, type PreloadPhase } from "./preloadController";
 import { Conversation, Turn, titleFrom } from "./store";
 import { kindLabel } from "./ArtifactView";
 import { VersionedViewer, versionTitle } from "./VersionMenu";
 import type { VersionResult } from "../core/versionBook";
-import { LogoMark, AgentsIcon, ArtifactIcon, CheckShieldIcon, GlobeIcon, LoopIcon, PlusIcon, SlidersIcon, VisionIcon } from "./Icons";
+import { LogoMark, AgentsIcon, CheckShieldIcon, LoopIcon, PlusIcon, SlidersIcon } from "./Icons";
 import { BRAND } from "./brand";
 import { filesOpenBesideChat, noModelHeading } from "../core/settingsUi";
 import { readBool, readSetting } from "../shared/settingsSchema";
@@ -199,7 +199,7 @@ function TurnActivity({ t, files }: { t: Turn; files: string[] }) {
 }
 
 /** All the work before the answer. While it runs each piece shows as it is; once the turn is over, two steps or more fold into one line. */
-function TurnWork({ t, files, settings, onSettings, onSkip }: { t: Turn; files: string[]; settings: Settings; onSettings: (p: Partial<Settings>) => void; onSkip?: (back?: boolean) => void }) {
+function TurnWork({ t, files, onSkip }: { t: Turn; files: string[]; settings: Settings; onSettings: (p: Partial<Settings>) => void; onSkip?: (back?: boolean) => void }) {
   const w = workOf(t);
   const progress = t.pending ? t.notices?.filter((n) => /^(Document search timed out|The model server stopped serving mid-call)/.test(n)).at(-1) : undefined;
   const pieces = (
@@ -715,7 +715,7 @@ export function Chat(props: {
   voiceOnRef.current = voiceOn;
   const [vstate, setVstate] = useState<VoiceState>("idle");
   const [level, setLevel] = useState(0);
-  const [heard, setHeard] = useState("");
+  const [, setHeard] = useState("");
   const [live, setLive] = useState<LiveText | null>(null);
   const [caption, setCaption] = useState("");
   const [micMuted, setMicMuted] = useState(false);
@@ -789,9 +789,6 @@ export function Chat(props: {
   // the controller captured is shown as soon as the phase drops to null.
   const preloadFailure = preloadState === null ? preloadController.lastError() : null;
 
-  const isModifierOrNavKeyHandler = (e: React.KeyboardEvent<HTMLTextAreaElement>) =>
-    isModifierOrNavKey(e.key, e.ctrlKey, e.altKey, e.metaKey);
-
   const setDraft = (v: string) => {
     setInput(v);
     saveDraft(convRef.current.id, v);
@@ -854,7 +851,6 @@ export function Chat(props: {
   const vsRef = useRef(voiceSettings);
   vsRef.current = voiceSettings;
 
-  const voiceReady = !!(voiceSettings.sttModelId && voiceSettings.ttsModelId);
   const sttReady = !!voiceSettings.sttModelId;
   const ttsReady = !!voiceSettings.ttsModelId;
   /** The speech worker must be alive: when the build carries none, the microphone says so instead of failing later. */

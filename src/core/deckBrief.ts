@@ -22,7 +22,6 @@ export type Setting = (typeof SETTINGS)[number];
 /** How much of what the slides need is in the person's own text. */
 export type Info = "enough" | "some" | "none";
 
-const oneOf = (key: string, values: readonly string[]) => ({ type: "object", additionalProperties: false, required: [key], properties: { [key]: { type: "string", enum: [...values] } } });
 const field = (raw: unknown, key: string): unknown => (raw && typeof raw === "object" ? (raw as Record<string, unknown>)[key] : undefined);
 const quiet = async (ask: Ask, q: string, schema: object): Promise<unknown> => { try { return await ask(q, schema); } catch { return null; } };
 

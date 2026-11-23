@@ -1,10 +1,9 @@
-import { xFlaws } from "../src/core/xcheck";
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { bundleHtml, linkedFiles, pageLinking } from "../src/core/bundle";
 import { buildStatus, cleanFile, directPlan, interfaceOf, parsePlan, scriptSurface, seenProblems, stepwise, stubHistory, Session } from "../src/core/build";
-import { assemblePage, stubUnits } from "../src/core/construct/assemble";
+import { stubUnits } from "../src/core/construct/assemble";
 import { readMark } from "../src/core/construct/marks";
 import { checkPageWithoutWindow } from "../src/core/construct/pagecheck";
 import { quickErrors } from "../src/core/codecheck";
@@ -143,7 +142,7 @@ describe("the main session keeps no code", () => {
 describe("building from one prompt", () => {
   const big = "A sentence that makes the request long enough to be worth a plan.";
   it("writes each file whole in one session, each seeing what the earlier ones define, then explains", async () => {
-    const m = fake((name, msgs) => {
+    const m = fake((name, _msgs) => {
       if (name === "plan") return "Mode: build\nDesign: dark and neon\nFile: index.html | new | the page\nFile: style.css | new | the look\nFile: script.js | new | scroll effects";
       if (name === "write:0") return "<!doctype html>\n<html><head><title>t</title><link rel=\"stylesheet\" href=\"style.css\"></head><body>\n<h1 id=\"hero\">Hi</h1>\n<section class=\"card\">F</section>\n<footer id=\"foot\">end</footer>\n<script src=\"script.js\"></script>\n</body></html>";
       if (name === "write:1") return "```css\n.card { color: var(--c) }\n```";
@@ -607,7 +606,7 @@ F flag
 
   it("marks the build's token total as estimated when any session produced estimated stats, and verified when every call reported usage", async () => {
     // a stream where every session reports token usage verified by the server — the final count is exactly the sum of those
-    const verifiedStream: Session = async function* (sid: string, msgs: ChatMessage[]) {
+    const verifiedStream: Session = async function* (sid: string, _msgs: ChatMessage[]) {
       const text = sid.replace(/^[^:]*:/, "") === "plan"
         ? "Mode: build\nFile: index.html | new | the page"
         : sid.includes(":write") ? file("index.html", "<!doctype html><html><body><p id=\"n\">42</p></body></html>")
@@ -616,7 +615,7 @@ F flag
       yield { id: sid, type: "done", stats: { ttftSec: 0.1, tokPerSec: null, tokens: 15, totalSec: 0.5, tokensEstimated: false } };
     };
     // a stream whose sessions report no server usage (estimates) — the recorded "823 tokens / 0/7" shape
-    const estimatedStream: Session = async function* (sid: string, msgs: ChatMessage[]) {
+    const estimatedStream: Session = async function* (sid: string, _msgs: ChatMessage[]) {
       const text = sid.replace(/^[^:]*:/, "") === "plan"
         ? "Mode: build\nFile: index.html | new | the page"
         : sid.includes(":write") ? file("index.html", "<!doctype html><html><body><p id=\"n\">43</p></body></html>")
@@ -1147,7 +1146,7 @@ describe("a wrong no from the small router is answered in the chat with the buil
 });
 
 describe("the finish rule: what the test run saw decides done or unresolved", () => {
-  const site = (name: string, msgs: ChatMessage[]) => {
+  const site = (name: string, _msgs: ChatMessage[]) => {
     if (name === "plan") return "Mode: build\nDesign: dark and neon\nFile: index.html | new | the page\nFile: style.css | new | the look\nFile: script.js | new | scroll effects";
     if (name === "write:0") return "<!doctype html>\n<html><head><title>t</title><link rel=\"stylesheet\" href=\"style.css\"></head><body>\n<h1 id=\"hero\">Hi</h1>\n<section class=\"card\">F</section>\n<button id=\"go\">go</button>\n<script src=\"script.js\"></script>\n</body></html>";
     if (name === "write:1") return "```css\n.card { color: var(--c) }\n```";

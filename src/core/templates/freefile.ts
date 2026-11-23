@@ -31,7 +31,7 @@ export function fileText(reply: string, kind: "xlsx" | "docx"): string {
   return text.split("\n").filter((l) => /^\s*#{1,3}\s+\S/.test(l) || l.includes("|")).join("\n").trim();
 }
 
-const titleOf = (source: string, kind: "xlsx" | "docx", lang: string): string => {
+const titleOf = (source: string, kind: "xlsx" | "docx", _lang: string): string => {
   const h = (kind === "docx" ? /^#\s+(.+)$/m : /^#{1,3}\s+(.+)$/m).exec(source)?.[1]?.replace(/[*_`]/g, "").trim();
   return (h || (kind === "xlsx" ? "Sheet" : "Document")).slice(0, 80);
 };

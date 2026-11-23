@@ -1,5 +1,5 @@
 import { FigureProgress } from "./FigureProgress";
-import { Fragment, memo, createContext, useContext, useEffect, useMemo, useState } from "react";
+import { Fragment, memo, createContext, useContext, useMemo, useState } from "react";
 import { Code, LiveCode } from "./Code";
 import { ChartBlock } from "./ChartBlock";
 import { DiagramBlock } from "./DiagramBlock";
@@ -9,7 +9,6 @@ import { Tex } from "./Tex";
 import { parseChartSpec } from "../core/chart";
 import { diagramKind } from "../core/diagram";
 import { MAX_IMAGES_SHOWN } from "../core/wikimedia";
-import { api } from "./api";
 import { parseMarkdown, type Block, type Inline } from "../core/markdown";
 
 /** Words as separate nodes (keyed by position), so a word that has just arrived fades in and the ones before it stay still. */

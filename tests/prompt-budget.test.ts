@@ -59,7 +59,7 @@ describe("the assembled instructions", () => {
     }
   });
   it("drop whole blocks, never a cut rule: what is dropped is absent, what is kept is complete", async () => {
-    const { assembleInstructions, instructionBudgetFor } = await prompts();
+    const { assembleInstructions } = await prompts();
     const tiny = assembleInstructions(FULL, 700); // only the core fits
     const full = assembleInstructions(FULL, 100_000);
     expect(tiny.tokens).toBeLessThanOrEqual(700);

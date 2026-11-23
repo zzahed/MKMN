@@ -14,9 +14,9 @@
  * An object a change uses that is not drawn yet is drawn apart, as when the page was made.
  */
 import { docFor } from "./xdocs";
-import { ARTIST_INSTRUCTIONS, REPAIR_INSTRUCTIONS, WRITE_INSTRUCTIONS, XEvent, XHost, assetTag, cleanSvg, plainArt, xcall } from "./xbuild";
+import { ARTIST_INSTRUCTIONS, WRITE_INSTRUCTIONS, XEvent, XHost, assetTag, cleanSvg, plainArt, xcall } from "./xbuild";
 import { bibleOf, mendFragment, parseTasks, statesUsed } from "./xplan";
-import { xFlaws, xMend } from "./xcheck";
+import { xFlaws } from "./xcheck";
 import type { PickInfo } from "./pick";
 import { ranksIn } from "./slidePicks";
 

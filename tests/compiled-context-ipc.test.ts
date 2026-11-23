@@ -18,7 +18,7 @@ import path from "node:path";
 import { compiledContextOf } from "../src/core/qairt";
 import { canonicalName } from "../src/core/modelIdentity";
 import { dynamicItems } from "../src/renderer/tauriBridge";
-import type { InstalledModel, Settings } from "../src/shared/types";
+import type { Settings } from "../src/shared/types";
 
 // ---- a fake models cache holding ONE installed QAIRT artifact compiled to 2048
 const CONFIG_2048 = JSON.stringify({ dialog: { context: { size: 2048 } }, models: {} });

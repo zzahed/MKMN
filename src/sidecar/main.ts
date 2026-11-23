@@ -44,7 +44,6 @@ import { knowledgeDirOf, openKnowledgeIndex } from "../core/knowledge/store";
 import { resolveModelIdentity } from "../core/modelIdentity";
 import { scoreEntry } from "../core/fit";
 import { describers } from "../core/vision";
-import { quickErrors } from "../core/codecheck";
 import { CHART_FIX_INSTRUCTIONS } from "../core/chart";
 import { diagramFixInstructions } from "../core/diagram";
 import { runtimeLease } from "../core/lease";
@@ -66,7 +65,7 @@ import { applyEffort, effectiveEffort, thinkingSupport } from "../core/effort";
 import { DEFAULT_ENDPOINT, geniexVersion } from "../core/geniex";
 import { GeniexGate, parseGeniexCliVersion } from "../core/geniexGate";
 import { NPU_UTIL_SCRIPT, WINDOWS_BUILD_SCRIPT, npuReadingFromHost, parseNpuCounters, type NpuReading } from "../core/perf";
-import { BATTERY_SCRIPT, batteryFromHost, batteryPercent, createCachedPowerReader, createHostFirstBatteryReader, parseBattery, type BatteryReading } from "../core/battery";
+import { BATTERY_SCRIPT, batteryFromHost, batteryPercent, createCachedPowerReader, createHostFirstBatteryReader, parseBattery } from "../core/battery";
 import { ROUTER_CTX, ROUTER_HOST, ROUTER_MODEL, ROUTER_PREFERRED, RouterPlacement, ROUTER_TIMEOUT_MS, PRODUCE_VOTES, Q, TREE, FileKindMemo, RouterBreaker, RouterWarmGate, SortMemory, parseYesNo, servesRouterModel, readSearchQuery, routerSampling, searchQueryPrompt, settled, sortByQuestions, yesNoPrompt, type Asked } from "../core/router";
 import { ServerManager } from "../core/server";
 import type { TemplateKind } from "../core/templates/kit";
@@ -662,18 +661,14 @@ function recordSpeed(entry: CatalogEntry, tokPerSec: number | null, tokens: numb
 
 import {
   AUTO_GOALS,
-  COMPUTE_LABEL,
-  ENGINE_LABEL,
   candidatesFor,
   describeSelection,
   selectAuto,
-  selectManual,
   type AutoGoal,
-  type Candidate,
   type Measurement,
   type Selection,
 } from "../core/adaptiveCompute";
-import { FoundryHost, cliRunner, findFoundry, type FoundryCachedVariant } from "../core/foundryHost";
+import { FoundryHost, cliRunner, findFoundry } from "../core/foundryHost";
 
 /** hardware.json lives in the host's Config dir (mkmnPaths), the file the Rust host writes after each benchmark. */
 const hardwareFile = () => PATHS.hardwareFile;
@@ -761,7 +756,7 @@ async function selectForRequest(entry: CatalogEntry, serveRef: string, o?: { set
     const facts = engineFactsFor(entry, serveRef);
     const foundry = isFoundryEntry(entry) ? await foundryVariantsFor(String((entry as any).foundryAlias ?? entry.repo)) : [];
     if (isFoundryEntry(entry)) (facts as any).foundryVariants = foundry.map((v) => ({ alias: String((entry as any).foundryAlias ?? entry.repo), device: v.device, modelId: v.modelId, cached: v.cached }));
-    const { candidates, gatedOut } = candidatesFor(entry, facts, measurementsFor(serveRef, entryRef(entry)));
+    const { candidates } = candidatesFor(entry, facts, measurementsFor(serveRef, entryRef(entry)));
     // The two readings run in PARALLEL (they used to be awaited one after the other,
     // seconds of added latency per request), and the battery is cached for 30 s: a
     // battery does not change between two requests. The NPU reading is never cached
@@ -1236,7 +1231,7 @@ async function routerQuery(text: string): Promise<string | null> {
 }
 
 /** Starts the router in the background, so that the first request already finds it ready. */
-function warmRouter(force = false) {
+function warmRouter(_force = false) {
   if (!readBool(settings(), "dynamic.router")) return;
   if (routerWarming) return;
   if (!findGeniex(settings().geniexPath ?? null)) return;

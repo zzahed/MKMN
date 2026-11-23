@@ -160,7 +160,6 @@ export function directPlan(request: string, existing: string[]): Plan | null {
   return { mode: "build", design: "", files: [{ name: named, action: "new", job: "the whole program in this one file: page, styling and working behaviour" }], read: [] };
 }
 
-const CHIT_CHAT = /^\s*(?:thanks?(?: you)?|thx|ok(?:ay)?|cool|great|nice|perfect|super|good|hello|hi|bye)\b[\s!.]*$/i;
 const CHANGE_WORDS = /\b(make|add|change|fix|remove|delete|replace|rename|update|increase|decrease|speed|slow|set|turn|put|move|show|hide|use|enable|disable|give|let|allow|include|implement|create|spawn|insert|apply|chang\w*|cache|active\w*)\b/i;
 
 const BUG_WORDS = /\b(doesn['’]?t|does not|don['’]?t|do not|isn['’]?t|is not|won['’]?t|can['’]?t|cannot|not working|broken|bugg?y?|crash\w*|errors?|fail\w*|stuck|freez\w*|frozen|blank|empty|glitch\w*|wrong|nothing (?:happens|works|moves|shows|appears)|no (?:button|sound|score|game|movement)|invisible)\b/i;

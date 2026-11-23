@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { OPS, evalPlan, makeCalcSheet, readInputs, readSteps, readWords, sheetAnswers, sheetText, stepsSchema, methodNotes, type CalcPlan } from "../src/core/templates/calcsheet";
+import { OPS, evalPlan, readInputs, readSteps, readWords, sheetAnswers, sheetText, stepsSchema, methodNotes, type CalcPlan } from "../src/core/templates/calcsheet";
 import { makeFromTemplate } from "../src/core/templates/build";
 import { Q } from "../src/core/router";
 import { artifactsIn } from "../src/core/artifacts";

@@ -12,7 +12,6 @@ import reactHooks from "eslint-plugin-react-hooks";
 
 const DEBT = [
   "@typescript-eslint/no-explicit-any",
-  "@typescript-eslint/no-unused-vars",
 ];
 
 export default tseslint.config(
@@ -36,6 +35,9 @@ export default tseslint.config(
       ...Object.fromEntries(DEBT.map((rule) => [rule, "warn"])),
       // ES5-style code (the X blocks) and async generator bodies reach `this` through `self`
       "@typescript-eslint/no-this-alias": ["error", { allowedNames: ["self"] }],
+      // a name kept on purpose starts with _ (a parameter a signature needs, `for (const _ of …)`);
+      // `const { a, ...rest }` may drop `a` from rest
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_", ignoreRestSiblings: true }],
     },
   },
   {

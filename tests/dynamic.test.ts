@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CATEGORY_IDS, BundleModel, candidateRepos, DynamicData, Pack, TaskCategory, healEntry, installedOf, mergedPack, missingInPack, packStats, parseSort, pickModel, profileFor, sortRequest } from "../src/core/dynamic";
+import { CATEGORY_IDS, BundleModel, candidateRepos, TaskCategory, healEntry, installedOf, mergedPack, missingInPack, packStats, parseSort, pickModel, profileFor, sortRequest } from "../src/core/dynamic";
 import type { CatalogEntry } from "../src/shared/types";
 
 /** What people really ask, in English and French, and the kind of task each one is. */

@@ -348,14 +348,6 @@ while ($true) {
   return () => { try { s.kill(); } catch { /* gone */ } };
 }
 
-/** NPU utilization, the same counters the app reads. One reading takes ~2s. */
-function npuSample() {
-  try {
-    const r = spawnSync("powershell", ["-NoProfile", "-Command", NPU_UTIL_SCRIPT], { encoding: "utf8", timeout: 15000 });
-    return parseNpuCounters(r.stdout ?? "");
-  } catch { return null; }
-}
-
 /** Persistent NPU sampler: the counter discovery runs ONCE, then each round
  * re-enumerates the instance paths (GPU Engine instances are PID-scoped — a
  * candidate's geniex process does not exist at discovery time, so fixed paths

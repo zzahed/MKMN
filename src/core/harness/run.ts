@@ -157,7 +157,6 @@ export function createRun(defs: StepDef<unknown, unknown>[], opts: RunOptions): 
   let cancelled: string | undefined;
   const controller = new AbortController();
   const settled: SettledStep[] = [];
-  let runHeaderWritten = false;
 
   function journalWrite(entry: JournalEntry): void {
     if (file === null) return;
@@ -173,7 +172,6 @@ export function createRun(defs: StepDef<unknown, unknown>[], opts: RunOptions): 
     if (state === "queued") {
       state = moveRun(state, "start");
       journalWrite({ type: "run", runId, pipeline: opts.pipeline, startedAt: new Date().toISOString(), resumed: false, ...(opts.conversationId ? { conversationId: opts.conversationId } : {}) });
-      runHeaderWritten = true;
     }
   }
 

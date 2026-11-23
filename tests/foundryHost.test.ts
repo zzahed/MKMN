@@ -2,16 +2,6 @@ import { describe, expect, it } from "vitest";
 import { parseCatalogJson, parseJsonOutput } from "../src/core/foundry";
 import { FoundryHost, parseCacheJson, parseCacheList, parseStatusJson, type FoundryRunner } from "../src/core/foundryHost";
 
-/** A fetch that answers the health check and records what was asked. */
-function fakeFetch(handler: (url: string) => Response = () => new Response("{}", { status: 200 })) {
-  const urls: string[] = [];
-  const fn = (async (url: string) => {
-    urls.push(String(url));
-    return handler(String(url));
-  }) as unknown as typeof fetch;
-  return { fn, urls };
-}
-
 const CATALOG_JSON = JSON.stringify({
   models: [
     {
