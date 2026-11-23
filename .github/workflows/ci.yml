@@ -72,9 +72,17 @@ jobs:
           pnpm run build;                                    if ($LASTEXITCODE) { exit $LASTEXITCODE }
           pnpm run build:sidecar;                            if ($LASTEXITCODE) { exit $LASTEXITCODE }
           $env:MKMN_REQUIRE_SIDECAR = "1"
-          pnpm test;                                         if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          pnpm test --coverage;                              if ($LASTEXITCODE) { exit $LASTEXITCODE }
           cargo clippy --manifest-path src-tauri/Cargo.toml --target aarch64-pc-windows-msvc -- -D warnings; if ($LASTEXITCODE) { exit $LASTEXITCODE }
           cargo test   --manifest-path src-tauri/Cargo.toml --target aarch64-pc-windows-msvc;              exit $LASTEXITCODE
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: coverage
+          path: |
+            coverage/coverage-summary.json
+            coverage/lcov.info
+          retention-days: 30
 
   security:
     runs-on: ubuntu-latest
