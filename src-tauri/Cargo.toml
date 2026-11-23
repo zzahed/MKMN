@@ -29,7 +29,7 @@ tauri-plugin-dialog = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-process = "2"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "io-util", "sync", "time"] }
-reqwest = { version = "0.12", default-features = false, features = ["json"] }
+reqwest = { version = "0.13", default-features = false, features = ["json"] }
 sha2 = "0.10"
 # The WebView2 bindings Tauri itself uses (same version): the frame navigation guard (artifact_frame.rs).
 webview2-com = "0.39"
