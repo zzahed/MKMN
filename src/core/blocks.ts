@@ -194,7 +194,7 @@ export async function settleBlocks(text: string, ask: (system: string, user: str
     if (!why) continue;
     let fixed: string | null = null, reason = why;
     for (let k = 0; k < tries && fixed === null; k++) {
-      let reply = "";
+      let reply: string;
       try { reply = await ask(blockFixInstructions(lang), `The ${lang} block:\n${raw.trim().slice(0, 2500)}\n\nWhy it does not draw as written: ${reason}\n\nSend the corrected block.`); } catch { break; }
       const candidate = reply.trim().replace(/^```\w*\n?|\n?```$/g, "");
       const again = candidate ? blockFlaw(lang, candidate) : "the reply was empty";

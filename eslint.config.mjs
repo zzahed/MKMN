@@ -13,9 +13,6 @@ import reactHooks from "eslint-plugin-react-hooks";
 const DEBT = [
   "@typescript-eslint/no-explicit-any",
   "@typescript-eslint/no-unused-vars",
-  "@typescript-eslint/no-require-imports",
-  "no-useless-escape",
-  "no-useless-assignment",
 ];
 
 export default tseslint.config(
@@ -40,6 +37,24 @@ export default tseslint.config(
       // ES5-style code (the X blocks) and async generator bodies reach `this` through `self`
       "@typescript-eslint/no-this-alias": ["error", { allowedNames: ["self"] }],
     },
+  },
+  {
+    // package.json has no "type": "module", so these scripts are CommonJS: require() is how they import
+    files: ["**/*.cjs", "scripts/**/*.js", "tests/**/*.js"],
+    languageOptions: { sourceType: "commonjs" },
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
+  {
+    // plain Node scripts: the browser-only globals (window, open, …) do not exist there
+    files: ["scripts/*.cjs", "scripts/**/*.js", "tests/**/*.js"],
+    languageOptions: {
+      globals: Object.fromEntries(Object.keys(globals.browser).filter((name) => !(name in globals.node)).map((name) => [name, "off"])),
+    },
+  },
+  {
+    // the X block smoke tests run their blocks in a page (jsdom); `open` is the harness's, not window.open
+    files: ["scripts/xblocks-smoke/**"],
+    languageOptions: { globals: { open: "off" } },
   },
   {
     // stand-in model streams in tests fail or finish before their first chunk on purpose

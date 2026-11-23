@@ -162,7 +162,7 @@ export function looksGarbled(text: string): boolean {
   if (!t) return true;
   if (/(.)\1{29,}/s.test(t)) return true;
   if (t.length >= 24) {
-    const plain = (t.match(/[\p{L}\p{N}\s.,;:!?'"()\-]/gu) ?? []).length;
+    const plain = (t.match(/[\p{L}\p{N}\s.,;:!?'"()-]/gu) ?? []).length;
     if (plain / t.length < 0.5) return true;
   }
   return false;

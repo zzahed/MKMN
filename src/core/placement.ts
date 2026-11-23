@@ -71,7 +71,7 @@ export function judgePlacement(i: PlacementInput): Placement {
   if (i.cpuBusyPct !== null) ev.push(`system CPU was ${Math.round(i.cpuBusyPct)}% busy while it answered (all processes, not attributed to the model)`);
   if (i.logHint) ev.push(`the server log mentions the ${i.logHint === "npu" ? "NPU / Hexagon" : "CPU"}`);
   if (i.asked === "cpu") ev.push("the server was started with --compute cpu");
-  let runsOn: RunsOn = "unknown";
+  let runsOn: RunsOn;
   if (i.asked === "cpu") {
     // the CPU was asked for explicitly: busy CPU corroborates it, NPU counters contradict it
     runsOn = cpuHeavy || (!npuSignal && haveCounters) ? "cpu" : npuSignal ? "mixed" : "cpu";

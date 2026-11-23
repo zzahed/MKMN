@@ -143,10 +143,10 @@ export function repairJson(raw: string): string | null {
   if (parses(t)) return t;
   const steps: ((x: string) => string)[] = [
     // a formula written with the placeholder marks and no quotes: "y":[[=P*(1+r/100)^t]]
-    (x) => x.replace(/([:,]\s*)\[\[?=\s*([^\[\]"]+?)\s*\]\]?(?=\s*[,}\]])/g, '$1"$2"'),
+    (x) => x.replace(/([:,]\s*)\[\[?=\s*([^[\]"]+?)\s*\]\]?(?=\s*[,}\]])/g, '$1"$2"'),
     // a quote that slipped in front of an object or a list: [{...},"{"label":...}]
-    (x) => x.replace(/([,\[:]\s*)"(?=\s*[{\[])/g, "$1"),
-    (x) => x.replace(/([{,]\s*)"([A-Za-z_]\w*):\s*(?=[-\d\[{"tfn])/g, '$1"$2":'),
+    (x) => x.replace(/([,[:]\s*)"(?=\s*[{[])/g, "$1"),
+    (x) => x.replace(/([{,]\s*)"([A-Za-z_]\w*):\s*(?=[-\d[{"tfn])/g, '$1"$2":'),
     (x) => x.replace(/([{,]\s*)([A-Za-z_]\w*)\s*:/g, '$1"$2":'),
     (x) => (x.includes('"') ? x : x.replace(/'/g, '"')),
     (x) => x.replace(/,\s*([}\]])/g, "$1"),
@@ -196,7 +196,7 @@ export async function healChartText(raw: string, ask?: (system: string, user: st
   if (fixed0 && chartFlaw(fixed0) === null) return { text: fixed0, how: "repaired" };
   let reason = flaw ?? "it is not valid JSON";
   for (let k = 0; ask && k < tries; k++) {
-    let reply = "";
+    let reply: string;
     try { reply = await ask(CHART_FIX_INSTRUCTIONS, `The chart:\n${raw.trim().slice(0, 2500)}\n\nWhy it cannot be drawn: ${reason}\n\nSend the corrected JSON.`, raw, reason); } catch { break; }
     const candidate = repairJson(reply) ?? reply.trim().replace(/^```\w*\n?|```$/g, "");
     const check = chartFlaw(candidate);

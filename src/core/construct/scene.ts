@@ -28,12 +28,12 @@ export function pageElements(html: string): { id: string; tag: string; attrs: Re
   let m: RegExpExecArray | null;
   while ((m = re.exec(html))) {
     const attrs = m[2];
-    const idm = /(?:^|\s)id\s*=\s*(\"([^\"]*)\"|'([^']*)'|([^\s>]*))/i.exec(attrs);
+    const idm = /(?:^|\s)id\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]*))/i.exec(attrs);
     if (!idm) continue;
     const id = idm[2] ?? idm[3] ?? idm[4];
     if (!id || !/^[A-Za-z_]/.test(id)) continue;
     const rest: Record<string, string> = {};
-    for (const am of attrs.matchAll(/([\w-]+)\s*=\s*(\"[^\"]*\"|'[^']*'|[^\s>]*)/g)) {
+    for (const am of attrs.matchAll(/([\w-]+)\s*=\s*("[^"]*"|'[^']*'|[^\s>]*)/g)) {
       const v = am[2];
       rest[am[1]] = v.startsWith('"') || v.startsWith("'") ? v.slice(1, -1) : v;
     }
@@ -60,7 +60,7 @@ export function wiredEvents(script: string): Wired {
   }
   for (const m of script.matchAll(/document\.addEventListener\("(keydown|keyup)", function \(e\) \{ if \(([\s\S]*?)\) \{ e\.preventDefault\(\); __run\(([\w$]+), e\);/g)) {
     const lit = /e\.code === "Space"/.test(m[2]) ? null : /e\.key === ("(?:[^"\\]|\\.)*")/.exec(m[2])?.[1];
-    let key: string | null = null;
+    let key: string | null;
     try { key = lit !== null && lit !== undefined ? (JSON.parse(lit) as string) : (/e\.code === "Space"/.test(m[2]) ? "Space" : null); } catch { key = null; }
     if (key) (m[1] === "keydown" ? out.down : out.up).push({ name: m[3], key });
   }

@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import { geniexCandidates, locateGeniex, initialSteps } from "../src/core/setup";
 import { SetupService, geniexNeedsFeed, geniexUpgradeOffer, installGeniex } from "../src/core/setupService";
 import { canTransition } from "../src/shared/stateMachines";
+import * as os from "os";
 
-const gate = (state: "ok" | "missing" | "outdated" | "invalid", detected: string | null) => ({ state, path: state === "missing" ? null : "C:\g.exe", detected, required: "0.11.0", message: `${state}` });
+const gate = (state: "ok" | "missing" | "outdated" | "invalid", detected: string | null) => ({ state, path: state === "missing" ? null : "C:g.exe", detected, required: "0.11.0", message: `${state}` });
 
 const env = { LOCALAPPDATA: "C:\\Users\\me\\AppData\\Local", USERPROFILE: "C:\\Users\\me", Path: "C:\\Windows;C:\\Tools" } as any;
 
@@ -28,7 +29,7 @@ describe("installGeniex", () => {
     signature: async () => ({ status: "Valid", signer: "CN=Qualcomm Technologies, Inc., O=Qualcomm Technologies, Inc." }),
     sha256: async () => "ab12",
     probe: async () => "GenieX CLI Version: v0.11.0",
-    env, tmpDir: require("os").tmpdir() + "/opennpu-test", ...over
+    env, tmpDir: os.tmpdir() + "/opennpu-test", ...over
   });
   it("downloads, runs, and returns the found path with progress", async () => {
     const seen: any[] = [];
@@ -72,7 +73,7 @@ describe("setup service", () => {
     expect(s.check()).toBe(false);
   });
   it("offers an optional update when a compatible GenieX has a newer stable release", async () => {
-    const s = new SetupService(ops({ geniexPath: () => "C:\g.exe" }));
+    const s = new SetupService(ops({ geniexPath: () => "C:g.exe" }));
     expect(s.check({ geniex: gate("ok", "0.11.0"), upgrade: "v0.12.0" })).toBe(true);
     expect(s.status().steps[0]).toMatchObject({ state: "pending", detail: expect.stringContaining("Optional update") });
     expect(s.status().steps[0].detail).toContain("v0.12.0");
@@ -84,16 +85,16 @@ describe("setup service", () => {
     const missing = new SetupService(ops({ geniexPath: () => null }));
     missing.check({ geniex: gate("missing", null) });
     expect(missing.status().steps[0]).toMatchObject({ state: "pending", detail: expect.stringContaining("v0.11.0 or newer") });
-    const old = new SetupService(ops({ geniexPath: () => "C:\g.exe" }));
+    const old = new SetupService(ops({ geniexPath: () => "C:g.exe" }));
     old.check({ geniex: gate("outdated", "0.10.0") });
     expect(old.status().steps[0].state).toBe("pending");
     expect(old.status().steps[0].detail).toMatch(/Found v0\.10\.0\. MKMN needs GenieX v0\.11\.0 or newer/);
-    const bad = new SetupService(ops({ geniexPath: () => "C:\g.exe" }));
+    const bad = new SetupService(ops({ geniexPath: () => "C:g.exe" }));
     bad.check({ geniex: gate("invalid", null) });
     expect(bad.status().steps[0].detail).toContain("no valid version");
   });
   it("leaves a compatible GenieX alone when no newer release is known (offline)", () => {
-    const s = new SetupService(ops({ geniexPath: () => "C:\g.exe", voiceNeeds: () => ({ stt: false, tts: false, sttName: "a", ttsName: "b" }) }));
+    const s = new SetupService(ops({ geniexPath: () => "C:g.exe", voiceNeeds: () => ({ stt: false, tts: false, sttName: "a", ttsName: "b" }) }));
     expect(s.check({ geniex: gate("ok", "0.11.0"), upgrade: null })).toBe(false);
     expect(s.status().steps[0].state).toBe("done");
   });
@@ -114,22 +115,22 @@ describe("setup service", () => {
   });
   it("remembers a skipped optional update, never a skipped required install", () => {
     const seen: string[] = [];
-    const opt = new SetupService(ops({ geniexPath: () => "C:\g.exe", onGeniexUpdateSkipped: (t: string) => seen.push(t) }));
+    const opt = new SetupService(ops({ geniexPath: () => "C:g.exe", onGeniexUpdateSkipped: (t: string) => seen.push(t) }));
     opt.check({ geniex: gate("ok", "0.11.0"), upgrade: "v0.12.0" });
     opt.skip("geniex");
     expect(seen).toEqual(["v0.12.0"]);
-    const declined = new SetupService(ops({ geniexPath: () => "C:\g.exe", onGeniexUpdateSkipped: (t: string) => seen.push(t) }));
+    const declined = new SetupService(ops({ geniexPath: () => "C:g.exe", onGeniexUpdateSkipped: (t: string) => seen.push(t) }));
     declined.check({ geniex: gate("ok", "0.11.0"), upgrade: "v0.13.0" });
     declined.decline();
     expect(seen).toEqual(["v0.12.0", "v0.13.0"]);
-    const required = new SetupService(ops({ geniexPath: () => "C:\g.exe", onGeniexUpdateSkipped: (t: string) => seen.push(t) }));
+    const required = new SetupService(ops({ geniexPath: () => "C:g.exe", onGeniexUpdateSkipped: (t: string) => seen.push(t) }));
     required.check({ geniex: gate("outdated", "0.10.0"), upgrade: "v0.12.0" });
     required.skip("geniex");
     required.decline();
     expect(seen).toEqual(["v0.12.0", "v0.13.0"]);
   });
   it("skipping setup leaves the GenieX step skipped (the gate keeps inference off) and the app opens", () => {
-    const s = new SetupService(ops({ geniexPath: () => "C:\g.exe" }));
+    const s = new SetupService(ops({ geniexPath: () => "C:g.exe" }));
     s.check({ geniex: gate("outdated", "0.10.0") });
     s.decline();
     expect(s.status()).toMatchObject({ active: false, awaitingConfirm: false });

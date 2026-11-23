@@ -264,7 +264,7 @@ export function selectAuto(input: SelectionInput): Selection {
   }
 
   // ---- scored selection per goal
-  let pick: { c: Candidate; lat: number | null } | null = null;
+  let pick: { c: Candidate; lat: number | null } | null;
   const goalLine: string[] = [];
   if (goal === "fastest") {
     pick = best;

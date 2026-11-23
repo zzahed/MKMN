@@ -1609,8 +1609,8 @@ export async function* stepwise(o: StepwiseOptions): AsyncGenerator<ChatEvent, S
       const test = begin(verify, "run", round ? `Test run ${round + 1}` : "Test run", `loading ${page.title}, pressing its keys, clicking its buttons`);
       yield run("running");
       let report: Awaited<ReturnType<NonNullable<StepwiseOptions["check"]>>>;
-      let mark: { scenarios?: Scenario[]; units?: Unit[]; skipped?: string[] } | null = null;
-      let checked = page.content;
+      let mark: { scenarios?: Scenario[]; units?: Unit[]; skipped?: string[] } | null;
+      let checked: typeof page.content;
       try {
         const now = current.get(page.title.toLowerCase()) ?? page;
         checked = now.content;

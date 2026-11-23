@@ -34,17 +34,17 @@ describe("no inline settings default is left behind", () => {
       lines.forEach((line, i) => {
         const n = i + 1;
         // A `??`/`||` fallback beside the point of use restates a default the schema holds.
-        for (const m of line.matchAll(/settings[\?\.)\w]*\.(\w+)[\?\.\w\[\]'"]*\s*(\?\?|\|\|)\s*(".*?"|[\d_]+|true|false|\[\]|\{\})/g)) {
+        for (const m of line.matchAll(/settings[?.)\w]*\.(\w+)[?.\w[\]'"]*\s*(\?\?|\|\|)\s*(".*?"|[\d_]+|true|false|\[\]|\{\})/g)) {
           const key = m[1];
           if (leaves.has(key)) offenders.push(`${f}:${n}: ${line.trim()}`);
         }
         // The boolean idioms that hide a default: `!!x` (false), `x !== false` (true),
         // `x === true` (false). Comparisons against enum values are reads, not defaults.
-        for (const m of line.matchAll(/!!\s*settings[\?\.)\w]*\.(\w+)/g)) {
+        for (const m of line.matchAll(/!!\s*settings[?.)\w]*\.(\w+)/g)) {
           const key = m[1];
           if (booleanLeaves.has(key)) offenders.push(`${f}:${n}: ${line.trim()}`);
         }
-        for (const m of line.matchAll(/settings[\?\.)\w]*\.(\w+)[\?\.\w]*\s*!==\s*false|settings[\?\.)\w]*\.(\w+)[\?\.\w]*\s*===\s*true/g)) {
+        for (const m of line.matchAll(/settings[?.)\w]*\.(\w+)[?.\w]*\s*!==\s*false|settings[?.)\w]*\.(\w+)[?.\w]*\s*===\s*true/g)) {
           const key = m[1] ?? m[2];
           if (key && booleanLeaves.has(key)) offenders.push(`${f}:${n}: ${line.trim()}`);
         }

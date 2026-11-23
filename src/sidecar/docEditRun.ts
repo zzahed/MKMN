@@ -186,7 +186,7 @@ export async function runDocEdit(deps: DocEditRunDeps): Promise<void> {
     emit({ runId, status, step, phase: "settled", line, actions: [], at: Date.now(), ...extra });
   const fail = (message: string) => settle("failed", `Failed: ${message}`);
   let tmpPath: string | null = null;
-  let copyPath: string | null = null;
+  let copyPath: string | null;
   let wrote = false;
   try {
     // ---- read

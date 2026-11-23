@@ -558,7 +558,7 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
   };
 
   const doImport = async () => {
-    let text: string | null = null;
+    let text: string | null;
     try {
       text = await api().importSettingsJson();
     } catch (err) {

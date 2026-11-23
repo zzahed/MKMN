@@ -8,7 +8,7 @@
 
   /* ---------- reading the expression ---------- */
   function tokenize(src) {
-    var re = /\s*(?:(\d+(?:\.\d+)?)|("[^"]*"|'[^']*')|([A-Za-z_]\w*(?:\.\w+)*)|(==|!=|<=|>=|[-+*\/%()<>,]))/y, out = [], pos = 0, m;
+    var re = /\s*(?:(\d+(?:\.\d+)?)|("[^"]*"|'[^']*')|([A-Za-z_]\w*(?:\.\w+)*)|(==|!=|<=|>=|[-+*/%()<>,]))/y, out = [], pos = 0, m;
     while (pos < src.length) {
       re.lastIndex = pos;
       m = re.exec(src);
@@ -208,7 +208,7 @@
     update() {
       if (!this._name || !this.isConnected) return;
       if (!countWrite()) { report(this, "calc loop stopped: " + this._name + " keeps changing the values it reads"); return; }
-      var v = 0;
+      var v;
       try {
         if (this._error) throw new Error(this._error);
         if (this._deps.indexOf(this._name) >= 0) throw new Error("calc " + this._name + " reads its own value");
