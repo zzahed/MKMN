@@ -10,7 +10,7 @@ import type { ArtifactKind, CatalogEntry, ChatEvent, ChatMessage, ChatOptions, C
 import { readBool, readNum, readObj } from "../shared/settingsSchema";
 import * as nodePath from "node:path";
 import { existsSync } from "node:fs";
-import { CATEGORY_INFO, THINKING_OK, isDynamicId, installedOf, mergedPack, pickModel, sortRequest, tierOf, wantedNote, type BundleModel, type TaskCategory } from "./dynamic";
+import { CATEGORY_INFO, isDynamicId, installedOf, mergedPack, pickModel, sortRequest, tierOf, wantedNote, type BundleModel, type TaskCategory } from "./dynamic";
 import { DYNAMIC_DATA } from "./dynamic-data";
 import { scoreEntry } from "./fit";
 import { scoreOf } from "./scores";
@@ -30,7 +30,7 @@ import type { StepUsage } from "./harness/journal";
 import { journalDir } from "./harness/journal";
 import { DEFAULT_ENDPOINT } from "./geniex";
 const isFoundryEntry = (e: CatalogEntry) => e.id.startsWith("foundry:");
-import { applyEffort, autoEffort, effectiveEffort, stageEffort, thinkingSupport, visionSupport, withSystem } from "./effort";
+import { applyEffort, effectiveEffort, stageEffort, thinkingSupport, visionSupport, withSystem } from "./effort";
 import { codeSampling } from "./sampling";
 import { latestArtifacts, compactHistory, reviewCode, resolveEdits, stripEdits } from "./review";
 import { interfaceOf, stepwise, stubHistory, type Session } from "./build";
@@ -48,6 +48,7 @@ import { CHART_FIX_INSTRUCTIONS, settleCharts, mendLeakedFormulas, chartBlocks, 
 import { settleBlocks } from "./blocks";
 import { diagramFixInstructions } from "./diagram";
 import { prepareTurn } from "./chatPrepare";
+import { chooseEffort } from "./chatRoute";
 import { orchestrate } from "./orchestrate";
 import { makeDeck, wantsDeck } from "./deckBuild";
 import { changeDeck } from "./deckEdit";
@@ -737,28 +738,10 @@ export async function runChatOrchestrator(host: ChatHost, id: string, entryId: s
       if (isDynamicId(entryId)) { team = await dynamicTeam(host, entryId, messages, !onCommand); if (team) entry = team.pick.entry; } // sorted again on the words, now that the image is text
       lap("Reading the image");
     }
-    // a model that can think is told not to, except for reasoning, maths and plans: its thinking is minutes of waiting for a mail or a page
-    let effortNow = team && !THINKING_OK.has(team.pick.category) ? ("off" as const) : opts.effort;
-    // Auto: the level is read from the kind of request and its words, no model call; a model that cannot think has nothing to settle
-    if (opts.effort === "auto" && thinkingSupport(entry) !== "none") {
-      const lastUser = [...messages].reverse().find((m) => m.role === "user");
-      const words = typeof lastUser?.content === "string" ? lastUser.content : (lastUser?.content ?? []).map((p) => (p.type === "text" ? p.text : "")).join("");
-      const category = team ? team.pick.category : sortRequest(words, { hasFiles: latestArtifacts(messages).length > 0 }).category;
-      const auto = autoEffort(category, words);
-      effortNow = auto.level;
-      host.send({ id, type: "notice", text: `Thinking: ${auto.level} (${auto.why}).` });
-    }
-    // the default level (Medium) of a model picked by hand: a request the words already show to be plain (a mail, a translation, a chat) is
-    // answered without the minutes of thinking; High, Low and Off are the person's own choice and stay
-    if (!team && opts.effort === "medium" && thinkingSupport(entry) === "toggle") {
-      const lastUser = [...messages].reverse().find((m) => m.role === "user");
-      const words = typeof lastUser?.content === "string" ? lastUser.content : (lastUser?.content ?? []).map((p) => (p.type === "text" ? p.text : "")).join("");
-      const kind = sortRequest(words, { hasFiles: latestArtifacts(messages).length > 0 });
-      if (kind.confidence >= 0.8 && !THINKING_OK.has(kind.category)) {
-        effortNow = "off";
-        host.send({ id, type: "notice", text: "A plain request: answered without thinking first (choose High to make it think)." });
-      }
-    }
+    // route (src/core/chatRoute.ts): how much the model thinks for this request, and the notice that says so
+    const thinking = chooseEffort(opts.effort, entry, team ? { category: team.pick.category } : null, messages);
+    const effortNow = thinking.effort;
+    if (thinking.notice) host.send({ id, type: "notice", text: thinking.notice });
     // F04: the served object is carried through model switches — `bring()` re-serves
     // and updates it, so every use below (streams, compaction, helper passes) names
     // the model the server ACTUALLY runs now, not the one the chat started with.
