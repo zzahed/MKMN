@@ -225,6 +225,8 @@ makensis /DVERSION=0.0.2 installer.nsi
 ## Explore Further
 
 - [User guide](docs/guide/user-guide.md): every feature in plain words
+- [Words and common questions](docs/guide/faq.md): NPU, GenieX, FUSE and more; offline use, privacy, a model that won't load
+- [UI work without a Snapdragon laptop](CONTRIBUTING.md#ui-work-without-a-snapdragon-laptop): the browser preview with made-up data
 - [Documentation index](docs/README.md): design notes, research and test matrix
 - [Release notes](docs/RELEASE-NOTES.md) · [Latest release](https://github.com/zzahed/MKMN/releases/latest)
 - [What is stored on your PC](docs/design/data-at-rest.md)

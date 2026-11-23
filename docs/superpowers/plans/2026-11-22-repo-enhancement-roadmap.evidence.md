@@ -112,6 +112,7 @@ Recorded 2026-11-22 on base `fd402bd`, Windows 11 ARM64, Node 26.13.0, pnpm 10.2
 | 13 | owner gate accepted (privacy.retentionDays, default null, prunes journals and payloads at sidecar start) after CI run 45071081599 | privacy, saved data (C4) | 2026-11-23 |
 | 14 | owner gate accepted (SECURITY.md, PR template, bug and feature issue forms) | repo policy (C4) | 2026-11-23 |
 | 15 | owner gate accepted (ESLint at 0 errors with 14 rules set to warn as `DEBT`, Prettier check only, `pnpm lint` in `lint-type`) | CI (C4) | 2026-11-23 |
+| 16 | owner gate accepted (code names renamed to MKMN; the five `opennpu.*` saved keys kept) | saved data (C4) | 2026-11-23 |
 
 ## CI run 45056310505 (PR 6, commit 36a4040, Node 24.22.3)
 
