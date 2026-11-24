@@ -56,6 +56,8 @@ export interface JournalStep {
   validations: ValidationRecord[];
   tokens: StepUsage;
   error?: string;
+  /** The step's input: a run journals the whole settled record, and a resume checks it against the plan. */
+  input?: unknown;
 }
 
 export interface JournalRun {
@@ -103,7 +105,15 @@ export interface JournalRewind {
   reason: string;
 }
 
-export type JournalEntry = JournalRun | JournalStepStarted | JournalStep | JournalInterrupted | JournalRewind;
+/** Written by a resume that accepted a torn last line (a process that died mid-write): the line
+ *  before it is that fragment, already accounted for, not corruption. */
+export interface JournalTorn {
+  type: "torn";
+  runId: string;
+  at: string;
+}
+
+export type JournalEntry = JournalRun | JournalStepStarted | JournalStep | JournalInterrupted | JournalRewind | JournalTorn;
 
 /** The harness folder of the workspace; every run's journal lives here. */
 export function journalDir(env: NodeJS.ProcessEnv = process.env): string {
@@ -120,21 +130,39 @@ export function appendEntry(file: string, entry: JournalEntry): void {
   appendFileSync(file, `${JSON.stringify(entry)}\n`, "utf8");
 }
 
-/** Read every well-formed line. A malformed line is skipped and counted, never rewritten. */
-export function readJournal(file: string): { entries: JournalEntry[]; malformed: number } {
-  if (!existsSync(file)) return { entries: [], malformed: 0 };
+/** Read every well-formed line. A malformed line is skipped and counted, never rewritten.
+ *  `torn` says the LAST line is one of them: what a process that died mid-write leaves.
+ *  `corrupt` counts the malformed lines that are neither that last line nor a fragment an earlier
+ *  resume sealed (a malformed line directly followed by a "torn" entry). */
+export function readJournal(file: string): { entries: JournalEntry[]; malformed: number; torn: boolean; corrupt: number } {
+  if (!existsSync(file)) return { entries: [], malformed: 0, torn: false, corrupt: 0 };
   const entries: JournalEntry[] = [];
   let malformed = 0;
+  let corrupt = 0;
+  let pending = false; // the line before was malformed and is not yet known to be a sealed fragment
   for (const line of readFileSync(file, "utf8").split("\n")) {
     const text = line.trim();
     if (!text) continue;
+    let entry: JournalEntry;
     try {
-      entries.push(JSON.parse(text) as JournalEntry);
+      entry = JSON.parse(text) as JournalEntry;
     } catch {
       malformed++;
+      if (pending) corrupt++;
+      pending = true;
+      continue;
     }
+    if (pending && entry.type !== "torn") corrupt++;
+    pending = false;
+    entries.push(entry);
   }
-  return { entries, malformed };
+  return { entries, malformed, torn: pending, corrupt };
+}
+
+/** End a torn last line and mark it sealed, in one append, so what is journaled next starts on a
+ *  line of its own and later reads do not take the fragment for corruption. */
+export function sealTornTail(file: string, runId: string): void {
+  appendFileSync(file, `\n${JSON.stringify({ type: "torn", runId, at: new Date().toISOString() } satisfies JournalTorn)}\n`, "utf8");
 }
 
 /** The settled step records of a journal, in order. */
@@ -145,10 +173,15 @@ export function settledSteps(file: string): JournalStep[] {
 /**
  * What a resume needs: the settled steps to replay, and the steps that were started
  * and never settled (their process died mid-step), which the resuming run marks
- * interrupted before executing them again.
+ * interrupted before executing them again. Also what the resume must refuse on: `corrupt`, the
+ * unreadable lines before the journal's end (a torn last line, or one an earlier resume sealed, is
+ * not one), and `foreign`, the entries that belong to another run than `runId` (left out of
+ * settled and dangling). `torn` says the last line is a fragment the resume must seal before it
+ * writes (sealTornTail).
  */
-export function resumeReplay(file: string): { settled: JournalStep[]; dangling: { seq: number; id: string }[] } {
-  const { entries } = readJournal(file);
+export function resumeReplay(file: string, runId?: string): { settled: JournalStep[]; dangling: { seq: number; id: string }[]; corrupt: number; foreign: number; torn: boolean } {
+  const { entries: all, corrupt, torn } = readJournal(file);
+  const entries = runId === undefined ? all : all.filter((e) => e.runId === runId);
   const settled = new Map<number, JournalStep>();
   const started = new Map<number, string>();
   for (const e of entries) {
@@ -161,5 +194,11 @@ export function resumeReplay(file: string): { settled: JournalStep[]; dangling: 
   const dangling = [...started]
     .map(([seq, id]) => ({ seq, id }))
     .sort((a, b) => a.seq - b.seq);
-  return { settled: [...settled.values()].sort((a, b) => a.seq - b.seq), dangling };
+  return {
+    settled: [...settled.values()].sort((a, b) => a.seq - b.seq),
+    dangling,
+    corrupt,
+    foreign: all.length - entries.length,
+    torn,
+  };
 }

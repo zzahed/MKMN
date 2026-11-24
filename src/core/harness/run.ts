@@ -17,6 +17,7 @@ import {
   journalPath,
   readJournal,
   resumeReplay,
+  sealTornTail,
   type JournalStep,
   type JournalEntry,
   type PromptSectionRef,
@@ -75,6 +76,10 @@ export interface StepDef<I, O> {
   outputRetries?: number;
   /** Retries after the exec threw (default 1; the gateway counts transport faults here). */
   transportRetries?: number;
+  /** The step changes something outside the run (writes a file, sends a message, calls a tool that
+   *  acts): when a resume finds it interrupted before it settled, it refuses rather than run it
+   *  again, since the first try may already have done its work. */
+  sideEffects?: boolean;
   exec(input: I, attempt: StepAttempt<I>): Promise<O | ExecResult<O>> | O | ExecResult<O>;
 }
 
@@ -187,7 +192,36 @@ export function createRun(defs: StepDef<unknown, unknown>[], opts: RunOptions): 
     // Resume: replay the settled steps of the journal, mark the dangling ones interrupted.
     let firstIndex = 0;
     if (file !== null && readJournal(file).entries.length > 0) {
-      const { settled: replayed, dangling } = resumeReplay(file);
+      const { settled: replayed, dangling, corrupt, foreign, torn } = resumeReplay(file, runId);
+      // Every refusal comes before the first write, so a refused resume leaves the journal as it was.
+      const refuse = (why: string): never => { throw new Error(`Cannot resume run ${runId}: ${why}`); };
+      if (foreign > 0) refuse(`the journal holds ${foreign} ${foreign === 1 ? "entry" : "entries"} of another run.`);
+      if (corrupt > 0) refuse(`the journal has ${corrupt} unreadable line${corrupt === 1 ? "" : "s"} before its end, so its checkpoint cannot be trusted.`);
+      // A resumed run must match the original plan's contiguous settled prefix, step by step and
+      // input by input. Otherwise a changed graph or corrupted journal could silently skip a step,
+      // or replay an output made for another input, then claim an incompatible checkpoint completed.
+      for (let i = 0; i < replayed.length; i++) {
+        const rec = replayed[i];
+        if (rec.seq !== i || defs[i]?.id !== rec.id) {
+          refuse(`checkpoint step ${rec.seq} (${rec.id}) does not match the current execution plan at position ${i}.`);
+        }
+        if (JSON.stringify(rec.input) !== JSON.stringify(defs[i].input)) {
+          refuse(`checkpoint step ${rec.seq} (${rec.id}) was recorded with a different input than the current execution plan gives it.`);
+        }
+      }
+      // A step that died mid-way may have done its work already: one that changes the world outside
+      // the run is never run a second time on its own.
+      // Checked against the step that stands at its position, so a step inserted before it cannot
+      // move it out from under the side-effect check.
+      for (const d of dangling) {
+        if (defs[d.seq]?.id !== d.id) refuse(`interrupted step ${d.seq} (${d.id}) does not match the current execution plan at position ${d.seq}.`);
+        if (defs[d.seq].sideEffects) refuse(`step ${d.seq} (${d.id}) was interrupted before it settled and has side effects, so it is not run again automatically.`);
+      }
+      // Accepted: from here the resume writes. A torn last line is ended and marked first, so the next
+      // entry does not glue onto it and a later resume does not take it for corruption.
+      if (torn) {
+        try { sealTornTail(file, runId); } catch (e) { console.error(`[harness] could not seal the torn journal of run ${runId}: ${(e as Error).message}`); }
+      }
       for (const d of dangling) {
         journalWrite({
           type: "interrupted",
@@ -198,15 +232,6 @@ export function createRun(defs: StepDef<unknown, unknown>[], opts: RunOptions): 
           reason: "the run was interrupted before this step settled",
         });
       }
-      // A resumed run must match the original plan's contiguous settled prefix.
-      // Otherwise a changed graph or corrupted journal could silently skip a step,
-      // then claim an incompatible checkpoint completed successfully.
-      for (let i = 0; i < replayed.length; i++) {
-        const rec = replayed[i];
-        if (rec.seq !== i || defs[i]?.id !== rec.id) {
-          throw new Error(`Cannot resume run ${runId}: checkpoint step ${rec.seq} (${rec.id}) does not match the current execution plan at position ${i}.`);
-        }
-      }
       for (const rec of replayed) {
         const def = defs[rec.seq];
         const copy: SettledStep = { ...rec, input: def.input, replayed: true };
@@ -214,7 +239,8 @@ export function createRun(defs: StepDef<unknown, unknown>[], opts: RunOptions): 
         yield copy;
       }
       firstIndex = replayed.length;
-      if (firstIndex >= defs.length) {
+      // A hard failure ended the first life, as it ends a fresh run: the later steps never had their chance.
+      if (firstIndex >= defs.length || replayed.some((r) => r.status === "failed")) {
         ensureRunning();
         finishRun();
         return;
