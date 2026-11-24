@@ -1,0 +1,274 @@
+/* ==========================================================================
+   Strata: the MKMN AI interface finish. Loaded last.
+
+   makman (مَكمَن) is a reservoir: value kept safe below the surface. The window is
+   read as layers of stone. The rail and title bar are the deepest stratum, the
+   sidebar the next, the canvas the surface, and panels one step lighter again.
+   Depth comes from tone alone: no glass, no blur, no grey shadow under every box.
+
+   One bold element only: the symbol's contours continue across the welcome
+   surface, and the same contours ripple while the model is working. Everything
+   else stays quiet.
+
+   Radius follows hierarchy: dialogs 12, panels 10, controls 6, chips round.
+   Type: Segoe UI Variable Display for titles, Text for reading, Small for meta.
+   No all-caps labels. Numbers that are measurements use tabular figures.
+   ========================================================================== */
+
+:root {
+  --r-dialog: 12px;
+  --r-panel: 10px;
+  --r-control: 6px;
+  --r-chip: 999px;
+  --fg: var(--text); /* older rules (window agent) asked for --fg, which no theme defined */
+  --panel: var(--raised);
+  --lift: 0 12px 32px color-mix(in srgb, var(--shadow-color) 16%, transparent), 0 0 0 1px color-mix(in srgb, var(--shadow-color) 4%, transparent);
+}
+
+/* ---------- type ---------- */
+body { font: 13px/1.5 var(--sans); background: var(--bg); }
+h1, h2, h3 { font-family: var(--display); letter-spacing: -.012em; }
+.page h1, .welcome h1, .empty h1, .setup-card h1, .runtime-card h1, .title-input,
+.page .set-body .set-head-title, .page .set-side .set-title {
+  font-family: var(--display); font-weight: 600; letter-spacing: -.022em; line-height: 1.15;
+}
+.page h1 { font-size: 28px; }
+.page .set-body .set-head-title { font-size: 28px; }
+.page .set-side .set-title { font-size: 20px; }
+.page h2, .page .set-body h2 { font-size: 15px; font-weight: 600; letter-spacing: -.005em; }
+.small, .muted.small, .stats, .badge, .count, .tag, .cap, .search-sub, .search-tag,
+.recents-title, .set-nav-heading, .menu-title, .hud-pill, .meter-head { font-family: var(--small); }
+.stats, .badge, .count, .meter-head, .hud-pill, .metrics-table td, .bd-val, .kpi-value,
+.perf-tile strong, .lane-num, .ver-n { font-variant-numeric: tabular-nums; }
+
+/* labels read as sentences: no tracked-out capitals anywhere */
+.f-label, .src, .compare tbody th, .set-subhead, .foundry-block > h3, .chart-formula-label,
+.flashcard-side, .metrics-table th, .runtime-kicker {
+  text-transform: none; letter-spacing: 0;
+}
+.f-label, .set-subhead, .foundry-block > h3, .compare tbody th, .metrics-table th { font-size: 12px; font-weight: 600; color: var(--muted); }
+.set-subhead { margin: 18px 0 -2px; }
+.src { font-size: 11px; }
+.runtime-kicker { font-size: 12.5px; font-weight: 600; color: var(--accent); }
+
+/* ---------- the frame: three strata ---------- */
+.titlebar { background: var(--rail); border-bottom: 0; }
+.app-rail { background: var(--rail); border-right: 0; }
+.sidebar { background: var(--side); border-right: 0; }
+.main, .chat { background: var(--bg); }
+.side-foot { border-top: 1px solid var(--line); }
+
+/* rail: the active place is a slab of the sidebar's stone, joined to it */
+.rail-btn { border-radius: var(--r-panel); color: var(--muted); }
+.rail-btn:hover { color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); }
+.rail-btn.active { color: var(--text); background: var(--side); }
+.rail-btn.active svg { color: var(--accent); }
+.rail-tip { border-radius: var(--r-control); background: var(--raised); box-shadow: var(--lift); border-color: var(--border); }
+
+/* sidebar rows: no accent bar, the selected row is lifted to the canvas tone */
+.sidebar-heading { font-family: var(--display); font-weight: 600; letter-spacing: -.015em; }
+.navbtn, .recent, .proj-head, .profile, .show-more { border-radius: var(--r-control); }
+.navbtn:hover:not(.active), .recent:hover:not(.active), .proj-head:hover { background: color-mix(in srgb, var(--text) 5%, transparent); }
+.navbtn.active, .recent.active, .proj-head.active { background: var(--bg); font-weight: 500; }
+.sidebar .navbtn.active::before, .recent.active::before { content: none; }
+.recents-title { color: var(--muted); font-weight: 600; font-size: 12px; }
+.count { background: color-mix(in srgb, var(--text) 7%, transparent); opacity: 1; color: var(--muted); }
+.recent .x.more { background: var(--bg); border-color: var(--border); }
+.recent .x.more:hover { background: var(--surface); }
+.recent.busy .recent-title > span { background: linear-gradient(100deg, var(--muted) 30%, var(--text) 45%, var(--brass) 50%, var(--text) 55%, var(--muted) 70%); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; }
+.dot.live { background: var(--brass); }
+.recent-actions { background: var(--raised); box-shadow: var(--lift); border-radius: var(--r-panel); }
+
+/* ---------- controls ---------- */
+input:not([type="radio"]):not([type="checkbox"]):not([type="range"]), select, textarea { border-radius: var(--r-control); background: var(--raised); border-color: var(--border); }
+button.primary, button.ghost, button.danger, button.small-btn, button.icon-btn, .agent-stop, .agent-review-save, .agent-review-cancel { border-radius: var(--r-control); }
+button.primary { padding: 7px 14px; font-weight: 600; }
+button.ghost { border-color: var(--border); background: transparent; }
+button.ghost:hover { background: color-mix(in srgb, var(--text) 5%, transparent); border-color: color-mix(in srgb, var(--text) 22%, var(--border)); }
+.iconbtn, .linkbtn, .chip, .side-toggle, .sidebar-search, button.ctx { border-radius: var(--r-control); }
+.send { border-radius: var(--r-control); background: var(--accent); color: var(--on-accent); }
+.send.stop { background: var(--text); color: var(--bg); }
+.send:hover:not(:disabled) { transform: none; background: var(--accent-hover); opacity: 1; }
+.send.stop:hover:not(:disabled) { background: color-mix(in srgb, var(--text) 85%, var(--bg)); }
+.filter-chip, .skill-cat, .ver-chip, .agent-toggle, .bd-pills li, .tb-status { border-radius: var(--r-chip); }
+.filter-chip.on, .skill-cat.on { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+[data-theme="dark"] .filter-chip.on, [data-theme="dark"] .skill-cat.on { color: var(--accent-hover); }
+
+/* segmented controls: a groove cut into the surface, the pill is the surface itself */
+.seg { background: color-mix(in srgb, var(--text) 6%, transparent); border-radius: calc(var(--r-control) + 3px); }
+.seg button { border-radius: var(--r-control); }
+.seg button.on { background: var(--raised); box-shadow: none; }
+.seg-pill { border-radius: var(--r-control); background: var(--raised); box-shadow: 0 0 0 1px var(--border); }
+[data-theme="dark"] .seg-pill, [data-theme="dark"] .seg button.on { background: var(--raised); }
+
+/* ---------- surfaces: flat, toned, radius by rank ---------- */
+.card, .row-item, .artifact-card, .side-card, .card-lite, .bd-card, .bd-tile, .bd-pct, .kpi, .quiz-q, .chart-block,
+.vis-card, .skel, .step, .stat, .current-model, .compare-wrap, .filters, .bench-progress, .router-panel,
+.update-note, .icon-picker, .flashcard, .lane, .in-use, .agent-panel, .agent-picklist, .agent-review, .task-summary, .codeblock {
+  border-radius: var(--r-panel);
+  box-shadow: none;
+}
+.card, .row-item, .artifact-card, .side-card, .card-lite, .bd-card, .bd-tile, .bd-pct, .kpi, .step, .current-model, .filters, .bench-progress {
+  background: var(--surface);
+  border-color: var(--line);
+}
+.card:not(.editor):hover { transform: none; box-shadow: none; border-color: var(--border); }
+.card.clickable:hover, .row-item.clickable:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); background: var(--surface); }
+.empty-box { border-radius: var(--r-panel); border-style: solid; border-color: var(--line); background: color-mix(in srgb, var(--text) 2.5%, transparent); }
+.mrow { border-radius: var(--r-panel); background: var(--surface); border-color: var(--line); }
+.mrow.selected { border-color: var(--accent); }
+.badge, .tag, .cap, .chip-quiet, .bd-score { border-radius: var(--r-chip); }
+/* the model families: one stone each, the chosen one outlined in teal; no box inside the box */
+.card.dyn-card { border-color: var(--line); background: var(--surface); }
+.card.dyn-card.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.lane { border: 0; border-radius: var(--r-control); background: color-mix(in srgb, var(--text) 5%, transparent); }
+
+/* menus and popovers rise above the strata: the one place a shadow is earned */
+.menu, .side-menu, .add-menu, .ver-menu, .mic-menu, .vm-menu, .set-search-pop, .slash-menu, .cite-pop {
+  background: var(--raised); border: 1px solid var(--border); border-radius: var(--r-panel); box-shadow: var(--lift);
+}
+.menu-row, .menu-item, .mic-item, .ver-row, .slash-item, .add-menu button, .set-search-hits button { border-radius: var(--r-control); }
+
+/* dialogs */
+.modal { border-radius: var(--r-dialog); background: var(--bg); border-color: var(--border); box-shadow: 0 24px 64px color-mix(in srgb, var(--shadow-color) 40%, transparent); }
+.modal-head { border-bottom-color: var(--line); }
+.search-box { border-radius: var(--r-dialog); background: var(--raised); box-shadow: 0 24px 64px color-mix(in srgb, var(--shadow-color) 40%, transparent); }
+.search-row, .search-tab { border-radius: var(--r-control); }
+.search-row.on { background: var(--accent-soft); }
+
+/* ---------- chat ---------- */
+.messages { padding-top: 24px; }
+.column { gap: 18px; }
+.assistant { font-size: 15px; line-height: 1.62; }
+.md .md-h { font-family: var(--display); font-weight: 600; letter-spacing: -.01em; }
+.md blockquote { border-left-color: var(--brass); }
+.md-table th { background: transparent; }
+.user-bubble { background: var(--bubble); border-radius: 14px 14px 4px 14px; padding: 9px 14px; font-size: 15px; line-height: 1.55; }
+.codeblock { background: var(--code-bg); border-color: var(--line); }
+.codehead { border-bottom-color: var(--line); }
+.inline-code { border-color: var(--line); border-radius: 4px; }
+.artifact-panel { background: var(--surface); border-left: 0; box-shadow: -1px 0 0 var(--line); }
+.artifact-head { border-bottom-color: var(--line); }
+
+/* the composer: a raised slab of limestone, bordered, no halo */
+.composer, .proj-ask { background: var(--raised); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 1px 0 color-mix(in srgb, var(--shadow-color) 4%, transparent); }
+.composer:focus-within { border-color: color-mix(in srgb, var(--accent) 38%, var(--border)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 9%, transparent); }
+.composer textarea { font-size: 15px; }
+.attach-chip { border-radius: var(--r-control); }
+
+/* ---------- welcome: the reservoir field ---------- */
+.welcome, .setup { background-image: none; }
+.welcome { position: relative; isolation: isolate; overflow: hidden; }
+.welcome .greet { gap: 16px; margin-bottom: 4px; }
+.greet-mark { position: relative; display: grid; place-items: center; flex: none; }
+.welcome .greet .logo-mark { width: 36px; height: 36px; }
+.welcome h1 { font-size: clamp(28px, 3vw, 36px); font-weight: 600; letter-spacing: -.028em; }
+.reservoir-field {
+  position: absolute; left: 50%; top: 50%; width: 1400px; height: 1400px; translate: -50% -50%;
+  z-index: -1; pointer-events: none; overflow: visible;
+}
+.reservoir-field path {
+  stroke: var(--text); stroke-width: 1px; vector-effect: non-scaling-stroke; stroke-linecap: round;
+  opacity: calc(.2 - var(--k) * .013);
+  stroke-dasharray: 1; stroke-dashoffset: 1;
+  animation: field-draw 1.1s var(--ease-out) forwards; animation-delay: calc(80ms + var(--k) * 55ms);
+}
+.reservoir-field path:first-child { stroke: var(--brass); opacity: .45; }
+[data-theme="dark"] .reservoir-field path { opacity: calc(.16 - var(--k) * .0105); }
+[data-theme="dark"] .reservoir-field path:first-child { opacity: .4; }
+@keyframes field-draw { to { stroke-dashoffset: 0; } }
+.starters button, .starter { border-radius: var(--r-chip); }
+
+/* ---------- the working mark: contours lit from the deepest point outward ---------- */
+.spark-glyph { color: var(--accent); }
+.reservoir-pulse { display: block; overflow: visible; }
+.reservoir-pulse .rp { opacity: .28; animation: rp-ripple 1.6s var(--ease-in-out) infinite; }
+.reservoir-pulse .rp2 { animation-delay: .2s; }
+.reservoir-pulse .rp3 { animation-delay: .4s; }
+@keyframes rp-ripple { 0%, 70%, 100% { opacity: .28; } 25% { opacity: 1; } }
+.presence-text { animation: rise .35s var(--ease-out) both; background: none; color: var(--muted); -webkit-text-fill-color: currentColor; }
+
+/* ---------- pages ---------- */
+.page { padding: 36px 44px 64px; }
+.page-head { align-items: flex-end; padding-bottom: 18px; margin-bottom: 6px; border-bottom: 1px solid var(--line); }
+.page-head p { margin-bottom: 0; }
+
+/* Skills: rows to scan, not a wall of cards */
+.skill-list { gap: 0 28px; }
+.skill-row { background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; box-shadow: none; padding: 14px 6px; }
+.skill-row:hover { background: color-mix(in srgb, var(--text) 3%, transparent); border-color: var(--line); box-shadow: none; }
+.skill-icon { border-radius: var(--r-panel); background: var(--side); color: var(--accent); }
+.skill-actions { opacity: 0; }
+.skill-row:hover .skill-actions, .skill-row:focus-within .skill-actions { opacity: 1; }
+.skill-cats { gap: 6px; }
+.skill-cat { border-color: var(--line); padding: 5px 12px; }
+
+/* Projects */
+.proj-chats .row-item { border-bottom-color: var(--line); }
+
+/* ---------- settings: one column of bands ---------- */
+.set-side { background: var(--side); border-right: 0; }
+.set-nav-item { border-radius: var(--r-control); }
+.set-nav-item.on { background: var(--bg); color: var(--text); }
+.set-head { border-bottom: 0; padding-bottom: 4px; }
+.page .set-body section { background: transparent; border: 0; border-top: 1px solid var(--line); border-radius: 0; padding: 22px 0 6px; }
+.page .set-body section section { border-top: 0; padding: 0; }
+.page .set-body > section:first-of-type, .page .set-body .set-head + section { border-top: 0; padding-top: 10px; }
+.page .set-body section.perf-strip { border: 1px solid var(--line); border-radius: var(--r-panel); background: var(--surface); padding: 0; }
+.page .set-body section.set-changed-list { padding: 4px 0; }
+.perf-tile + .perf-tile { border-left-color: var(--line); }
+.set-adv { border-style: solid; border-color: var(--line); border-radius: var(--r-panel); }
+.set-confirm { border-radius: var(--r-panel); }
+.appearance-option { border-radius: var(--r-panel); border-color: var(--line); }
+.appearance-preview { border-radius: var(--r-control); background: #f5f2ea; border-color: #d9d1bf; }
+.appearance-preview i { background: #fbfaf6; border-color: #e0d9c9; }
+.appearance-preview i:first-child { background: #ece7db; }
+.appearance-preview i:nth-child(3) { background: #e0e8e4; }
+.appearance-preview.dark { background: #10191b; border-color: #2a373b; }
+.appearance-preview.dark i { background: #172124; border-color: #2a373b; }
+.appearance-preview.dark i:first-child { background: #0c1416; }
+.appearance-preview.dark i:nth-child(3) { background: #173537; }
+.appearance-preview.system { background: linear-gradient(90deg, #f5f2ea 0 50%, #10191b 50%); }
+.appearance-preview.system i { background: linear-gradient(90deg, #fbfaf6 0 50%, #172124 50%); border-color: #8f9692; }
+
+/* ---------- first run and the runtime notice ---------- */
+.setup { background-color: var(--bg); }
+.runtime-card { border-radius: var(--r-dialog); box-shadow: none; border-color: var(--line); }
+.runtime-instructions { border-radius: var(--r-panel); border-color: var(--line); }
+
+/* ---------- title bar meters: theme tones, the app's own type ---------- */
+.hud-pill { font-family: var(--small); background: color-mix(in srgb, var(--text) 5%, transparent); border-color: transparent; border-radius: var(--r-control); }
+.hud-pill:hover { background: color-mix(in srgb, var(--text) 10%, transparent); border-color: transparent; }
+.hud-pill.active { background: var(--side); border-color: var(--border); }
+.hud-pill.npu-pulse { color: var(--green); box-shadow: none; animation: none; border-color: color-mix(in srgb, var(--green) 40%, transparent); }
+.metrics-flyout { background: var(--raised); backdrop-filter: none; -webkit-backdrop-filter: none; border-color: var(--border); box-shadow: var(--lift); font-family: var(--sans); border-radius: var(--r-panel); }
+.metrics-flyout-header { border-bottom-color: var(--line); }
+.metrics-flyout-badge, .metrics-flyout-syscpu { font-family: var(--small); font-variant-numeric: tabular-nums; }
+.metrics-flyout-btn { background: transparent; border-color: var(--border); border-radius: var(--r-control); }
+.metrics-flyout-btn:hover { background: color-mix(in srgb, var(--text) 6%, transparent); border-color: var(--border); }
+.metrics-table th { border-bottom-color: var(--border); }
+.metrics-table td { font-family: var(--sans); border-bottom-color: var(--line); }
+.metrics-table tr:hover td { background: color-mix(in srgb, var(--text) 3%, transparent); }
+.metrics-comp-name { font-family: var(--sans) !important; }
+.metrics-table tr.total-row td { border-top-color: var(--border); border-bottom-color: var(--line); background: color-mix(in srgb, var(--text) 3%, transparent); }
+.metrics-table tr.system-row td { background: transparent; }
+.status-badge.standby { background: color-mix(in srgb, var(--text) 6%, transparent); }
+
+/* hard-coded colours that ignored the theme */
+.pick-chip { background: var(--text); color: var(--bg); font-family: var(--sans); border-radius: var(--r-control); }
+.pick-chip b { background: var(--accent); color: var(--on-accent); }
+.pick-chip button:hover { background: color-mix(in srgb, var(--bg) 18%, transparent); }
+.vb-mic.off, .vb-btn.mic.off { background: var(--red); }
+.banner-close:hover { background: color-mix(in srgb, currentColor 14%, transparent); }
+.dyn-badge { color: var(--on-accent); }
+.cite-pop { background: var(--raised); }
+
+@media (max-width: 680px) {
+  .page { padding: 24px 16px 44px; }
+  .reservoir-field { width: 1000px; height: 1000px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reservoir-field path { animation: none; stroke-dashoffset: 0; }
+  .reservoir-pulse .rp { animation: none; opacity: .7; }
+}

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { StepIcon } from "./StepIcon";
+import { ReservoirPulse } from "./Icons";
 
 /** Seconds since this mounted, counting while `running`; the value is kept once it stops. */
 export function useElapsed(running: boolean): number {
@@ -32,7 +33,7 @@ export function StatusMark({ s }: { s: "running" | "done" | "error" | "info" }) 
 }
 
 /** The mark beside "working" text: the hexagon of the app, its ring lit by an arc that runs around it and its core beating. */
-export const Spark = ({ size = 16 }: { size?: number }) => <span className="spark-glyph"><StepIcon tag="work" state="running" size={size + 2} /></span>;
+export const Spark = ({ size = 16 }: { size?: number }) => <span className="spark-glyph"><ReservoirPulse size={size + 2} /></span>;
 
 /** A page being written: its lines draw one after another. */
 export const WritingGlyph = ({ live }: { live: boolean }) => (

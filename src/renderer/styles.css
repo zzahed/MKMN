@@ -1,37 +1,33 @@
 :root, [data-theme="light"] {
   color-scheme: light;
-  /* MKMN AI light theme: limestone surfaces, charcoal text, petroleum-teal actions. */
-  --bg: #f5f2ea; --side: #eeeae0; --surface: #fdfcf8; --text: #172124; --muted: #5c625f; --border: #ddd6c6;
-  --accent: #123c3d; --accent-hover: #0d2f30; --accent-soft: #e2e8e4; --bubble: #eef0ea; --code-bg: #f0ede4; --on-accent: #f5f2ea;
+  /* MKMN AI "Strata" light theme: the window is three layers of stone. The rail and
+     title bar are the deepest stratum, the sidebar the next, the canvas limestone;
+     panels sit one step lighter. Depth comes from tone, never from shadows. */
+  --rail: #e4decf; --side: #ece7db; --bg: #f5f2ea; --surface: #fbfaf6; --raised: #ffffff;
+  --text: #172124; --muted: #565d5a; --border: #d9d1bf; --line: #e6e0d2;
+  --accent: #123c3d; --accent-hover: #0d2f30; --accent-soft: #e0e8e4; --bubble: #ebe6d9; --code-bg: #efebe1; --on-accent: #f5f2ea;
   --green: #1e7a34; --green-bg: #e5f2e7; --amber: #8a5a00; --amber-bg: #f8efd8; --red: #b42318; --red-bg: #fdefec;
   --cat-1: #123c3d; --cat-2: #33655f; --cat-3: #007c91; --cat-4: var(--green); --cat-5: #8a5a00; --cat-6: #99415d;
-  --star: #9a7440; --knob: #fff; --scrim: rgb(23 33 36 / 48%); --shadow-color: #172124;
+  --brass: #be9455; --star: #9a7440; --knob: #fff; --scrim: rgb(23 33 36 / 44%); --shadow-color: #172124;
   --sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --display: "Segoe UI Variable Display", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --small: "Segoe UI Variable Small", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   --mono: ui-monospace, "Cascadia Code", Consolas, "SF Mono", monospace;
-  --card-glass: rgba(253, 252, 248, 0.92);
 }
 [data-theme="dark"] {
   color-scheme: dark;
-  /* MKMN AI dark theme: deep mineral background, warm light text, a lighter
-     petroleum teal for interactive elements, brass reserved for emphasis. */
-  --bg: #10191b; --side: #0c1416; --surface: #172124; --text: #edeee9; --muted: #9aa5a1; --border: #263338;
-  --accent: #4ea8a2; --accent-hover: #6cbdb7; --accent-soft: rgba(78, 168, 162, 0.16); --bubble: #1a2629; --code-bg: #0d1416; --on-accent: #061212;
+  /* MKMN AI "Strata" dark theme: deep mineral strata, warm limestone text, a lighter
+     petroleum teal for interaction, brass kept for the symbol and the working mark. */
+  --rail: #091012; --side: #0c1416; --bg: #10191b; --surface: #172124; --raised: #1c282b;
+  --text: #edeee9; --muted: #9aa5a1; --border: #2a373b; --line: #1f2b2e;
+  --accent: #4ea8a2; --accent-hover: #6cbdb7; --accent-soft: #173537; --bubble: #1a2629; --code-bg: #0d1416; --on-accent: #061212;
   --green: #3fae62; --green-bg: #0d2b18; --amber: #d3a04a; --amber-bg: #2f2410; --red: #f06a5e; --red-bg: #3a120e;
   --cat-1: #4ea8a2; --cat-2: #6fcab8; --cat-3: #4cc3d4; --cat-4: var(--green); --cat-5: #d3a04a; --cat-6: #e07a95;
-  --star: #c9a05f; --knob: #edeee9; --scrim: rgb(0 0 0 / 72%); --shadow-color: #000;
+  --brass: #be9455; --star: #c9a05f; --knob: #edeee9; --scrim: rgb(0 0 0 / 66%); --shadow-color: #000;
   --sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --display: "Segoe UI Variable Display", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --small: "Segoe UI Variable Small", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   --mono: ui-monospace, "Cascadia Code", Consolas, "SF Mono", monospace;
-  --card-glass: rgba(23, 33, 36, 0.85);
-}
-
-[data-theme="dark"] .card, 
-[data-theme="dark"] .side-card, 
-[data-theme="dark"] .bd-card,
-[data-theme="dark"] .runtime-card {
-  background: var(--card-glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-color: rgba(255, 255, 255, 0.08);
 }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }

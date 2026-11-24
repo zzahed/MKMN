@@ -58,6 +58,37 @@ export const LogoMark = ({ className }: { className?: string }) => (
   </svg>
 );
 
+/** The working mark: the symbol's own contour layers, lit one after another from the
+    deepest point outward (strata.css), so the brand motif is what "working" looks like. */
+export const ReservoirPulse = ({ size = 16 }: { size?: number }) => (
+  <svg className="reservoir-pulse" width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true">
+    {[...RESERVOIR_ARCS].reverse().map((a, i) => (
+      <path key={a.d} className={`rp rp${i + 1}`} d={a.d} stroke="currentColor" strokeWidth={a.sw + 1} strokeLinecap="round" />
+    ))}
+    <circle cx={RESERVOIR_DOT.cx} cy={RESERVOIR_DOT.cy} r={RESERVOIR_DOT.r + .6} fill="var(--logo-accent, #BE9455)" />
+  </svg>
+);
+
+/** Contour rings of the field: they keep spreading outward around the symbol, wider
+    apart as they go, each open toward the upper right like the symbol's own layers. */
+const FIELD_RINGS = Array.from({ length: 13 }, (_, k) => {
+  const r = 46 * 1.235 ** k;
+  const half = (13 * Math.PI) / 180;
+  const at = (deg: number) => [Math.cos(deg) * r, Math.sin(deg) * r].map((n) => n.toFixed(1)).join(" ");
+  const mid = -Math.PI / 4;
+  return { k, d: `M ${at(mid - half)} A ${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${at(mid + half)}` };
+});
+
+/** The welcome surface's one large image: the symbol's contours continued across the
+    page, centered on the symbol beside the greeting. Decorative only. */
+export const ReservoirField = () => (
+  <svg className="reservoir-field" viewBox="-800 -800 1600 1600" fill="none" aria-hidden="true">
+    {FIELD_RINGS.map(({ k, d }) => (
+      <path key={k} d={d} pathLength={1} style={{ ["--k" as string]: k }} />
+    ))}
+  </svg>
+);
+
 /** Horizontal lockup: the symbol beside the monoline MKMN wordmark, with "AI" as a
     secondary descriptor. Decorative (aria-hidden): every surface that renders it
     also names the product in adjacent visible text. Used on welcome, setup and

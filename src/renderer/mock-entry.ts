@@ -12,10 +12,11 @@ const [{ App }, { ErrorBoundary }, React, { createRoot }] = await Promise.all([
   import("react"),
   import("react-dom/client"),
 ]);
-import("./styles.css");
-import("./motion.css");
-import("./composer.css");
-import("./polish.css");
+await import("./styles.css");
+await import("./motion.css");
+await import("./composer.css");
+await import("./polish.css");
+await import("./strata.css");
 createRoot(document.getElementById("root")!).render(
   React.createElement(ErrorBoundary, null, React.createElement(App)),
 );

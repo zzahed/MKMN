@@ -8,6 +8,7 @@ import "./styles.css";
 import "./motion.css";
 import "./composer.css";
 import "./polish.css";
+import "./strata.css";
 
 // Attempt to wire Tauri v2 API bridge if running in WebView2/Tauri
 setupTauriBridge();
@@ -16,7 +17,7 @@ function UnsupportedHost() {
   return <main className="runtime-required">
     <div className="runtime-card">
       <LogoMark className="runtime-logo" />
-      <p className="runtime-kicker">MKMN AI · PRIVATE DESKTOP ASSISTANT</p>
+      <p className="runtime-kicker">MKMN AI, the private assistant on your PC</p>
       <h1>Windows desktop runtime required</h1>
       <p className="muted">MKMN AI runs as a Windows app. Open the installed app to reach your local models and saved work.</p>
       <div className="runtime-instructions">

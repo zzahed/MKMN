@@ -127,6 +127,18 @@ selected, disabled, warning, and error states.
 ## Typography
 
 `"Segoe UI Variable Text", "Segoe UI", system-ui` with standard fallbacks.
+Titles use the Display optical size (`--display`) and small meta text the Small
+size (`--small`), both of the same installed family. Labels are sentence case,
+never tracked-out capitals.
+
+**Interface finish ("Strata", `src/renderer/strata.css`, loaded last):** the
+window is read as layers of stone. The rail and title bar are the deepest tone
+(`--rail`), then the sidebar (`--side`), then the canvas (`--bg`), with panels
+on `--surface` and menus on `--raised`. Depth comes from tone; only menus and
+dialogs carry a shadow. Radius follows rank: dialogs 12, panels 10, controls 6,
+chips round. The symbol's contours carry on across the welcome surface
+(`ReservoirField`), and the same contours ripple from the deepest point outward
+as the working mark (`ReservoirPulse`). Nothing else is decorative.
 No remote fonts or CDN assets. Monospace: Cascadia Code / Consolas stack.
 Headings are prominent but restrained; body copy stays readable; technical
 information and performance metrics keep a legible size and tabular alignment.
