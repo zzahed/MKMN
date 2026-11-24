@@ -52,7 +52,7 @@ const SIDE_MIN = 200, SIDE_MAX = 440, NARROW_AT = 820;
 const RAIL_W = 60, RAIL_W_EXPANDED = 168;
 const SHORT_STATE: Record<ServerStatus["state"], string> = { stopped: "Idle", starting: "Starting…", loading: "Loading…", ready: "Ready", busy: "Generating…", restarting: "Restarting…", failed: "Failed", unloaded: "Unloaded" };
 const STATE_LABEL:Record<ServerStatus["state"], string> = {
-  stopped: "Model idle", starting: "Starting…", loading: "Loading model…", ready: BRAND.modelReady, busy: "Generating…", restarting: "Restarting…", failed: "Server failed", unloaded: "Model unloaded — it reloads on the next message"
+  stopped: "Model idle", starting: "Starting…", loading: "Loading model…", ready: BRAND.modelReady, busy: "Generating…", restarting: "Restarting…", failed: "The AI stopped working", unloaded: "Model unloaded — it reloads on the next message"
 };
 
 /** Every DISPLAYED meter field takes part in the value comparison: a changed memory
@@ -883,12 +883,12 @@ export function App() {
           <span className="dot" />
           <span>
             {serverPhase === "stale" && `Status unavailable · last updated ${lastUpdatedText(serverView.at)}`}
-            {serverPhase === "failed" && "AI status unavailable — the status check keeps failing"}
-            {serverPhase === "disconnected" && "MKMN AI's backend is not answering"}
+            {serverPhase === "failed" && "Can't check the AI right now. Try again, or restart MKMN if this continues."}
+            {serverPhase === "disconnected" && "MKMN's AI service isn't answering. Try again, or restart MKMN."}
             {serverPhase === "loading" && "Checking AI status…"}
           </span>
           {(serverPhase === "stale" || serverPhase === "failed" || serverPhase === "disconnected") && (
-            <button type="button" className="ghost obs-retry" onClick={retryReads}>Retry</button>
+            <button type="button" className="ghost obs-retry" onClick={retryReads}>Try again</button>
           )}
         </div>
       )}

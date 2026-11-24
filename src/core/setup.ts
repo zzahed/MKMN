@@ -44,8 +44,8 @@ export function initialSteps(needs: { geniex: boolean; llama?: boolean; stt: boo
     id, label, detail, ...WHAT_IT_DOES[id], sizeMB: id === "voice-stt" ? names.sttMB ?? null : id === "voice-tts" ? names.ttsMB ?? null : null, state: needed ? "pending" : "done", percent: null, message: needed ? null : "Already installed", error: null
   });
   return [
-    mk("geniex", "GenieX runtime (runs models on the NPU)", "Qualcomm's command-line runtime, downloaded from Qualcomm", needs.geniex),
-    mk("llama", "llama.cpp (runs models on the GPU or the CPU)", "Open-source runtime from github.com/ggml-org/llama.cpp, works on any PC", !!needs.llama),
+    mk("geniex", "AI engine for the NPU (Qualcomm GenieX)", "Downloaded from Qualcomm", needs.geniex),
+    mk("llama", "AI engine for the graphics card and processor (llama.cpp)", "Free and open source, from github.com/ggml-org/llama.cpp", !!needs.llama),
     mk("voice-stt", `Dictation model: ${names.stt}`, "Speech to text, runs locally", needs.stt),
     mk("voice-tts", `Read-aloud model: ${names.tts}`, "Text to speech, runs locally", needs.tts)
   ];

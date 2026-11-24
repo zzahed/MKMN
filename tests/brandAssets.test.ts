@@ -294,7 +294,7 @@ describe("setup copy follows the real outcome", () => {
     }));
     expect(v.outcome).toBe("failed");
     expect(v.heading).toMatch(/couldn't be installed/);
-    expect(v.description).toContain("GenieX runtime (runs models on the NPU)");
+    expect(v.description).toContain("AI engine for the NPU (Qualcomm GenieX)");
     expect(v.description).toContain("Read-aloud model: Piper");
     expect(v.description).toMatch(/Retry below|continue with limited features/);
   });
