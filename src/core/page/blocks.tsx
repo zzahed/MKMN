@@ -23,7 +23,8 @@ function safeHref(h: string | undefined | null): string {
 const itemsOf = (v: unknown): Props[] => (Array.isArray(v) ? v.filter((x): x is Props => !!x && typeof x === "object") : []);
 const pointsOf = (v: unknown): string[] => (Array.isArray(v) ? v.map(T).filter(Boolean) : T(v).split("\n").map((x) => x.trim()).filter(Boolean));
 const slug = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "section";
-export const anchorOf = (s: Props): string => slug(T(s.id) || T(s.title) || T(s.type));
+/** A section's anchor: its own id, else its title. The contact section is always #contact (unless given an id): a button with no link of its own points there, whatever the section is called. */
+export const anchorOf = (s: Props): string => slug(T(s.id) || (T(s.type) === "contact" ? "contact" : "") || T(s.title) || T(s.type));
 
 /** Text with **bold** and line breaks; everything else is escaped by React, so nothing the model writes can add markup. */
 function Rich({ text }: { text: string }) {
@@ -102,7 +103,8 @@ const BLOCK_VIEW: Record<string, (p: BlockProps) => ReactNode> = {
   text: (s) => <Section s={s} alt={s.alt}><Head s={s} /><div style={{ maxWidth: 760 }}>{T(s.text) ? <p><Rich text={T(s.text)} /></p> : null}{itemsOf(s.items).map((it, i) => <div key={i}><h3>{T(it.title)}</h3><p><Rich text={T(it.text)} /></p></div>)}</div></Section>,
   contact: (s) => <Section s={s} alt={s.alt} id={anchorOf(s) === "section" ? "contact" : anchorOf(s)}><Head s={s} />{T(s.email) ? <form action={`mailto:${T(s.email)}`} method="post" encType="text/plain"><input name="name" placeholder="Name" required /><input name="email" type="email" placeholder="Email" required /><textarea name="message" rows={5} placeholder="Message" required /><button className="btn" type="submit">{T(s.cta) || "Send"}</button></form> : null}{T(s.text) ? <p><Rich text={T(s.text)} /></p> : null}</Section>
 };
-export const Block = ({ type, ...props }: BlockProps & { type: string }) => <>{(BLOCK_VIEW[type] ?? BLOCK_VIEW.text)(props)}</>;
+// the type rides along: a section's anchor (anchorOf) depends on it, and the menu computes the same anchor from the same props
+export const Block = ({ type, ...props }: BlockProps & { type: string }) => <>{(BLOCK_VIEW[type] ?? BLOCK_VIEW.text)({ ...props, type } as BlockProps)}</>;
 
 /** The menu at the top of the page: the titled sections and the hero's main button. */
 export function Nav({ spec, sections }: { spec: PageSpec; sections: Props[] }) {

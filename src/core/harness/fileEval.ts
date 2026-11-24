@@ -5,13 +5,14 @@
  * formula cannot run and whose total is typed by hand. A persona answers from what the app asked it (it follows the feedback,
  * as a model does), never from a network. The file is scored by its rubric (src/core/fileQuality.ts) and must reach QUALITY_BAR.
  *
- * Web pages are scored by the same rubric family (pageQuality); their end-to-end persona waits for the site renderer to load
- * under the test runner (it needs the page editor's dependencies installed).
+ * Websites made from the site template run the same way (SITE_SCENARIOS): a page of "Feature 1" placeholders and lorem ipsum, a
+ * page whose cards all say the same thing. They need the site renderer, which loads the page icons first (`loadIcons`).
  */
 import type { ChatEvent, ChatMessage, ChatStats } from "../../shared/types";
 import { makeFromTemplate } from "../templates/build";
 import type { Session } from "../build";
 import { artifactsIn } from "../artifacts";
+import { loadIcons } from "../page/iconTable";
 import { fileQuality, type FileKind } from "../fileQuality";
 import { QUALITY_BAR } from "./quality";
 import type { CaseResult } from "./evals";
@@ -84,6 +85,7 @@ export const FILE_SCENARIOS: FileScenario[] = [
 
 /** Run one scenario through the Word/Excel pipeline and score the file it made. */
 export async function evaluateFileScenario(s: FileScenario): Promise<CaseResult> {
+  if (s.kind === "html") await loadIcons(); // the site renderer draws icons from the table, which loads out of the startup bundle
   const stream: Session = async function* (sid: string, messages: ChatMessage[]): AsyncGenerator<ChatEvent> {
     const asked = String(messages[messages.length - 1]?.content ?? "");
     yield { id: "eval", type: "answer", text: s.reply(sid, asked, TOLD.test(asked)) };
@@ -99,3 +101,34 @@ export async function evaluateFileScenario(s: FileScenario): Promise<CaseResult>
   const pass = q.score >= QUALITY_BAR;
   return { id: s.id, pass, metrics: { quality: q.score }, detail: pass ? undefined : `score ${q.score}: ${q.failed.map((f) => `${f.id} (${f.note})`).join("; ")}` };
 }
+
+// ---------------------------------------------------------------- websites (the site template)
+
+const CAFE_PAGE = {
+  language: "en", title: "Green Bean Café",
+  sections: [
+    { type: "hero", title: "Green Bean Café", subtitle: "Coffee roasted in the back room every morning", cta: "See the menu" },
+    { type: "features", title: "Why people come back", items: [{ title: "Fresh roast", text: "Beans roasted daily in small batches for a sweeter cup." }, { title: "Quiet tables", text: "Long tables and soft light make it easy to work for hours." }, { title: "Local bakery", text: "Pastries arrive at seven from the bakery two streets away." }] },
+    { type: "faq", title: "Questions", items: [{ q: "Do you have oat milk?", a: "Yes, oat and almond milk are free with every drink." }, { q: "Can I book a table?", a: "Tables are first come, but the back room can be booked for groups." }] },
+    { type: "contact", title: "Visit us", text: "Open every day from seven in the morning until six in the evening, two minutes from the station." },
+  ],
+};
+const siteReply = (weak: object) => (sid: string, _asked: string, told: boolean): string =>
+  sid.endsWith(":template") ? '{"template":"site"}' : /:fill:/.test(sid) ? JSON.stringify(told ? CAFE_PAGE : weak) : "Done.";
+
+export const SITE_SCENARIOS: FileScenario[] = [
+  {
+    id: "site-placeholders",
+    description: "fills a landing page with \"Feature 1\" cards and lorem ipsum until told the page says nothing",
+    kind: "html",
+    request: "make a landing page for my café, Green Bean",
+    reply: siteReply({ language: "en", title: "Café", sections: [{ type: "hero", title: "Café" }, { type: "features", title: "Features", items: [{ title: "Feature 1", text: "Lorem ipsum dolor sit amet." }, { title: "Feature 2", text: "Lorem ipsum dolor sit amet." }] }, { type: "cta", title: "Contact" }] }),
+  },
+  {
+    id: "site-repeats",
+    description: "writes cards that all say the same thing until told they repeat",
+    kind: "html",
+    request: "make a landing page for my café, Green Bean",
+    reply: siteReply({ language: "en", title: "Green Bean Café", sections: [{ type: "hero", title: "Green Bean Café", subtitle: "Coffee roasted in the back room every morning" }, { type: "features", title: "Why people come back", items: [1, 2, 3].map((n) => ({ title: `Reason ${["one", "two", "three"][n - 1]}`, text: "Our coffee is roasted fresh every single morning in the back room for the best taste." })) }, { type: "contact", title: "Visit us", text: "Open every day from seven in the morning until six in the evening." }] }),
+  },
+];
