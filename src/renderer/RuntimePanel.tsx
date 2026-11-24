@@ -17,6 +17,20 @@ function suggestGpuLayers(modelGB: number, layers: number, vramGB: number, reser
 }
 
 const TARGETS: { id: ComputeTarget; label: string }[] = [{ id: "npu", label: "NPU" }, { id: "hybrid", label: "CPU + NPU" }, { id: "gpu", label: "GPU" }, { id: "cpu", label: "CPU" }];
+const PLACE: Record<string, string> = { npu: "the NPU", hybrid: "the NPU and the processor", gpu: "the graphics card", cpu: "the processor" };
+
+/** The last automatic choice in one plain line, from the decision's own facts. The raw
+ *  label, reasons and refused options stay one click away under Technical details. */
+export function plainLastChoice(last: { config: { compute: string } | null; reason: string[]; provisional: boolean }): { where: string; why: string } {
+  const where = last.config ? `Ran on ${PLACE[last.config.compute] ?? last.config.compute}` : "No choice made yet";
+  const said = last.reason.join(" ");
+  const why = last.provisional ? "Not tested on this PC yet, so MKMN used the usual choice."
+    : /already resident/i.test(said) ? "Already loaded, so nothing changed."
+    : /staying resident/i.test(said) ? "Stayed where it was: switching would not have been noticeably faster."
+    : "Chosen from how this PC has performed.";
+  return { where, why };
+}
+
 /** RuntimeInfo.choices only knows npu/gpu/cpu: hybrid rides on geniex's availability (it is geniex's own -c hybrid). */
 const choiceFor = (id: ComputeTarget, info: RuntimeInfo | null) => (id === "hybrid" ? info?.choices.find((c) => c.id === "npu") : info?.choices.find((c) => c.id === id));
 
@@ -90,7 +104,7 @@ export function RuntimePanel({ settings, onSave, changed }: { settings: Settings
   return (
     <section>
       <h2>Where the chat model runs</h2>
-      <p className="muted small">Auto picks the best part of this PC's chip for each message, from how this PC has performed before. Manual lets you choose it yourself.</p>
+      <p className="muted small">Auto chooses where the model runs (the NPU, the processor or the graphics card) for each message, based on how this PC has performed. Manual lets you choose.</p>
 
       <div className="role-row">
         <div><strong>Mode</strong>{dot("computeMode")}</div>
@@ -118,14 +132,13 @@ export function RuntimePanel({ settings, onSave, changed }: { settings: Settings
             <strong className="small">Last choice</strong>
             {adaptive?.last ? (
               <div className="small" style={{ marginTop: 4 }}>
-                <div>{adaptive.last.label}</div>
-                {adaptive.last.reason.map((r, i) => <div key={i} className="muted small">{r}</div>)}
-                {adaptive.last.gatedOut.length > 0 && (
-                  <details className="small" style={{ marginTop: 4 }}>
-                    <summary className="muted">{adaptive.last.gatedOut.length} option{adaptive.last.gatedOut.length === 1 ? "" : "s"} not available right now</summary>
-                    {adaptive.last.gatedOut.map((g) => <div key={g.id} className="muted small">{COMPUTE_LABEL[g.compute as keyof typeof COMPUTE_LABEL] ?? g.compute}: {g.why}</div>)}
-                  </details>
-                )}
+                {(() => { const p = plainLastChoice(adaptive.last); return <><div>{p.where}</div><div className="muted small">{p.why}</div></>; })()}
+                <details className="small" style={{ marginTop: 4 }}>
+                  <summary className="muted">Technical details</summary>
+                  <div className="muted small">{adaptive.last.label}</div>
+                  {adaptive.last.reason.map((r, i) => <div key={i} className="muted small">{r}</div>)}
+                  {adaptive.last.gatedOut.map((g) => <div key={g.id} className="muted small">Not available: {COMPUTE_LABEL[g.compute as keyof typeof COMPUTE_LABEL] ?? g.compute}. {g.why}</div>)}
+                </details>
               </div>
             ) : (
               <div className="muted small" style={{ marginTop: 4 }}>No message sent in Auto yet. After your next message, the choice appears here.</div>
@@ -145,13 +158,15 @@ export function RuntimePanel({ settings, onSave, changed }: { settings: Settings
               options={TARGETS.map((t) => {
                 const c = choiceFor(t.id, info);
                 const unavailable = c && !c.available;
-                return { id: t.id, label: t.label + (unavailable ? " ·" : ""), why: c?.note };
+                return { id: t.id, label: t.label + (unavailable ? " (not available)" : ""), why: c?.note };
               })}
             />
           </div>
-          {cur && <div className={cur.available ? "muted small" : "warn small"}>{cur.available ? cur.note : `${cur.note} You can still choose it.`}</div>}
+          {/* the NPU card below says what the NPU is: its engine notes would only repeat it */}
+          {cur && !cur.available && <div className="warn small">{cur.note} You can still choose it.</div>}
+          {cur && cur.available && off && <div className="muted small">{cur.note}</div>}
           {choice.id === "hybrid" && <div className="muted small">CPU + NPU splits the model between the two: most of it on the NPU, the rest on the CPU. It works with most downloaded models, but not with models built only for the NPU.</div>}
-          {info && <div className="muted small">{info.note}</div>}
+          {info && off && <div className="muted small">{info.note}</div>}
         </>
       )}
 
@@ -173,19 +188,19 @@ export function RuntimePanel({ settings, onSave, changed }: { settings: Settings
             // nothing, so their absence is stated instead of shown as dead buttons
             <div className="role-row">
               <div>
-                <strong>llama.cpp</strong>
-                <div className="muted small">Not part of this build: the models are served by Qualcomm's GenieX runtime (NPU, CPU + NPU, GPU and CPU). There is nothing to install or locate.</div>
+                <strong>Engine for the processor and graphics card</strong>
+                <div className="muted small">Nothing to install: this version of MKMN runs models on the processor and graphics card by itself.</div>
               </div>
             </div>
           ) : (
             <div className="role-row">
               <div>
-                <strong>llama.cpp</strong>
-                <div className="muted small">{info.llamaPath ? `${info.llamaVersion ?? "installed"} · ${info.llamaPath}` : "Not installed yet. It is the open-source engine that runs the model on your GPU or CPU."}</div>
+                <strong>Engine for the processor and graphics card</strong>
+                <div className="muted small" title={info.llamaPath ? `llama.cpp ${info.llamaVersion ?? ""} · ${info.llamaPath}` : "llama.cpp"}>{info.llamaPath ? `Installed${info.llamaVersion ? ` (version ${info.llamaVersion})` : ""}` : "Not installed yet. It is a free engine that runs the model on the graphics card or processor."}</div>
               </div>
               <div className="row" style={{ margin: 0 }}>
-                <button className="primary" disabled={installing} onClick={() => void api().installLlamaServer().catch((e) => setInstallError((e as Error).message))}>{installing ? "Installing…" : info.llamaPath ? "Update" : "Install llama.cpp"}</button>
-                <button className="ghost" onClick={async () => { try { await api().pickLlamaServer(); } catch (e) { setInstallError((e as Error).message); } refresh(); }}>Locate llama-server…</button>
+                <button className="primary" disabled={installing} onClick={() => void api().installLlamaServer().catch((e) => setInstallError((e as Error).message))}>{installing ? "Installing…" : info.llamaPath ? "Update engine" : "Install engine"}</button>
+                <button className="ghost" onClick={async () => { try { await api().pickLlamaServer(); } catch (e) { setInstallError((e as Error).message); } refresh(); }}>Find engine on this PC…</button>
               </div>
             </div>
           )}

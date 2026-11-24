@@ -13,6 +13,6 @@ export function RunsBadge({ on, native, here }: { on?: "npu" | "hybrid" | "gpu" 
   // the shipped test results (scores.json, recorded on a Snapdragon X Plus):
   // the latter must never read as this device's verification.
   if (!on) return <span className="badge runs-untested" title="Where this model runs was not measured on this device yet. It is known once it has been tried here.">Not measured here</span>;
-  if (on === "npu" && native) return <span className="badge runs-native" title={"Compiled for the NPU (an AI Hub bundle or NPU Foundry build) and placed on it when it was tried." + (here ? "" : ELSEWHERE)}>Native NPU</span>;
-  return <span className={`badge runs-${on}${here ? "" : " elsewhere"}`} title={INFO[on].hint + (here ? "" : ELSEWHERE)}>{INFO[on].label}{here ? "" : " *"}</span>;
+  if (on === "npu" && native) return <span className="badge runs-native" title={"Compiled for the NPU (an AI Hub bundle or NPU Foundry build) and placed on it when it was tried." + (here ? "" : ELSEWHERE)}>Built for the NPU</span>;
+  return <span className={`badge runs-${on}${here ? "" : " elsewhere"}`} title={INFO[on].hint + (here ? "" : ELSEWHERE)}>{INFO[on].label}{here ? "" : " (tested elsewhere)"}</span>;
 }

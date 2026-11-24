@@ -20,6 +20,7 @@ describe("the measure hint on an unmeasured model's card", () => {
   });
 
   it("is rendered on the card ONLY while the model is unmeasured (source pin)", () => {
-    expect(models).toMatch(/!\s*bp\.on[^>]*>\s*\{measureHint\(\)\}/);
+    // a plain line first; where a measurement comes from is one click away, still only while unmeasured
+    expect(models).toMatch(/!\s*bp\.on[^>]*><summary>Not tried on this PC yet<\/summary>\{measureHint\(\)\}/);
   });
 });

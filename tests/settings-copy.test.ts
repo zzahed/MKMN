@@ -97,3 +97,32 @@ describe("Models library rows", () => {
     expect(wordsPerSec(0.4)).toBe(1);
   });
 });
+
+describe("phase 2, round 2: what a first-time user meets by default", () => {
+  it("the Auto box leads with one plain line; the raw decision is under Technical details", async () => {
+    const { plainLastChoice } = await import("../src/renderer/RuntimePanel");
+    expect(plainLastChoice({ config: { compute: "npu" }, reason: ["provisional: no latency or throughput measurement exists"], provisional: true }))
+      .toEqual({ where: "Ran on the NPU", why: "Not tested on this PC yet, so MKMN used the usual choice." });
+    expect(plainLastChoice({ config: { compute: "hybrid" }, reason: ["already resident: no switch, no reload"], provisional: false }).why).toBe("Already loaded, so nothing changed.");
+    expect(plainLastChoice({ config: { compute: "gpu" }, reason: ["staying resident: GenieX · NPU (switching would save less than 10%)"], provisional: false }).where).toBe("Ran on the graphics card");
+    expect(runtime).toMatch(/<summary className="muted">Technical details<\/summary>\s*<div className="muted small">\{adaptive\.last\.label\}/);
+  });
+
+  it("the Auto power mode says what power.rs does: steady on battery, saving below 25%", () => {
+    const rust = readFileSync("src-tauri/src/power.rs", "utf8");
+    expect(rust).toMatch(/battery_percent\.is_some_and\(\|b\| b <= 25\)/);
+    expect(speedAdvanced).toContain("steady on battery, saves power below 25%");
+  });
+
+  it("no tokens-per-second on the model rows, cards or speed chip outside Details and tooltips", () => {
+    const visible = copyOf(models.replace(/title=\{[^}]*\}/g, "").replace(/<details className="small model-details">[\s\S]*?<\/details>/, ""));
+    expect(visible).not.toMatch(/tok\/s|tokens\/s/);
+  });
+
+  it("placement badges say Built for the NPU and tested elsewhere, never a bare asterisk", () => {
+    const badge = readFileSync("src/renderer/RunsBadge.tsx", "utf8");
+    expect(badge).toContain(">Built for the NPU<");
+    expect(badge).toContain('" (tested elsewhere)"');
+    expect(badge).not.toContain('" *"');
+  });
+});

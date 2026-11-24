@@ -1053,9 +1053,13 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
         <div className="perf-tile">
           <span className="muted small">Fits in memory</span>
           <strong>{gate.phase === "loading" || gate.phase === "stale" || gate.phase === "refreshing" ? "Measuring…"
-            : gate.phase === "failed" ? "Couldn't check: see Advanced › Memory use"
+            : gate.phase === "failed" ? "Couldn't check"
             : gate.phase === "unavailable" ? "Unknown on this PC"
-            : mem.phase === "fits" ? "Yes" : "Too large: see Advanced › Memory use"}</strong>
+            : mem.phase === "fits" ? "Yes" : "Too large"}</strong>
+          {/* a result the user must act on links straight to it: goto opens the Advanced fold */}
+          {(gate.phase === "failed" || (mem.phase === "over" && gate.phase === "ready")) && (
+            <span className="small"><button type="button" className="link" onClick={() => goto({ tab: "models", section: "sec-models-memory" })}>{gate.phase === "failed" ? "Try again in Memory use" : "See what to do"}</button></span>
+          )}
         </div>
       </section>
       <section id="sec-models-compute" tabIndex={-1}>
@@ -1095,7 +1099,7 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
         <p className="muted small">
           {rt.idleReleaseSec === 0
             ? "The model stays ready, so every message starts at once, but it keeps using memory."
-            : `The model's memory is freed after ${Math.round(rt.idleReleaseSec / 60)} minute${rt.idleReleaseSec === 60 ? "" : "s"} without use. The next message then takes about 10 to 25 seconds longer while it loads.`}
+            : `The model's memory is freed after ${Math.round(rt.idleReleaseSec / 60)} minute${rt.idleReleaseSec === 60 ? "" : "s"} without use. The next message then waits while the model loads: usually 10 to 25 seconds on the NPU, longer for large models.`}
         </p>
         <details style={{ marginTop: 6 }}>
           <summary className="small"><strong>Advanced: start-up time limit</strong> <span className="muted">· for slow models</span></summary>
@@ -1151,6 +1155,10 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
           </p>
         )}
         {gate.phase === "unavailable" && <p className="muted small" role="status">This machine did not return usable memory readings, so no estimate is shown.</p>}
+        {mem.phase === "over" && gate.phase === "ready" && (
+          <p className="warn small" role="status">This model may not load. Choose a smaller model in the{" "}
+            <button type="button" className="link" onClick={() => selectTab("library")}>Models library</button>, or set a shorter conversation length below.</p>
+        )}
 
         {memHasNumbers ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8, marginTop: 8 }}>
@@ -1258,8 +1266,8 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
         </details>
         {server && (server.state === "ready" || server.state === "busy") ? (
           <div className="muted small" role="status">
-            In use now: conversation length {server.contextKind === "compiled" ? "fixed by the model" : server.servedNctx ? `${server.servedNctx} tokens` : "the model's default"}
-            {server.servedKvType ? ` · cache ${server.servedKvType}` : ""}{typeof server.servedKvInRam === "boolean" ? ` · cache in RAM: ${server.servedKvInRam ? "yes" : "no"}` : ""}.
+            In use now: conversation length {server.contextKind === "compiled" ? "fixed by the model" : server.servedNctx ? `about ${(Math.round(server.servedNctx * 0.75 / 100) * 100).toLocaleString()} words` : "the model's default"}
+            {server.servedKvType ? ` · precision ${server.servedKvType}` : ""}{typeof server.servedKvInRam === "boolean" ? ` · kept in main memory: ${server.servedKvInRam ? "yes" : "no"}` : ""}.
           </div>
         ) : (
           <div className="muted small">Takes effect the next time a model loads.</div>
@@ -1275,7 +1283,7 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
               value={readSetting(settings, "powerProfile")}
               onChange={(e) => void save({ powerProfile: e.target.value as Settings["powerProfile"] })}
             >
-              <option value="auto">Automatic: fastest when plugged in, saves battery otherwise (recommended)</option>
+              <option value="auto">Automatic: fastest when plugged in, steady on battery, saves power below 25% (recommended)</option>
               <option value="burst">Fastest</option>
               <option value="balanced">Balanced</option>
               <option value="power_saver">Battery saver: less heat, slower</option>
@@ -1293,7 +1301,7 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
         <p className="muted small">
           {powerInfo === null ? "Checking the power supply…" :
             (readSetting(settings, "powerProfile")) === "auto"
-              ? (powerInfo?.onAcPower ? "Plugged in: running at full speed." : "On battery: saving power.")
+              ? (powerInfo?.onAcPower ? "Plugged in: full speed. Applies the next time the model loads." : "On battery: steady speed, and below 25% battery it saves power. Applies the next time the model loads.")
               : (readSetting(settings, "powerProfile") === "burst" ? "Always runs the NPU at full speed. Answers are fastest; the PC may get warmer." : "The NPU runs in the mode chosen above.")}
         </p>
       </section>
@@ -1921,7 +1929,7 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
           <tr><td>NPU memory limit</td><td>{hw.npuBudgetGB} GB <span className="muted">({hw.npuBudgetSource === "estimated" ? "estimated: about half of RAM" : hw.npuBudgetSource === "user" ? "set by you" : "measured"})</span></td></tr>
           <tr><td>App build</td><td>{info.arch}{hw.emulated ? " (emulated: install the ARM64 build)" : " (native)"} · v{info.version}</td></tr>
         </tbody></table>
-        <div className="muted small">The memory override lives next to the memory estimate, in Speed &amp; memory → Memory use.</div>
+        <div className="muted small">To correct the NPU memory limit, <button type="button" className="link" onClick={() => goto({ tab: "models", section: "sec-models-memory" })}>open Speed &amp; memory › Advanced › Memory use</button>.</div>
       </section>
 
       <section id="sec-sys-execution" tabIndex={-1}>
