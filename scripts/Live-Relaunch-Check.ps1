@@ -37,18 +37,18 @@
   Software\MKMN\InstallDir), falling back to the per-user default path.
 
 .PARAMETER ExpectedVersion
-  The FileVersion MKMN.exe must report (default 0.0.3-rc.1).
+  The FileVersion MKMN.exe must report (default 0.0.3-rc.2).
 
 .PARAMETER GraceSeconds
   How long each behavioral check may take to settle (default 20).
 
 .EXAMPLE
-  powershell -File scripts\Live-Relaunch-Check.ps1 -ExpectedVersion 0.0.3-rc.1
+  powershell -File scripts\Live-Relaunch-Check.ps1 -ExpectedVersion 0.0.3-rc.2
 #>
 [CmdletBinding()]
 param(
   [string]$InstallDir = "",
-  [string]$ExpectedVersion = "0.0.3-rc.1",
+  [string]$ExpectedVersion = "0.0.3-rc.2",
   [int]$GraceSeconds = 20
 )
 $ErrorActionPreference = "Stop"

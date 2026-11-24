@@ -2,7 +2,11 @@
 
 **Current release: v0.0.2**
 
-**Current candidate: v0.0.3-rc.1** (controlled pilot; availability confirmed on its [GitHub prerelease](https://github.com/zzahed/MKMN/releases/tag/v0.0.3-rc.1))
+**Current candidate: v0.0.3-rc.2** (controlled pilot). [GitHub prerelease](https://github.com/zzahed/MKMN/releases/tag/v0.0.3-rc.2) · [Candidate notes](releases/RELEASE_NOTES_v0.0.3-rc.2.md).
+
+## 0.0.3-rc.2 — Dependency and runtime hardening
+
+Updates the Windows ARM64 toolchain, native search and speech runtimes, and page editor. Includes the sandbox and recovery fixes merged after RC1. [Candidate notes](releases/RELEASE_NOTES_v0.0.3-rc.2.md).
 
 ## 0.0.3-rc.1 — Engineering hardening candidate
 

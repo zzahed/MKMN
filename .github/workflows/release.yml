@@ -1,12 +1,9 @@
 name: MKMN Windows ARM64 verification
 
-# Restricted candidate-branch build: verify installer, CI and CodeQL on exact head,
-# then publish a GitHub prerelease (never Latest) with unsigned binary, SHA-256 and provenance.
-# The publishing job alone receives contents:write. Stable publication is out of scope.
+# Build an attested candidate and verify its exact revision. Publish the tested
+# artifact after recording physical device acceptance.
 on:
   workflow_dispatch:
-  push:
-    branches: [release/v0.0.3-rc.1]
 
 permissions:
   contents: read
@@ -80,7 +77,7 @@ jobs:
       - name: Validate the packaged installer
         shell: pwsh
         run: |
-          powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\Validate-Installer.ps1"
+          powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\Validate-Installer.ps1" -Release
           exit $LASTEXITCODE
       - name: Write SHA-256 and build provenance
         shell: pwsh
@@ -107,15 +104,16 @@ jobs:
             dist/MKMN-*-build.txt
           if-no-files-found: error
 
-  publish-prerelease:
-    name: Publish controlled pilot prerelease
+  verify-candidate:
+    name: Verify the attested pilot candidate
+    if: github.repository == 'zzahed/MKMN' && github.ref == 'refs/heads/main'
     needs: windows-arm64
-    if: github.event_name == 'push' && github.ref == 'refs/heads/release/v0.0.3-rc.1' && github.repository == 'zzahed/MKMN'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions:
-      contents: write
+      contents: read
       actions: read
+      attestations: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Verify this exact revision passed CI and CodeQL
@@ -126,14 +124,13 @@ jobs:
           import json, os, subprocess, sys, time
           repo, sha = os.environ["GITHUB_REPOSITORY"], os.environ["GITHUB_SHA"]
           for attempt in range(60):
-              data = json.loads(subprocess.check_output(
-                  ["gh", "api", f"repos/{repo}/actions/runs?per_page=100"], text=True))
               matches = {}
-              for run in data.get("workflow_runs", []):
-                  if run.get("head_sha") == sha and run.get("name") in ("ci", "codeql"):
-                      name = run["name"]
-                      if name not in matches or run["id"] > matches[name]["id"]:
-                          matches[name] = run
+              for name in ("ci", "codeql"):
+                  endpoint = f"repos/{repo}/actions/workflows/{name}.yml/runs?head_sha={sha}&branch=main&event=push&per_page=100"
+                  data = json.loads(subprocess.check_output(["gh", "api", endpoint], text=True))
+                  runs = [r for r in data.get("workflow_runs", []) if r.get("head_sha") == sha]
+                  if runs:
+                      matches[name] = max(runs, key=lambda r: r["id"])
               print(f"Gate {attempt + 1}: " + ", ".join(
                   f"{name}={matches.get(name, {}).get('conclusion') or matches.get(name, {}).get('status', 'missing')}"
                   for name in ("ci", "codeql")), flush=True)
@@ -142,7 +139,7 @@ jobs:
                   break
               if any(matches.get(n, {}).get("status") == "completed"
                      and matches[n].get("conclusion") != "success" for n in ("ci", "codeql")):
-                  sys.exit("Refusing publication: CI or CodeQL did not succeed")
+                  sys.exit("Candidate verification failed: CI or CodeQL did not succeed")
               if attempt == 59:
                   sys.exit("Timed out waiting for successful CI and CodeQL on this exact SHA")
               time.sleep(30)
@@ -152,29 +149,22 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name MKMN-Windows-ARM64-unsigned --dir dist
       - name: Verify installer SHA-256 and build provenance
-        run: |
-          set -euo pipefail
-          test "$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')" = "0.0.3-rc.1"
-          cd dist
-          test -s MKMN-0.0.3-rc.1-arm64-Setup.exe
-          sha256sum -c MKMN-0.0.3-rc.1-arm64-Setup.exe.sha256
-          # PowerShell writes CRLF on Windows. Compare normalized lines without mutating the published asset.
-          sed 's/\r$//' MKMN-0.0.3-rc.1-build.txt | grep -Fx "commit=$GITHUB_SHA"
-          sed 's/\r$//' MKMN-0.0.3-rc.1-build.txt | grep -Fx "version=0.0.3-rc.1"
-      - name: Publish GitHub prerelease (not Latest)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          if gh release view v0.0.3-rc.1 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Refusing to overwrite an existing v0.0.3-rc.1 release"
-            exit 1
-          fi
-          gh release create v0.0.3-rc.1 \
-            dist/MKMN-0.0.3-rc.1-arm64-Setup.exe \
-            dist/MKMN-0.0.3-rc.1-arm64-Setup.exe.sha256 \
-            dist/MKMN-0.0.3-rc.1-build.txt \
-            --target "$GITHUB_SHA" \
-            --title "MKMN AI v0.0.3-rc.1 - Controlled HUMAIN pilot" \
-            --notes-file docs/releases/RELEASE_NOTES_v0.0.3-rc.1.md \
-            --prerelease --latest=false --repo "$GITHUB_REPOSITORY"
+          version="$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]
+          cd dist
+          installer="MKMN-$version-arm64-Setup.exe"
+          test -s "$installer"
+          sha="$(sha256sum "$installer" | cut -d ' ' -f1)"
+          # Normalize the Windows line endings for comparison with the published files.
+          sed 's/\r$//' "$installer.sha256" | grep -Fx "$sha  $installer"
+          sed 's/\r$//' "MKMN-$version-build.txt" | grep -Fx "commit=$GITHUB_SHA"
+          sed 's/\r$//' "MKMN-$version-build.txt" | grep -Fx "version=$version"
+          sed 's/\r$//' "MKMN-$version-build.txt" | grep -Fx "installer_sha256=$sha"
+          gh attestation verify "$installer" --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" \
+            --source-digest "$GITHUB_SHA" \
+            --source-ref refs/heads/main
