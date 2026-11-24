@@ -14,7 +14,7 @@ export function taskSummary(t: ScheduledTask, now: number, projects: Project[], 
   const at = t.enabled && !validateSchedule(t.schedule, now) ? nextRun(t.schedule, now) : null;
   const when = !t.enabled ? "Paused: it will not run until you turn it on" : at ? `Next run: ${new Date(at).toLocaleString()}` : "It will not run: the time is in the past";
   const own = t.modelId ? models.find((m) => m.entry.id === t.modelId)?.entry.name ?? t.modelId : null;
-  const model = own ? `Model: ${own}` : selectedModelName ? `Model: the selected one (now ${selectedModelName})` : "Model: the selected one (none is selected yet)";
+  const model = own ? `Model: ${own}` : selectedModelName ? `Model: the one chosen in Local Models (now ${selectedModelName})` : "Model: the one chosen in Local Models (none chosen yet)";
   const proj = projects.find((p) => p.id === t.projectId);
   const project = proj ? `Project: ${proj.name} (uses its latest instructions and files)` : "Project: none";
   return { when, model, project };
@@ -52,15 +52,16 @@ function Editor({ task, projects, models, selectedModelName, onSave, onCancel }:
         <textarea rows={4} value={t.prompt} onChange={(e) => setT({ ...t, prompt: e.target.value })} placeholder="Summarize my project notes and list the three most important things to do today. Put the list in a document file." />
       </label>
       <div className="row">
-        <label>Project (context)
+        <label>Project (optional)
           <select value={t.projectId ?? ""} onChange={(e) => setT({ ...t, projectId: e.target.value || null })}>
             <option value="">None</option>
             {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
+          <span className="muted small">The task uses the project's instructions and reference files.</span>
         </label>
         <label>Model
           <select value={t.modelId ?? ""} onChange={(e) => setT({ ...t, modelId: e.target.value || null })}>
-            <option value="">Selected model</option>
+            <option value="">The model chosen in Local Models</option>
             {models.filter((m) => m.installed && !m.hidden).map((m) => <option key={m.entry.id} value={m.entry.id}>{m.entry.name}</option>)}
           </select>
         </label>

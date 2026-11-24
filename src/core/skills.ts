@@ -45,8 +45,28 @@ export function skillSize(s: Pick<Skill, "instructions" | "steps" | "libraries">
   const tokens = skillTokens(s);
   const level = tokens <= 500 ? 1 : tokens <= 1200 ? 2 : 3;
   // plain words for people; the token count stays in the object for whoever needs it
-  const label = level === 1 ? "Short: every model can use it, even small ones." : level === 2 ? "Medium: needs a mid-size model or larger." : "Long: needs one of the larger models.";
-  return { tokens, level, label, short: level === 1 ? "short · any model" : level === 2 ? "medium · mid-size models" : "long · larger models" };
+  // the levels follow the conversation length a model is set up for (8K and 16K tokens), not the model's size
+  const label = level === 1 ? "Short: works with any setting." : level === 2 ? "Medium: works best when the conversation length is Long." : "Long: needs a very long conversation setting.";
+  return { tokens, level, label, short: level === 1 ? "short" : level === 2 ? "medium" : "long" };
+}
+
+const PATTERN_CHARS = /[\\^$.*+?()[\]{}|]/;
+
+/** What a person types into "start by itself": plain words separated by commas ("invoice, bill")
+ *  become the pattern a skill starts on; anything with pattern characters is kept as written. */
+export function triggerFromInput(input: string): string | undefined {
+  const t = input.trim();
+  if (!t) return undefined;
+  if (PATTERN_CHARS.test(t)) return t;
+  const words = t.split(",").map((w) => w.trim()).filter(Boolean);
+  return words.length ? `\\b(${words.join("|")})\\b` : undefined;
+}
+
+/** The other way: a pattern made from plain words is shown as those words again. */
+export function triggerForInput(when: string | undefined): string {
+  if (!when) return "";
+  const m = when.match(/^\\b\(([^\\^$.*+?()[\]{}]+)\)\\b$/);
+  return m ? m[1].split("|").join(", ") : when;
 }
 
 export function cleanTags(tags: string[]): string[] {
@@ -70,8 +90,8 @@ export function skillProblems(s: Skill): string[] {
   s.steps.forEach((x, i) => { if (!x.prompt.trim()) out.push(`step ${i + 1} is empty`); });
   if (s.tags.length > MAX_TAGS) out.push(`it has more than ${MAX_TAGS} tags`);
   if (s.when) {
-    if (s.when.length > 300) out.push("its \"when\" pattern is longer than 300 characters");
-    try { new RegExp(s.when, "i"); } catch { out.push("its \"when\" pattern is not a valid regular expression"); }
+    if (s.when.length > 300) out.push("its \"start by itself\" words are longer than 300 characters");
+    try { new RegExp(s.when, "i"); } catch { out.push("its \"start by itself\" words or pattern are not valid: check them, or leave the box empty"); }
   }
   out.push(...libraryProblems(s.libraries));
   return out;

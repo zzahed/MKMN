@@ -27,8 +27,8 @@ describe("the task editor says what the task will do before it is saved", () => 
   });
   it("names the model, its own or the selected one", () => {
     expect(taskSummary(base({ modelId: "m1" }), now, projects, models, "Chat Model").model).toBe("Model: Model One");
-    expect(taskSummary(base(), now, projects, models, "Chat Model").model).toMatch(/selected one \(now Chat Model\)/);
-    expect(taskSummary(base(), now, projects, models, null).model).toMatch(/none is selected/);
+    expect(taskSummary(base(), now, projects, models, "Chat Model").model).toBe("Model: the one chosen in Local Models (now Chat Model)");
+    expect(taskSummary(base(), now, projects, models, null).model).toBe("Model: the one chosen in Local Models (none chosen yet)");
   });
   it("names the project and that its files stay current", () => {
     expect(taskSummary(base({ projectId: "p1" }), now, projects, models, null).project).toBe("Project: Notes (uses its latest instructions and files)");
