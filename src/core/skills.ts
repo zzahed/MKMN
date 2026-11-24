@@ -88,89 +88,150 @@ export function skillPattern(when: string, flags: string): RegExp {
 }
 
 /** The most a "start by itself" pattern reads of a message: enough to recognise a request,
- *  and it keeps even an allowed pattern with open-ended repeats quick on a pasted book. */
+ *  and with the grammar below every allowed pattern stays quick (at worst the square of this). */
 export const SKILL_MATCH_CHARS = 1000;
-/** Open-ended repeats (+, *, {n,}) a pattern may hold: each one multiplies the work. */
-const MAX_OPEN_REPEATS = 2;
-/** Open-ended repeats of an atom that matches almost anything (., [^…], \S, \W, \D): two of
- *  them in a row cost the cube of the message length (.*.* took 0.8 s on 1,000 characters). */
-const MAX_BROAD_REPEATS = 1;
 
-/** How a quantifier at p[j] repeats what it follows: "open" (+, *, {n,}), "bounded" ({n,m} or {n}
- *  with more than one), or null (none, or ? and {0,1}, which never repeat); len = its length. */
-function quantifierAt(p: string, j: number): { kind: "open" | "bounded" | null; len: number } {
-  const c = p[j];
-  let kind: "open" | "bounded" | null = null, len = 0;
-  if (c === "+" || c === "*") { kind = "open"; len = 1; }
-  else if (c === "?") { len = 1; }
-  else if (c === "{") {
-    const m = /^\{(\d+)(,(\d*))?\}/.exec(p.slice(j));
-    if (m) {
-      len = m[0].length;
-      const lo = Number(m[1]), comma = m[2] !== undefined, hi = m[3] === undefined || m[3] === "" ? null : Number(m[3]);
-      kind = comma && hi === null ? "open" : Math.max(lo, hi ?? lo) > 1 ? "bounded" : null;
-    }
-  }
-  if (len && (p[j + len] === "?" || p[j + len] === "+")) len++; // lazy or possessive mark
-  return { kind, len };
+/** Repeats of varying length (+, *, {n,m}) one path through a pattern may hold: two in a row
+ *  cost the cube of the message length (\w*\w*! took 0.6 s on 1,000 characters). */
+const MAX_VARIABLE_REPEATS = 1;
+/** Optional parts (x?) one path may hold: each one doubles the ways to try a match. */
+const MAX_OPTIONALS = 4;
+/** The largest number a {n} or {n,m} may use. */
+const MAX_BOUND = 100;
+
+const WORD_LITERAL = /^(?:\\[.*+?^${}()|[\]\\]|[^.*+?^${}()|[\]\\])+$/;
+
+/** The plain-words form exactly as triggerFromInput builds it: escaped words in one alternation. */
+function isWordsForm(p: string): boolean {
+  if (!p.startsWith(`${WORD_START}(?:`) || !p.endsWith(`)${WORD_END}`)) return false;
+  const body = p.slice(WORD_START.length + 3, p.length - WORD_END.length - 1);
+  return body.split(/(?<!\\)\|/).every((w) => WORD_LITERAL.test(w));
 }
 
+class Refused extends Error {}
+
+/** What a path through the pattern costs: varying repeats and optional parts, in a row. */
+interface Cost { repeats: number; optionals: number }
+
 /**
- * Why a skill's pattern could make the window freeze, or null when it is safe to run on
- * every message. A pattern is run on the window's own thread, so one that backtracks
- * catastrophically on a crafted message ("aaaa…!") would hang MKMN. Refused: a repeated
- * group that itself repeats or holds alternatives ((a+)+, (a|aa)+), back-references (\1),
- * and more than two open-ended repeats (.*.*.*). The plain-words form and the built-in
- * skills' patterns pass.
+ * Why a hand-written "start by itself" pattern could make the window freeze, or null when it
+ * is safe to run on every message. The pattern runs on the window's own thread, and a list of
+ * known dangerous shapes always misses one, so this ALLOWS a small grammar and refuses the rest:
+ *  - letters and escaped symbols, `.`, `^`, `$`, `\b`, `\d \w \s` (and capitals), character
+ *    classes, groups `( )` and `(?: )`, and `|`;
+ *  - a repeat (`+ * {n,m}`) only on a single character, escape or class, and at most one
+ *    repeat of varying length along any path through the pattern;
+ *  - `?` on a single item or on a group with no repeat inside, at most four along a path;
+ *  - no repeat on a group, no lookarounds, no back-references, no \p, \u, \x or \c.
+ * Every built-in skill's pattern and the plain-words form pass.
  */
 export function patternRisk(p: string): string | null {
-  if (/\\[1-9]|\\k</.test(p)) return "it refers back to an earlier part of itself";
-  const groups: { risky: boolean }[] = [];
-  let open = 0, broadOpen = 0;
-  /** A repeat inside a group makes that group risky to repeat again. */
-  const markInner = () => { if (groups.length) groups[groups.length - 1].risky = true; };
-  for (let i = 0; i < p.length; i++) {
+  if (isWordsForm(p)) return null;
+  let i = 0;
+  const fail = (why: string): never => { throw new Refused(why); };
+  const add = (a: Cost, b: Cost): Cost => ({ repeats: a.repeats + b.repeats, optionals: a.optionals + b.optionals });
+  const check = (c: Cost): Cost => {
+    if (c.repeats > MAX_VARIABLE_REPEATS) fail("it repeats more than one part of varying length in a row");
+    if (c.optionals > MAX_OPTIONALS) fail("it has too many optional parts in a row");
+    return c;
+  };
+
+  /** A quantifier after a single item: what it adds to the cost; i moves past it. */
+  const quantifier = (): Cost => {
     const c = p[i];
-    let atomEnd = i; // the atom ends here; a quantifier may follow it
-    if (c === "\\") {
-      // an escape is one atom; \p{…}, \u{…} and \x… carry their own braces
-      if ((p[i + 1] === "p" || p[i + 1] === "P" || p[i + 1] === "u") && p[i + 2] === "{") atomEnd = p.indexOf("}", i + 2);
-      else atomEnd = i + 1;
-      if (atomEnd < 0) return null; // an unfinished escape: RegExp itself refuses it
-    } else if (c === "[") {
-      let j = i + 1;
-      if (p[j] === "^") j++;
-      if (p[j] === "]") j++;
-      while (j < p.length && p[j] !== "]") j += p[j] === "\\" ? 2 : 1;
-      atomEnd = j;
-    } else if (c === "(") {
-      groups.push({ risky: false });
-      // skip the group's opening marks (?: (?= (?! (?<= (?<! (?<name>
-      if (p[i + 1] === "?") {
-        if (p[i + 2] === "<" && p[i + 3] !== "=" && p[i + 3] !== "!") i = p.indexOf(">", i + 3);
-        else i += p[i + 2] === "<" ? 3 : 2;
-      }
-      continue;
-    } else if (c === "|") {
-      markInner();
-      continue;
-    } else if (c === ")") {
-      const g = groups.pop();
-      const q = quantifierAt(p, i + 1);
-      if (q.kind && g?.risky) return "it repeats a part that itself repeats or has alternatives";
-      if (q.kind === "open" && ++open > MAX_OPEN_REPEATS) return "it has too many open-ended repeats";
-      if (q.kind || g?.risky) markInner();
-      i += q.len;
-      continue;
+    let cost: Cost = { repeats: 0, optionals: 0 };
+    if (c === "?") { i++; cost = { repeats: 0, optionals: 1 }; }
+    else if (c === "+" || c === "*") { i++; cost = { repeats: 1, optionals: 0 }; }
+    else if (c === "{") {
+      const m = /^\{(\d+)(,(\d*))?\}/.exec(p.slice(i));
+      if (!m) fail("it has a { that is not a count");
+      const lo = Number(m![1]), hi = m![2] === undefined ? lo : m![3] === "" ? null : Number(m![3]);
+      if (lo > MAX_BOUND || (hi !== null && hi > MAX_BOUND)) fail(`it repeats something more than ${MAX_BOUND} times`);
+      i += m![0].length;
+      if (hi === null || hi > lo) cost = { repeats: 1, optionals: 0 };
+    } else return cost;
+    if (p[i] === "?") i++; // a lazy repeat costs the same
+    if (p[i] === "+" || p[i] === "*" || p[i] === "{" || (p[i] === "?" && cost.optionals)) fail("it repeats a repeat");
+    return cost;
+  };
+
+  /** A character class from p[i] = "[" to its "]"; i moves past it. */
+  const charClass = () => {
+    i++;
+    if (p[i] === "^") i++;
+    // in JavaScript "[]" matches nothing and "[^]" matches anything: refused, never misread
+    if (p[i] === "]") fail("it has an empty character class");
+    while (i < p.length && p[i] !== "]") {
+      if (p[i] === "\\") {
+        const e = p[i + 1];
+        if (e === undefined || /[pPuxck0-9]/.test(e)) fail("it uses an escape that is not allowed here");
+        i += 2;
+      } else if (p[i] === "[") fail("it has a [ inside a character class");
+      else i++;
     }
-    const q = quantifierAt(p, atomEnd + 1);
-    const broad = c === "." || (c === "[" && p[i + 1] === "^") || (c === "\\" && "SWD".includes(p[i + 1]));
-    if (q.kind === "open" && broad && ++broadOpen > MAX_BROAD_REPEATS) return "it has more than one open-ended repeat that matches almost anything";
-    if (q.kind === "open" && ++open > MAX_OPEN_REPEATS) return "it has too many open-ended repeats";
-    if (q.kind) markInner();
-    i = atomEnd + q.len;
+    if (p[i] !== "]") fail("it has a character class that does not end");
+    i++;
+  };
+
+  const sequence = (): Cost => {
+    let cost: Cost = { repeats: 0, optionals: 0 };
+    while (i < p.length && p[i] !== "|" && p[i] !== ")") {
+      const c = p[i];
+      if (c === "(") {
+        i++;
+        if (p[i] === "?") {
+          if (p[i + 1] !== ":") fail("it uses a lookaround or a named group");
+          i += 2;
+        }
+        const inner = alternation();
+        if (p[i] !== ")") fail("it has a ( that does not close");
+        i++;
+        // any repeat of a group, even a fixed count such as (a?){50}, multiplies what is inside
+        if (p[i] === "+" || p[i] === "*" || p[i] === "{") fail("it repeats a group");
+        const q = quantifier();
+        if (q.optionals && (inner.repeats || inner.optionals)) fail("it makes optional a group that has repeats or optional parts inside");
+        cost = check(add(cost, add(inner, q)));
+      } else if (c === "[") {
+        charClass();
+        cost = check(add(cost, quantifier()));
+      } else if (c === "\\") {
+        const e = p[i + 1];
+        if (e === undefined) fail("it ends with a \\");
+        if (e === "b" || e === "B") { i += 2; if (p[i] && "?+*{".includes(p[i])) fail("it repeats a word edge"); continue; }
+        if (!/[dDwWsStnr]/.test(e) && /[A-Za-z0-9]/.test(e)) fail("it uses an escape that is not allowed here");
+        i += 2;
+        cost = check(add(cost, quantifier()));
+      } else if (c === "^" || c === "$") {
+        i++;
+        if (p[i] && "?+*{".includes(p[i])) fail("it repeats an anchor");
+      } else if ("?+*{}]".includes(c)) {
+        fail("it has a repeat with nothing to repeat");
+      } else {
+        i++; // a letter, a digit, a space or another plain symbol, or "."
+        cost = check(add(cost, quantifier()));
+      }
+    }
+    return cost;
+  };
+
+  const alternation = (): Cost => {
+    let worst = sequence();
+    while (p[i] === "|") {
+      i++;
+      const b = sequence();
+      worst = { repeats: Math.max(worst.repeats, b.repeats), optionals: Math.max(worst.optionals, b.optionals) };
+    }
+    return worst;
+  };
+
+  try {
+    alternation();
+    if (i < p.length) fail("it has a ) with no matching (");
+    return null;
+  } catch (e) {
+    if (e instanceof Refused) return e.message;
+    throw e;
   }
-  return null;
 }
 
 export function cleanTags(tags: string[]): string[] {
