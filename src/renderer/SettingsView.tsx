@@ -1102,7 +1102,7 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
             : `The model's memory is freed after ${Math.round(rt.idleReleaseSec / 60)} minute${rt.idleReleaseSec === 60 ? "" : "s"} without use. The next message then waits while the model loads: usually 10 to 25 seconds on the NPU, longer for large models.`}
         </p>
         <details style={{ marginTop: 6 }}>
-          <summary className="small"><strong>Advanced: start-up time limit</strong> <span className="muted">· for slow models</span></summary>
+          <summary className="small"><strong>Start-up time limit</strong> <span className="muted">· for slow models</span></summary>
           <div className="row">
           <label className="small">
             <span>Longest wait for a model to start</span>
