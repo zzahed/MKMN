@@ -2,7 +2,7 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { execFile, execFileSync, spawn, spawnSync } from "node:child_process";
 import { createServer, type AddressInfo } from "node:net";
 import { existsSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { getPriority, tmpdir } from "node:os";
 import * as path from "node:path";
 import { runExamples, smokeRun } from "../src/core/construct/sandbox";
 import { runCases } from "../src/core/benchChecks";
@@ -79,7 +79,7 @@ describe("generated code runs in a locked-down process", () => {
 
   // Security pre-review 2026-11-24, F1 and F2: node:sqlite opened, attached and wrote files outside
   // the permission model's file-system rules, and process.kill reached every process of the user.
-  it("in the locked-down process an escape can neither write a file through SQLite nor signal another process", async () => {
+  it("in the locked-down process an escape can neither write a file through SQLite nor signal or reprioritise another process", async () => {
     const target = path.join(tmpdir(), `mkmn-isolation-${process.pid}.db`);
     rmSync(target, { force: true });
     const victim = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], { stdio: "ignore", windowsHide: true });
@@ -89,12 +89,16 @@ describe("generated code runs in a locked-down process", () => {
         `try { var s = p.getBuiltinModule("node:sqlite"); if (!s) r.push("sqlite:none"); else { new s.DatabaseSync(":memory:").exec("vacuum into '${sqlTarget}'"); r.push("sqlite:wrote"); } } catch (e) { r.push("sqlite:" + (e.code || "error")); } ` +
         `try { p.kill(${victim.pid}, 0); r.push("kill:signalled"); } catch (e) { r.push("kill:" + (e.code || "error")); } ` +
         `try { p._kill(${victim.pid}, 0); r.push("rawkill:signalled"); } catch (e) { r.push("rawkill:" + (e.code || "error")); } ` +
+        // found reviewing #52: the permission model does not cover another process's priority either
+        `try { p.getBuiltinModule("os").setPriority(${victim.pid}, 19); r.push("priority:changed"); } catch (e) { r.push("priority:" + (e.code || "error")); } ` +
         `return r.join(","); })()`;
+      const priorityBefore = getPriority(victim.pid!);
       setIsolation(lockedNodeRunner(process.execPath, worker, codeDirs(path.join(dist, "sidecar"))));
       const r = await runExamples([], "function f() { return 1; }", [{ call: escape, expect: '"x"' }]);
-      expect(gave(r.failures)).toBe("sqlite:none,kill:ERR_ACCESS_DENIED,rawkill:ERR_ACCESS_DENIED");
+      expect(gave(r.failures)).toBe("sqlite:none,kill:ERR_ACCESS_DENIED,rawkill:ERR_ACCESS_DENIED,priority:ERR_ACCESS_DENIED");
       expect(existsSync(target)).toBe(false);
       expect(victim.exitCode).toBeNull();
+      expect(getPriority(victim.pid!)).toBe(priorityBefore);
     } finally {
       victim.kill();
       rmSync(target, { force: true });
