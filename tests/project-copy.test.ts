@@ -73,11 +73,15 @@ describe("failures in plain words", () => {
       "Your files could not be prepared because this project has more than 200 files. Remove some, or split them across projects.");
   });
   it("one message for a file that cannot be added, naming the kinds that work", () => {
-    expect(cannotAdd("photo.png")).toBe("“photo.png” can't be added. You can add PDFs, Word, Excel and PowerPoint files, and text files such as .txt or .csv.");
+    expect(cannotAdd("photo.png")).toBe("“photo.png” can't be added. You can add PDFs, Word, Excel and PowerPoint files, and text files such as .txt, .csv or code.");
   });
   it("names an untitled note by its first words", () => {
     expect(noteTitleFrom("  Quarterly review is on Tuesday at nine in room four ")).toBe("Quarterly review is on Tuesday at…");
     expect(noteTitleFrom("Short note")).toBe("Short note");
+    expect(noteTitleFrom("x".repeat(200))).toBe(`${"x".repeat(60)}…`); // capped when there are no spaces
+  });
+  it("names the too-many-files cause only for that error", () => {
+    expect(preparingFailure("the reply was at most 3 lines")).toMatch(/^Your files could not be prepared\. Try again\./);
   });
 });
 

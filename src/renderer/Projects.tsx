@@ -31,7 +31,9 @@ export function filesReadiness(count: number, indexState: string | null, overBud
 /** An untitled note is named by its first words, so several notes can be told apart. */
 export function noteTitleFrom(text: string): string {
   const words = text.trim().split(/\s+/);
-  return words.slice(0, 6).join(" ") + (words.length > 6 ? "…" : "");
+  const title = words.slice(0, 6).join(" ");
+  // a note without spaces (some languages, a pasted link) would otherwise be all title
+  return title.length > 60 ? `${title.slice(0, 60)}…` : title + (words.length > 6 ? "…" : "");
 }
 
 export function newProject(): Project {
@@ -48,13 +50,13 @@ export function wordCount(text: string): number {
 
 /** Why preparing failed, in plain words. The raw error is never shown: it can carry internal terms. */
 export function preparingFailure(error: string | null): string {
-  const most = error?.match(/at most (\d+)/);
+  const most = error?.match(/takes at most (\d+)/);
   if (most) return `Your files could not be prepared because this project has more than ${most[1]} files. Remove some, or split them across projects.`;
   return "Your files could not be prepared. Try again. If it keeps failing, remove the file you added last.";
 }
 
 /** The one message for a file that cannot be added to a project. */
-export const cannotAdd = (name: string) => `“${name}” can't be added. You can add PDFs, Word, Excel and PowerPoint files, and text files such as .txt or .csv.`;
+export const cannotAdd = (name: string) => `“${name}” can't be added. You can add PDFs, Word, Excel and PowerPoint files, and text files such as .txt, .csv or code.`;
 
 /** A file's size in plain words: its pages when the file has pages, and its words. */
 export function describeFileSize(words: number, pages: number, scannedPages: number): string {
@@ -135,7 +137,9 @@ function ProjectEditor({ project, convs, tasks, artifacts, contextTokens, onChan
         continue;
       }
       const kind = classifyFile(f.name, f.type);
-      if (kind === "unsupported" || kind === "image") { fail(cannotAdd(f.name)); continue; }
+      // pictures cannot be reference text; any other file is tried as text (Dockerfile, .env, .vue…),
+      // and a binary one is caught below by its NUL bytes
+      if (kind === "image") { fail(cannotAdd(f.name)); continue; }
       if (f.size > MAX_FILE) { fail(`“${f.name}” is larger than 1 MB. Split it into smaller files, or paste only the part you need under “Paste text instead”.`); continue; }
       const text = await f.text();
       if (text.includes("\u0000")) { fail(cannotAdd(f.name)); continue; }
@@ -296,7 +300,7 @@ function ProjectEditor({ project, convs, tasks, artifacts, contextTokens, onChan
                   : preparingFailure(indexError))}
             </p>
             {/* Try again only when trying again can help: never for too many files */}
-            {indexState === "failed" && used > budget && !/at most \d+/.test(indexError ?? "") && <button className="linkbtn" onClick={retryIndex}>Try again</button>}
+            {indexState === "failed" && used > budget && !/takes at most \d+/.test(indexError ?? "") && <button className="linkbtn" onClick={retryIndex}>Try again</button>}
             {overlaps.length > 0 && overlaps.map(([a, b]) => (
               <p key={`${a}\u0000${b}`} className="muted small">“{a}” and “{b}” cover much of the same content, so an answer may quote either one. If one is an older copy, remove it.</p>
             ))}
