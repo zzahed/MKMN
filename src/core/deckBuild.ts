@@ -18,6 +18,7 @@ import { askBrief, countFacts, infoLevel, answerOf, themeFromBrief, type Ask, ty
 import { keywords } from "./websearch";
 import { enrichPlan, eventsIn, figuresIn, insightOf, partFor, slideFromPart, takeawayOf, trendTable } from "./deckFacts";
 import { mdCell } from "./escape";
+import { MIN_BODY, REPEAT_AT, bodyOf, deckQuality, likeness } from "./deckQuality";
 
 export const MAX_DECK_SLIDES = 20;
 const MAX_IMAGE_SLIDES = 5;
@@ -188,14 +189,64 @@ export const SLIDE_WRITER = [
   "For a picture, write nothing about it: the app adds it."
 ].join("\n");
 
-export function slidePrompt(request: string, plan: DeckPlan, index: number, problems: string[] = [], previous = "", research = ""): string {
+/** What the plan gets wrong before a slide is written: topics that say the same thing (two slides that will repeat each other), and a long talk of bullets only. */
+export function planProblems(plan: DeckPlan): string[] {
+  const out: string[] = [];
+  const content = plan.slides.map((s, i) => ({ s, i })).filter(({ s }) => s.role === "content" && s.visual !== "section" && s.visual !== "agenda");
+  for (let a = 0; a < content.length; a++) for (let b = a + 1; b < content.length; b++) {
+    if (likeness(content[a].s.topic, content[b].s.topic) >= 0.6) { out.push(`Slides ${content[a].i + 1} ("${content[a].s.topic}") and ${content[b].i + 1} ("${content[b].s.topic}") are about the same thing: give each slide its own topic.`); a = content.length; break; }
+  }
+  if (content.length >= 5 && content.filter(({ s }) => s.visual !== "none").length < 2) out.push(`${content.length} content slides are all plain bullets: give at least 2 of them a visual (flow, columns, stats, number, timeline, quote) where it fits the topic.`);
+  return out;
+}
+
+/** The slides whose lines are not things said: the cover's subtitle, the agenda's list of topics, a divider. */
+const SKIP_SAID = new Set(["cover", "agenda", "section"]);
+/** What a content slide lacks, judged against the slides before it: too little on it, or a line an earlier slide already said. */
+export function contentProblems(s: Slide, visual: VisualKind, earlier: Slide[]): string[] {
+  const out: string[] = [];
+  const carried = ["flow", "chart", "diagram", "stats", "columns", "timeline", "quote", "number"].includes(visual);
+  if (!carried && bodyOf(s) < (visual === "image" ? 2 : MIN_BODY)) out.push(`The slide is too thin (${s.lines.length} line${s.lines.length === 1 ? "" : "s"}): write ${visual === "image" ? "2 to 4" : "3 to 5"} bullets, each a concrete fact, figure, example or consequence.`);
+  for (const l of s.lines) {
+    const k = earlier.findIndex((e) => !SKIP_SAID.has(e.layout ?? "") && e.lines.some((x) => likeness(x.text, l.text) >= REPEAT_AT));
+    if (k >= 0) { out.push(`The line "${clipPhrase(plain(l.text), 10)}" repeats slide ${k + 1}: say something new instead.`); break; }
+  }
+  return out;
+}
+
+/** What earlier slides already said, for the writer of the next one: their titles and lines, short. */
+export function saidBefore(slides: Slide[], max = 900): string {
+  const out: string[] = [];
+  let used = 0;
+  for (const [i, s] of slides.entries()) {
+    if (SKIP_SAID.has(s.layout ?? "")) continue;
+    const line = `${i + 1}. ${plain(s.title)}${s.lines.length ? `: ${s.lines.map((l) => plain(l.text)).join("; ")}` : ""}`;
+    if (used + line.length > max) { out.push(`${i + 1}. ${plain(s.title)}`); used += s.title.length; continue; }
+    out.push(line);
+    used += line.length;
+  }
+  return out.join("\n");
+}
+
+const TOO_LITTLE = /\b(?:empty|sparse|bare|blank|thin|too little|little content|lots of (?:white )?space|unused space|half[- ]empty|nothing (?:on|in))\b/i;
+const TOO_MUCH = /\b(?:cut off|cropped|overflow\w*|running over|runs? over|too long|too many|too much|too small|overlap\w*|on top of|tight|does not fit|doesn't fit|crowded|cramped|unreadable)\b/i;
+/** The way the fixer is sent: a slide that is too empty is filled, one that does not fit is shortened, anything else is fixed as named. */
+export function fixInstruction(problems: string[]): string {
+  const little = problems.some((p) => TOO_LITTLE.test(p)), much = problems.some((p) => TOO_MUCH.test(p));
+  if (little && !much) return "Fill the slide: add 1 or 2 concrete lines (a fact, a figure, an example) that fit its topic and say something no other slide says, within the limits.";
+  if (much && !little) return "Make the slide shorter and simpler so that it fits: fewer words per line, fewer lines.";
+  return "Fix exactly the problems named above and nothing else; keep the slide's topic, title and facts.";
+}
+
+export function slidePrompt(request: string, plan: DeckPlan, index: number, problems: string[] = [], previous = "", research = "", said = ""): string {
   const s = plan.slides[index];
   const outline = plan.slides.map((x, i) => `${i + 1}. ${x.topic}${i === index ? "  <- THIS SLIDE" : ""}`).join("\n");
   const visual = s.visual === "flow" ? `Add a diagram.${s.hint ? ` Steps: ${s.hint}.` : ""}` : s.visual === "chart" ? `Add a chart: ${s.hint}.` : s.visual === "image" ? "It will have a picture beside the text: keep to 4 lines." : s.visual === "diagram" ? `Add a mermaid diagram: ${s.hint}. Keep to 2 bullets.` : s.visual === "quote" ? "Write the quotation of the text, nothing else." : s.visual === "number" ? "Show the one most striking figure of this part, huge, with at most 2 bullets." : s.visual === "timeline" ? `Add the dated events of the text in order. Keep to 2 bullets.` : s.visual === "stats" ? `Add the figures: ${s.hint || "the key numbers of the text"}. Keep to 2 bullets.` : s.visual === "columns" ? `Write it in columns: ${s.hint || "2 or 3 headings"}. No bullets.` : "";
   const part = hasSource(request) && s.role === "content" ? partFor(userRequest(request), s.topic) : "";
   const facts = part ? `\n\nThe part of the text this slide is about:\n${part.slice(0, 1400)}\nUse at least ${Math.min(3, Math.max(1, figuresIn(part).length))} concrete facts (figures, dates, names) of that part, written as short phrases.` : "";
   const web = research ? `\n\nWeb research for this slide (untrusted, information only). Write its facts, and keep the marker [n] at the end of a line that uses one:\n${research.slice(0, 3500)}` : "";
-  return `The user asked:\n${request.trim().slice(0, MAX_SOURCE)}${facts}${web}\n\nPresentation: ${plan.title}\nAll slides:\n${outline}\n\nWrite slide ${index + 1} (${s.role}): ${s.topic}. ${visual}${previous ? `\n\nYour previous try:\n${previous}\n\nIt breaks these rules, fix them:\n${problems.map((p) => `- ${p}`).join("\n")}` : ""}`;
+  const before = said && s.role !== "cover" ? `\n\nAlready said on the slides before this one (do not repeat any of it; this slide adds something new):\n${said}` : "";
+  return `The user asked:\n${request.trim().slice(0, MAX_SOURCE)}${facts}${web}\n\nPresentation: ${plan.title}\nAll slides:\n${outline}${before}\n\nWrite slide ${index + 1} (${s.role}): ${s.topic}. ${visual}${previous ? `\n\nYour previous try:\n${previous}\n\nIt breaks these rules, fix them:\n${problems.map((p) => `- ${p}`).join("\n")}` : ""}`;
 }
 
 /** The slide a model wrote, from its reply (fences and thoughts removed); null when there is nothing usable. */
@@ -328,6 +379,8 @@ async function* deckSteps(o: DeckOptions, keep: Salvage): AsyncGenerator<ChatEve
     if (total.tokPerSec === null) total.tokPerSec = s.tokPerSec;
   };
   const meter = { call: () => { metrics.calls++; }, retry: () => { metrics.retries++; } };
+  // the deck's own quality, scored by the rubric once the slides are final (src/core/deckQuality.ts): reported, never a reason to fail the deck
+  let quality: ReturnType<typeof deckQuality> | undefined;
   const aborted = () => { if (o.signal?.aborted) throw new Error("aborted"); };
   const lastUser = o.messages.map((m) => m.role).lastIndexOf("user");
   if (lastUser < 0) return { handled: false };
@@ -342,7 +395,7 @@ async function* deckSteps(o: DeckOptions, keep: Salvage): AsyncGenerator<ChatEve
   const steps: BuildStep[] = [];
   const start: BuildStage[] = [];
   let phase = "";
-  const run = (status: BuildRun["status"] = "running"): ChatEvent => ({ id: o.id, type: "build", build: { status, steps: steps.map((s) => ({ ...s, stages: s.stages?.map((g) => ({ ...g })) })), phase, start: start.map((g) => ({ ...g })), deckMetrics: { calls: metrics.calls, retries: metrics.retries, renders: metrics.renders, reviews: metrics.reviews, previews: metrics.previews, elapsedSec: elapsed(), tokens: total.tokens, mode: o.lowPower ? "low" : "full" } } });
+  const run = (status: BuildRun["status"] = "running"): ChatEvent => ({ id: o.id, type: "build", build: { status, steps: steps.map((s) => ({ ...s, stages: s.stages?.map((g) => ({ ...g })) })), phase, start: start.map((g) => ({ ...g })), deckMetrics: { calls: metrics.calls, retries: metrics.retries, renders: metrics.renders, reviews: metrics.reviews, previews: metrics.previews, elapsedSec: elapsed(), tokens: total.tokens, mode: o.lowPower ? "low" : "full", ...(quality ? { quality: quality.score, qualityNotes: quality.failed.map((f) => f.note) } : {}) }, ...(quality ? { quality: { rubric: "deck", score: quality.score, notes: quality.failed.map((f) => f.note) } } : {}) } });
   const begin = (list: BuildStage[], id: string, label: string, note: string, agent: string, model?: string): BuildStage => { const g: BuildStage = { id, label, status: "running", note, agent, model, at: Date.now() }; list.push(g); return g; };
   const end = (g: BuildStage, status: BuildStage["status"], note?: string) => { g.status = status; g.sec = secOf(g.at ?? Date.now()); if (note !== undefined) g.note = note; };
 
@@ -441,6 +494,13 @@ async function* deckSteps(o: DeckOptions, keep: Salvage): AsyncGenerator<ChatEve
     let reply = await collect(o.stream, `${o.id}:deckplan`, [{ role: "system", content: DECK_PLANNER }, { role: "user", content: deckPlannerPrompt(request, count, images, diagrams) }], add, o.signal, "plan", undefined, meter);
     plan = parsePlan(reply, request, count, images, diagrams);
     if (plan.slides.length < 3 || !/^\s*slide/im.test(reply)) { reply = ""; plan = parsePlan(reply, request, count, images, diagrams); }
+    // a plan whose slides would repeat each other, or a long talk of bullets only, is asked for once more with what is wrong; the better one is kept
+    const wrong = reply ? planProblems(plan) : [];
+    if (wrong.length) {
+      const again = await collect(o.stream, `${o.id}:deckplan:1`, [{ role: "system", content: DECK_PLANNER }, { role: "user", content: deckPlannerPrompt(request, count, images, diagrams) }, { role: "assistant", content: reply }, { role: "user", content: `This plan has problems, write the whole plan again without them:\n- ${wrong.join("\n- ")}` }], add, o.signal, "plan", undefined, meter).catch((e) => { if (o.signal?.aborted) throw e; return ""; });
+      const next = /^\s*slide/im.test(again) ? parsePlan(again, request, count, images, diagrams) : null;
+      if (next && next.slides.length >= 3 && planProblems(next).length < wrong.length) plan = next;
+    }
   } catch (e) {
     if (o.signal?.aborted) throw e;
     plan = parsePlan("", request, count, images, diagrams);
@@ -519,16 +579,23 @@ async function* deckSteps(o: DeckOptions, keep: Salvage): AsyncGenerator<ChatEve
       end(rg, web ? "done" : "skipped", web ? "facts found" : "nothing found");
       yield run();
     }
+    // the writer sees what the slides before said, so it adds instead of repeating; the limits AND the content are checked,
+    // and of the two tries the one with fewer problems is kept (a second try that is worse never replaces a good first one)
+    const said = saidBefore(slides);
+    let limitProblems: string[] = [], best = Infinity;
     for (let attempt = 0; attempt < 2; attempt++) {
-      try { reply = yield* writing(`${o.id}:slide${i}:${attempt}`, [{ role: "system", content: SLIDE_WRITER }, { role: "user", content: slidePrompt(request, plan, i, problems, attempt ? slide ? slideSource(slide) : reply : "", web) }], ps.role); } catch (e) { if (o.signal?.aborted) throw e; problems = ["The last try failed: write the slide again."]; continue; }
+      try { reply = yield* writing(`${o.id}:slide${i}:${attempt}`, [{ role: "system", content: SLIDE_WRITER }, { role: "user", content: slidePrompt(request, plan, i, problems, attempt ? slide ? slideSource(slide) : reply : "", web, said) }], ps.role); } catch (e) { if (o.signal?.aborted) throw e; problems = ["The last try failed: write the slide again."]; continue; }
       let s: Slide | null = null;
       try { s = parseSlideReply(reply); } catch { /* unreadable: asked again below */ }
       if (!s) { problems = ["Reply with the slide in the form shown, starting with # and the title."]; continue; }
-      slide = s;
-      problems = slideProblems(s);
-      if (ps.visual === "image" || ps.visual === "diagram") { const extra = s.lines.length > 4 ? [`Too many lines for a slide with a picture (${s.lines.length}): at most 4.`] : []; problems = [...problems, ...extra]; }
+      let limits = slideProblems(s);
+      if (ps.visual === "image" || ps.visual === "diagram") { const extra = s.lines.length > 4 ? [`Too many lines for a slide with a picture (${s.lines.length}): at most 4.`] : []; limits = [...limits, ...extra]; }
+      const content = ps.role === "content" ? contentProblems(s, ps.visual, slides) : [];
+      problems = [...limits, ...content];
+      if (problems.length < best) { best = problems.length; slide = s; limitProblems = limits; }
       if (!problems.length) break;
     }
+    problems = limitProblems;
     if (!slide) slide = { title: ps.topic, lines: [], table: null, notes: "" };
     if (problems.length) { slide = trimSlide(slide); if (ps.visual === "image" || ps.visual === "diagram") slide = { ...slide, lines: slide.lines.slice(0, ps.visual === "diagram" ? 2 : 4) }; }
     try {
@@ -631,7 +698,7 @@ async function* deckSteps(o: DeckOptions, keep: Salvage): AsyncGenerator<ChatEve
   const rewrite = async (i: number, before: Slide, seen: string[], round: number): Promise<Slide> => {
     let next: Slide | null = null;
     try {
-      const reply = await collect(o.stream, `${o.id}:fix${i}:${round}`, [{ role: "system", content: SLIDE_WRITER }, { role: "user", content: `${slidePrompt(request, plan, i, seen, slideSource({ ...before, image: undefined }))}\n\nMake the slide shorter and simpler so that it fits: fewer words per line, fewer lines.` }], add, o.signal, undefined, undefined, meter);
+      const reply = await collect(o.stream, `${o.id}:fix${i}:${round}`, [{ role: "system", content: SLIDE_WRITER }, { role: "user", content: `${slidePrompt(request, plan, i, seen, slideSource({ ...before, image: undefined }), "", saidBefore(slides.slice(0, i)))}\n\n${fixInstruction(seen)}` }], add, o.signal, undefined, undefined, meter);
       next = parseSlideReply(reply);
     } catch (e) { if (o.signal?.aborted) throw e; }
     // A reply that is not the slide rewritten (prose like "OK", or an empty shell) is not a fix:
@@ -642,8 +709,12 @@ async function* deckSteps(o: DeckOptions, keep: Salvage): AsyncGenerator<ChatEve
       ? { ...next, flow: before.flow && next.flow ? next.flow : before.flow, stats: next.stats ?? before.stats, columns: next.columns ?? before.columns, timeline: next.timeline ?? before.timeline, blocks: next.blocks ?? before.blocks, table: before.table, chart: before.chart, image: before.image, notes: next.notes || before.notes }
       : before;
     candidate = verifyQuotes(candidate, full);
+    // a fix never changes what a slide IS: its layout stays, the cover keeps the deck's title and one subtitle line
+    candidate = { ...candidate, layout: before.layout };
+    if (before.layout === "cover") candidate = { ...candidate, title: before.title, lines: candidate.lines.slice(0, 1).map((l) => ({ ...l, bullet: false })) };
     if (slideProblems(candidate).length) candidate = trimSlide(candidate);
-    if (JSON.stringify(candidate) === JSON.stringify(before)) candidate = { ...trimSlide(before), lines: before.lines.slice(0, Math.max(1, before.lines.length - 1)) };
+    // an unchanged slide that does not fit loses a line; one that is too empty is never made emptier
+    if (JSON.stringify(candidate) === JSON.stringify(before) && !fixInstruction(seen).startsWith("Fill")) candidate = { ...trimSlide(before), lines: before.lines.slice(0, Math.max(1, before.lines.length - 1)) };
     return candidate;
   };
   for (const [i] of slides.entries()) {
@@ -688,9 +759,17 @@ async function* deckSteps(o: DeckOptions, keep: Salvage): AsyncGenerator<ChatEve
       yield run();
       const drawn = (metrics.renders++, await render(deckHtml(source, pics, i)).catch((): RenderResult => ({ problems: [] })));
       // the layout check is a judge too: a tight slide is fixed even when the screenshot reports nothing
-      let result: RenderResult = { shot: drawn.shot, problems: [...tight, ...drawn.problems] };
+      // the vision verdict is a judge like the others: it is part of the problems a fix is measured against, and a fix is looked at again,
+      // so "a big empty area" is never "fixed" by a rewrite nobody looked at (the count of problems must go DOWN for a fix to be kept)
+      const looks = !!(o.lookAt && !o.lowPower);
+      const lookAtSlide = async (shot: string | undefined, title: string): Promise<string[]> => {
+        if (!shot || !looks) return [];
+        metrics.reviews++;
+        const verdict = parseProblem((await o.lookAt!(shot, `${LOOK_SLIDE}\n\n${lookSlidePrompt(title)}`).catch(() => null)) ?? "");
+        return verdict ? [verdict] : [];
+      };
+      let result: RenderResult = { shot: drawn.shot, problems: [...tight, ...drawn.problems, ...(await lookAtSlide(drawn.shot, slides[i].title))] };
       let seen = result.problems.slice();
-      if (result.shot && o.lookAt && !o.lowPower) { metrics.reviews++; const verdict = parseProblem((await o.lookAt(result.shot, `${LOOK_SLIDE}\n\n${lookSlidePrompt(slides[i].title)}`).catch(() => null)) ?? ""); if (verdict) seen.push(verdict); }
       g.shot = result.shot;
       end(g, seen.length ? "error" : "done", seen.length ? seen[0].slice(0, 90) : "looks fine");
       yield run();
@@ -703,8 +782,8 @@ async function* deckSteps(o: DeckOptions, keep: Salvage): AsyncGenerator<ChatEve
         const candidate = await rewrite(i, before, seen, round);
         const trial = deckSource(plan.theme, slides.map((s, k) => (k === i ? candidate : s)), plan.tweak);
         const drawnAfter = (metrics.renders++, await render(deckHtml(trial, pics, i)).catch((): RenderResult => ({ problems: seen })));
-        const after: RenderResult = { shot: drawnAfter.shot, problems: [...overflowOf(i, trial, candidate), ...drawnAfter.problems] };
-        const better = after.problems.length <= result.problems.length;
+        const after: RenderResult = { shot: drawnAfter.shot, problems: [...overflowOf(i, trial, candidate), ...drawnAfter.problems, ...(await lookAtSlide(drawnAfter.shot, candidate.title))] };
+        const better = after.problems.length < result.problems.length;
         if (better) { slides[i] = candidate; source = trial; result = after; seen = after.problems.slice(); fix.shot = after.shot; }
         end(fix, better ? "done" : "skipped", better ? (seen.length ? "better, still not perfect" : "fixed") : "made it worse, undone");
         yield run();
@@ -721,6 +800,7 @@ async function* deckSteps(o: DeckOptions, keep: Salvage): AsyncGenerator<ChatEve
   for (const s of steps) s.status = "done";
 
   // the layout's own verdict, kept for the summary
+  try { quality = deckQuality(slides); } catch { /* a score is a report, never a failure */ }
   const left = (() => { try { return slides.map((s, i) => ({ i, p: layoutSlide(s, themeOf(source), { index: i, count: slides.length, pics }).overflow })).filter((x) => x.p.length); } catch { return []; } })();
 
   // 5 ---- the summary
@@ -729,7 +809,7 @@ async function* deckSteps(o: DeckOptions, keep: Salvage): AsyncGenerator<ChatEve
   const artifact = `<artifact type="pptx" title="${title}">\n${source.trim()}\n</artifact>`;
   phase = "Writing the summary…";
   yield run();
-  const report = `Presentation title (exact): ${plan.title}\nSlides: ${slides.length}. Theme: ${themeOf(`Theme: ${plan.theme}`).name}. Pictures: ${files.length}. Charts: ${slides.filter((s) => s.chart).length}. Flows and diagrams: ${slides.filter((s) => s.flow || s.figure).length}. Model calls: ${metrics.calls} (${metrics.retries} retries).${render ? ` Render passes: ${metrics.renders}. Vision reviews of screenshots: ${metrics.reviews}.` : " There is no renderer here: the slides were checked by the app's own layout measure only, not drawn or screenshotted."} Preview updates: ${metrics.previews}. Elapsed: ${elapsed()}s. Power mode: ${o.lowPower ? "low" : "full"}. ${o.lowPower ? (render ? "The vision check of screenshots was skipped; only slides the app's own layout check found too tight were drawn and fixed, once." : "The vision check was skipped and nothing was drawn: slides the app's own layout check found too tight were fixed once, judged by that measure.") : ""} Slide titles: ${slides.map((s) => s.title).join(" / ")}. ${info === "enough" ? "The facts come from the text the person gave." : o.search ? "Facts missing from the person's text were searched on the web." : "The text has few facts, so some facts come from the model's memory. State this in the report."}${srcSlide ? ` The web research is credited: ${srcSlide.lines.length} sources, ${count ? "in the notes of the last slide" : "on the last slide"}.` : ""}${left.length ? ` Slides still tight: ${left.map((x) => x.i + 1).join(", ")}.` : ""}`;
+  const report = `Presentation title (exact): ${plan.title}\nSlides: ${slides.length}. Theme: ${themeOf(`Theme: ${plan.theme}`).name}. Pictures: ${files.length}. Charts: ${slides.filter((s) => s.chart).length}. Flows and diagrams: ${slides.filter((s) => s.flow || s.figure).length}. Model calls: ${metrics.calls} (${metrics.retries} retries).${render ? ` Render passes: ${metrics.renders}. Vision reviews of screenshots: ${metrics.reviews}.` : " There is no renderer here: the slides were checked by the app's own layout measure only, not drawn or screenshotted."} Preview updates: ${metrics.previews}. Elapsed: ${elapsed()}s. Power mode: ${o.lowPower ? "low" : "full"}. ${o.lowPower ? (render ? "The vision check of screenshots was skipped; only slides the app's own layout check found too tight were drawn and fixed, once." : "The vision check was skipped and nothing was drawn: slides the app's own layout check found too tight were fixed once, judged by that measure.") : ""} Slide titles: ${slides.map((s) => s.title).join(" / ")}. ${info === "enough" ? "The facts come from the text the person gave." : o.search ? "Facts missing from the person's text were searched on the web." : "The text has few facts, so some facts come from the model's memory. State this in the report."}${srcSlide ? ` The web research is credited: ${srcSlide.lines.length} sources, ${count ? "in the notes of the last slide" : "on the last slide"}.` : ""}${left.length ? ` Slides still tight: ${left.map((x) => x.i + 1).join(", ")}.` : ""}${quality?.failed.length ? ` Weak points found by the app's quality check: ${quality.failed.map((f) => f.note).join("; ")}.` : ""}`;
   let explanation = "";
   try {
     explanation = (await collect(o.stream, `${o.id}:deckexplain`, [{ role: "user", content: `[You made a presentation yourself; it is open next to your message and the user can edit its text with the Edit button, or ask you to change it.]\n${report}\n\nReply to the user, in the language of their request: ${asked.slice(-300)}\nSay in 2 or 3 short sentences what you made (give the title exactly as written above, the number of slides, the look), that they can save it as a PowerPoint file with Save as, and offer one concrete change (another theme, a shorter version, speaker notes). Say only what the facts above say. First person singular. No code, no <artifact> tag.` }], add, o.signal, undefined, undefined, meter)).replace(/<artifact[\s\S]*?(?:<\/artifact>|$)/gi, "").replace(/<think>[\s\S]*?<\/think>/g, "").trim();
