@@ -105,6 +105,8 @@ describe("phase 2, round 2: what a first-time user meets by default", () => {
       .toEqual({ where: "Ran on the NPU", why: "Not tested on this PC yet, so MKMN used the usual choice." });
     expect(plainLastChoice({ config: { compute: "hybrid" }, reason: ["already resident: no switch, no reload"], provisional: false }).why).toBe("Already loaded, so nothing changed.");
     expect(plainLastChoice({ config: { compute: "gpu" }, reason: ["staying resident: GenieX · NPU (switching would save less than 10%)"], provisional: false }).where).toBe("Ran on the graphics card");
+    expect(plainLastChoice({ config: null, reason: ["No supported configuration passes the current constraints"], provisional: true }))
+      .toEqual({ where: "Couldn't choose automatically", why: "None of the options fit right now, for example because memory is low or other apps are busy." });
     expect(runtime).toMatch(/<summary className="muted">Technical details<\/summary>\s*<div className="muted small">\{adaptive\.last\.label\}/);
   });
 

@@ -22,7 +22,9 @@ const PLACE: Record<string, string> = { npu: "the NPU", hybrid: "the NPU and the
 /** The last automatic choice in one plain line, from the decision's own facts. The raw
  *  label, reasons and refused options stay one click away under Technical details. */
 export function plainLastChoice(last: { config: { compute: string } | null; reason: string[]; provisional: boolean }): { where: string; why: string } {
-  const where = last.config ? `Ran on ${PLACE[last.config.compute] ?? last.config.compute}` : "No choice made yet";
+  // Auto tried and every option was ruled out (memory, other apps, availability): say so, never "untested"
+  if (!last.config) return { where: "Couldn't choose automatically", why: "None of the options fit right now, for example because memory is low or other apps are busy." };
+  const where = `Ran on ${PLACE[last.config.compute] ?? last.config.compute}`;
   const said = last.reason.join(" ");
   const why = last.provisional ? "Not tested on this PC yet, so MKMN used the usual choice."
     : /already resident/i.test(said) ? "Already loaded, so nothing changed."
@@ -164,7 +166,8 @@ export function RuntimePanel({ settings, onSave, changed }: { settings: Settings
           </div>
           {/* the NPU card below says what the NPU is: its engine notes would only repeat it */}
           {cur && !cur.available && <div className="warn small">{cur.note} You can still choose it.</div>}
-          {cur && cur.available && off && <div className="muted small">{cur.note}</div>}
+          {/* a note that something will be installed on first use is news the NPU card does not carry */}
+          {cur && cur.available && (off || /install/i.test(cur.note)) && <div className="muted small">{cur.note}</div>}
           {choice.id === "hybrid" && <div className="muted small">CPU + NPU splits the model between the two: most of it on the NPU, the rest on the CPU. It works with most downloaded models, but not with models built only for the NPU.</div>}
           {info && off && <div className="muted small">{info.note}</div>}
         </>

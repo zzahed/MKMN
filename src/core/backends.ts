@@ -16,11 +16,11 @@ export function backendNote(target: ComputeTarget, rt: RuntimeSettings = {}): st
   if (target === "npu" || target === "hybrid") return "Runs on the NPU of a Snapdragon X with GenieX. Offloads model compute to dedicated neural hardware.";
   const layers = int(rt.gpuLayers);
   if (target === "gpu") {
-    if (layers === 0) return "Graphics card selected, but 0 layers are placed on it: everything runs on the processor.";
-    if (layers !== null && layers > 0) return `${layers} layers on the graphics card; the rest stays in RAM and runs on the processor, so a model larger than the video memory still loads (slower).`;
-    return "All layers on the graphics card. If the model is bigger than its video memory, lower “Layers on the GPU” so the rest stays in RAM.";
+    if (layers === 0) return "Graphics card selected, but the model is set to run entirely on the processor.";
+    if (layers !== null && layers > 0) return `${layers} layers (parts) of the model run on the graphics card and the rest on the processor, so a model larger than the card's memory still loads, more slowly.`;
+    return "Runs on the graphics card. If the model is larger than the card's memory, lower “Layers on the GPU” under Advanced load options so part of it runs on the processor.";
   }
-  return rt.mmap === false ? "Runs on the processor, loaded fully into RAM." : "Runs on the processor. The model file is mapped from disk, so a model bigger than the free RAM still starts (slower while it is paged in).";
+  return rt.mmap === false ? "Runs on the processor, loaded fully into memory." : "Runs on the processor. A model larger than the free memory still starts, but more slowly.";
 }
 
 /** A machine-readable summary for the selector: which targets this PC can offer and why not. */

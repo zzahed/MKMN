@@ -11,7 +11,7 @@ import { EvidenceBadges } from "./EvidenceBadges";
 import { ScoreChip } from "./ScoreChip";
 import { scoreOf } from "../core/scores";
 import { recommendedDefault, tierChoices, TIERS, type ArtifactManifestEntry, type EvidenceContext, type EvidenceRecord } from "../core/manifest";
-import { arrangeModels, badgePlacement, isNativeNpu, measureHint, placementOf, recommendedModels, type EngineFilter, type SortBy } from "../core/modelList";
+import { altNote, arrangeModels, badgePlacement, isNativeNpu, measureHint, placementOf, recommendedModels, type EngineFilter, type SortBy } from "../core/modelList";
 import { Seg } from "./Seg";
 import { SkeletonRows } from "./Skeleton";
 import { Explore } from "./Explore";
@@ -25,13 +25,6 @@ function EngineBadge({ foundry, installed }: { foundry: boolean; installed?: boo
   return foundry
     ? <span className="badge engine foundry" title={installed === false ? "Runs with Microsoft Foundry Local, which needs to be installed first" : "Runs with Microsoft Foundry Local"}>Foundry Local</span>
     : <span className="badge engine geniex" title="Runs with Qualcomm's NPU engine (GenieX)">GenieX</span>;
-}
-
-/** The other engine's build of the same model, in words a second like the speed column beside it. */
-function altLine(shown: CatalogItem, other: CatalogItem): string {
-  const a = scoreOf(shown.entry)?.tokPerSec, b = scoreOf(other.entry)?.tokPerSec;
-  const name = isFoundry(other.entry) ? "Foundry Local" : "Qualcomm's NPU engine";
-  return a && b ? `Faster here than with ${name} (about ${wordsPerSec(a)} against ${wordsPerSec(b)} words/s)` : `Also tested with ${name}`;
 }
 
 /** A speed people can picture: words a second, from the engine's tokens a second (about ¾ of a word each). */
@@ -129,7 +122,7 @@ function RelatedChip({ item, bench, own }: { item: CatalogItem; bench?: BenchPro
   if (own || !bench?.rows) return null;
   const rel = relatedVariantRun(item, bench.rows, bench.profiles);
   if (!rel) return null;
-  return <span className="bench-chip related muted small" title={`Measured on this PC with the Foundry Local build of this model, not with this build. ${benchDetailLines(rel.run).join(" · ")}`}>{rel.label}</span>;
+  return <span className="bench-chip related muted small" title={`Measured on this PC with the Foundry Local build of this model, not with this build. ${rel.label}. ${benchDetailLines(rel.run).join(" · ")}`}>Foundry Local version on this PC: about {wordsPerSec(rel.run.decodeTokPerSec)} words/s on {COMPUTE_LABEL[rel.run.compute as keyof typeof COMPUTE_LABEL] ?? rel.run.compute}</span>;
 }
 
 /** The evidence context the model cards render: the cache manifest, the per-device records and what "here" means. */
@@ -190,7 +183,7 @@ function ModelRow({ item, progress, selected, check, quiet, alt, bench, ...rest 
         <BenchChip sel={benchSelOf(bench, item)} preferredCompute={bench?.preferredCompute} />
         <RelatedChip item={item} bench={bench} own={benchSelOf(bench, item)} />
         <div className="muted small">{entry.role}</div>
-        {alt && <div className="small mrow-alt">{altLine(item, alt)}</div>}
+        {alt && <div className="small mrow-alt">{altNote(item, alt)}</div>}
       </div>
       <div className="mrow-badges">
         <EngineBadge foundry={isFoundry(entry)} installed={item.installed} />
