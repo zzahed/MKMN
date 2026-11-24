@@ -33,7 +33,7 @@ import type { SaveFeedbackState } from "../core/settingsUi";
 import { COMPUTE_LABEL } from "../core/adaptiveCompute";
 import type { AppInfo, CatalogItem, NpuPlanView } from "../shared/api";
 import type { HardwareProfile, ServerStatus, Settings, VoiceDownloadProgress, VoiceModel, VoiceModelView, VoiceSettings, VoiceStatus, PowerStatusInfo, BenchmarkResult } from "../shared/types";
-import { readBool, readNum, readObj, readSetting, settingDefault, settingDecl, changedKeys, resettableChangedKeys, exportSettings, importSettings, leafValuePatch, SETTING_GROUPS } from "../shared/settingsSchema";
+import { readBool, readNum, readObj, readSetting, voiceSettings as readVoiceSettings, settingDefault, settingDecl, changedKeys, resettableChangedKeys, exportSettings, importSettings, leafValuePatch, SETTING_GROUPS } from "../shared/settingsSchema";
 import { applyAppearance, type AppearanceMode } from "./theme";
 import { DEV_SECTIONS, PRIMARY_TABS, SETTINGS_SECTIONS, redirectTab, searchSettings, tabLabel, type SettingsTab } from "./settingsSearch";
 import { MultilingualSearch } from "./MultilingualSearch";
@@ -290,7 +290,7 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
   /** A successful benchmark just wrote new measurements into hardware.json: the caller refreshes the model list and the local-measurement chips. */
   onBenchSaved?: () => void;
 }) {
-  const v = settings.voice;
+  const v = useMemo(() => readVoiceSettings(settings), [settings]);
   /** The turn-budget pair from its two halves: Default on one half keeps the other;
    *  only both at Default store nothing (the policy default then stands). */
   const turnPair = (calls: number | null, tokens: number | null) =>
@@ -400,7 +400,7 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
       // first download of a kind becomes the selection
       const m = (await api().voiceModels()).find((x) => x.model.id === p.id)?.model;
       if (m) {
-        const cur = (await api().settings()).voice;
+        const cur = readVoiceSettings(await api().settings());
         if (m.kind === "stt" && !cur.sttModelId) await onSaveVoice({ sttModelId: m.id });
         if (m.kind === "tts" && !cur.ttsModelId) await onSaveVoice({ ttsModelId: m.id });
       }
