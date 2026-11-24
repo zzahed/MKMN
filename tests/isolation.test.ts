@@ -294,6 +294,28 @@ describe("generated code runs only on a runtime that is proven to block the netw
     for (const out of ["FS_WRITE_UNKNOWN", "CHILD_PROCESS_UNKNOWN", "WORKER_UNKNOWN"]) expect(probeVerdict(out)).toBeNull();
   }, 120_000);
 
+  // The installed app starts the sidecar with verbatim paths ("\\?\C:\Program Files\MKMN\..."),
+  // so __dirname carried the prefix into --allow-fs-read. The permission model does not match it
+  // against the plain path it checks: the worker could not read its own code, every check died
+  // with "the isolated check stopped (exit 1): Node.js v26...", and the probe (run with -e,
+  // never loading the worker) still passed.
+  it.runIf(process.platform === "win32")("the checks run when the sidecar's own paths are verbatim (\\\\?\\C:\\...)", async () => {
+    const verbatim = (p: string) => `\\\\?\\${p}`;
+    expect(codeDirs(verbatim(path.join(dist, "sidecar")))).toEqual(dirs());
+    expect(lockedNodeArgs([verbatim(dist)], verbatim(worker))).toEqual(lockedNodeArgs([dist], worker));
+    setIsolation(lockedNodeRunner(verbatim(process.execPath), verbatim(worker), codeDirs(verbatim(path.join(dist, "sidecar")))));
+    expect(await runExamples([], "function add(a, b) { return a + b; }", [{ call: "add(2, 3)", expect: "5" }])).toEqual({ ok: true, failures: [] });
+  }, 60_000);
+
+  it("the runner proves the worker itself starts before it runs generated code, and says so when it does not", async () => {
+    // read rules that do not cover the worker's code: the network probe still passes, the worker cannot load
+    const runner = lockedNodeRunner(process.execPath, worker, [path.join(root, "tests")]);
+    const first = await runner.run("runExamples", [[], "", []]).catch((e: Error) => e);
+    expect(first).toBeInstanceOf(IsolationUnsafeError);
+    expect((first as Error).message).toMatch(/^Generated code is paused: MKMN's isolated checker did not start on this PC \(.+\)\. It checks again on the next run\.$/);
+    expect(() => runner.runSync("runExamples", [[], "", []])).toThrow(/isolated checker did not start/);
+  }, 60_000);
+
   it("a locked process cannot resolve a name, send UDP or fetch either", async () => {
     const run = (code: string) => new Promise<string>((resolve) => {
       execFile(process.execPath, [...lockedNodeArgs(dirs(), "-e"), code], { windowsHide: true, timeout: 20_000 }, (_e, stdout) => resolve(String(stdout).trim()));

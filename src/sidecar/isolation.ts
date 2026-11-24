@@ -5,7 +5,7 @@
 import { execFile, spawn, spawnSync } from "child_process";
 import { randomBytes } from "crypto";
 import * as path from "path";
-import { IsolationUnsafeError, lockedNodeArgs, readReply, type IsolatedOp, type IsolationRunner } from "../core/isolate";
+import { IsolationUnsafeError, lockedNodeArgs, plainPath, readReply, type IsolatedOp, type IsolationRunner } from "../core/isolate";
 
 /** Long enough for a page played 200 ticks with its scenes; a runaway loop dies with its process. */
 const LIMIT_MS = 60_000;
@@ -31,9 +31,10 @@ export function lockedEnv(): NodeJS.ProcessEnv {
 
 /** The app's compiled code (dist, or Runtime once installed) and the packages beside it: the
  *  only folders the locked-down process may read. Installed, node_modules sits inside Runtime;
- *  in a checkout it sits beside dist. */
+ *  in a checkout it sits beside dist. Always plain paths (plainPath): the permission model does
+ *  not match verbatim ones. */
 export function codeDirs(sidecarDir: string): string[] {
-  const code = path.resolve(sidecarDir, "..");
+  const code = path.resolve(plainPath(sidecarDir), "..");
   return [code, path.join(code, "node_modules"), path.resolve(code, "..", "node_modules")];
 }
 
@@ -95,10 +96,65 @@ export function proveNetworkDeniedSync(nodePath: string, readDirs: string[]): bo
 /** How the runner proves the runtime blocks the network (injected by tests). */
 export interface NetworkProbe { probe?: () => Promise<boolean | null>; probeSync?: () => boolean | null }
 
-export function lockedNodeRunner(nodeExe = process.execPath, worker = path.join(__dirname, "isolateWorker.js"), readDirs = codeDirs(__dirname), net: NetworkProbe = {}): IsolationRunner {
+/** One request to a fresh locked worker process: its reply's value, or the error it stopped with. */
+function runLocked(nodeExe: string, args: string[], op: IsolatedOp, a: unknown[]): Promise<unknown> {
+  const nonce = randomBytes(16).toString("hex");
+  return new Promise((resolve, reject) => {
+    const child = spawn(nodeExe, args, { windowsHide: true, env: lockedEnv(), stdio: ["pipe", "pipe", "pipe"] });
+    let out = "", err = "", flooded = false;
+    const timer = setTimeout(() => { child.kill(); }, LIMIT_MS);
+    // what the process may print, on each stream, before it is stopped (as runLockedSync's maxBuffer)
+    const take = (d: Buffer | string, add: (s: string) => number) => {
+      if (!flooded && add(String(d)) > MAX_OUTPUT) { flooded = true; child.kill(); }
+    };
+    child.stdout.on("data", (d) => take(d, (s) => (out += s).length));
+    child.stderr.on("data", (d) => take(d, (s) => (err += s).length));
+    child.on("error", (e) => { clearTimeout(timer); reject(e); });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (flooded) return reject(new Error(FLOODED));
+      try { resolve(readReply(out, err, code, nonce)); } catch (e) { reject(e); }
+    });
+    child.stdin.end(JSON.stringify({ op, args: a, nonce }));
+  });
+}
+
+/** runLocked for a synchronous caller. */
+function runLockedSync(nodeExe: string, args: string[], op: IsolatedOp, a: unknown[]): unknown {
+  const nonce = randomBytes(16).toString("hex");
+  const r = spawnSync(nodeExe, args, { windowsHide: true, env: lockedEnv(), input: JSON.stringify({ op, args: a, nonce }), encoding: "utf8", timeout: LIMIT_MS, maxBuffer: MAX_OUTPUT });
+  if (r.error) throw (r.error as NodeJS.ErrnoException).code === "ENOBUFS" ? new Error(FLOODED) : r.error;
+  return readReply(r.stdout ?? "", r.stderr ?? "", r.status, nonce);
+}
+
+/** The smallest real request: a function with no examples. The probe runs with -e and never loads
+ *  the worker, so a worker that cannot start under the locked flags (its code outside the read
+ *  rules) passed it and then failed every check; this proves the worker answers. */
+const WORKER_CHECK: [IsolatedOp, unknown[]] = ["runExamples", [[], "function f() {}", []]];
+const problemOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+export function lockedNodeRunner(nodeExe = plainPath(process.execPath), worker = plainPath(path.join(__dirname, "isolateWorker.js")), readDirs = codeDirs(__dirname), net: NetworkProbe = {}): IsolationRunner {
   const args = lockedNodeArgs(readDirs, worker);
-  const probe = net.probe ?? (() => proveNetworkDenied(nodeExe, readDirs));
-  const probeSync = net.probeSync ?? (() => proveNetworkDeniedSync(nodeExe, readDirs));
+  const networkProbe = net.probe ?? (() => proveNetworkDenied(nodeExe, readDirs));
+  const networkProbeSync = net.probeSync ?? (() => proveNetworkDeniedSync(nodeExe, readDirs));
+  // A runtime proven safe is only used once the worker itself has answered under the same flags.
+  // A worker that did not start is "could not tell" (null): refused with what it said, asked again.
+  let workerProblem: string | null = null;
+  const probe = async (): Promise<boolean | null> => {
+    workerProblem = null;
+    const v = await networkProbe();
+    if (v !== true) return v;
+    try { await runLocked(nodeExe, args, ...WORKER_CHECK); } catch (e) { workerProblem = problemOf(e); return null; }
+    return true;
+  };
+  const probeSync = (): boolean | null => {
+    workerProblem = null;
+    const v = networkProbeSync();
+    if (v !== true) return v;
+    try { runLockedSync(nodeExe, args, ...WORKER_CHECK); } catch (e) { workerProblem = problemOf(e); return null; }
+    return true;
+  };
+  const refusal = (proven: boolean | null) => new IsolationUnsafeError(proven === null, proven === null ? workerProblem ?? undefined : undefined);
   // Asked before the first generated code runs; a definite answer (proven blocked, proven open)
   // is remembered for the sidecar's life. "Could not tell" (no output, a timeout, a probe that
   // threw) refuses that run and is asked again next time: a slow first start under load is not
@@ -124,34 +180,13 @@ export function lockedNodeRunner(nodeExe = process.execPath, worker = path.join(
   return {
     async run(op: IsolatedOp, a: unknown[]): Promise<unknown> {
       const proven = await safe();
-      if (proven !== true) throw new IsolationUnsafeError(proven === null);
-      const nonce = randomBytes(16).toString("hex");
-      return new Promise((resolve, reject) => {
-        const child = spawn(nodeExe, args, { windowsHide: true, env: lockedEnv(), stdio: ["pipe", "pipe", "pipe"] });
-        let out = "", err = "", flooded = false;
-        const timer = setTimeout(() => { child.kill(); }, LIMIT_MS);
-        // what the process may print, on each stream, before it is stopped (as runSync's maxBuffer)
-        const take = (d: Buffer | string, add: (s: string) => number) => {
-          if (!flooded && add(String(d)) > MAX_OUTPUT) { flooded = true; child.kill(); }
-        };
-        child.stdout.on("data", (d) => take(d, (s) => (out += s).length));
-        child.stderr.on("data", (d) => take(d, (s) => (err += s).length));
-        child.on("error", (e) => { clearTimeout(timer); reject(e); });
-        child.on("close", (code) => {
-          clearTimeout(timer);
-          if (flooded) return reject(new Error(FLOODED));
-          try { resolve(readReply(out, err, code, nonce)); } catch (e) { reject(e); }
-        });
-        child.stdin.end(JSON.stringify({ op, args: a, nonce }));
-      });
+      if (proven !== true) throw refusal(proven);
+      return runLocked(nodeExe, args, op, a);
     },
     runSync(op: IsolatedOp, a: unknown[]): unknown {
       const proven = safeSync();
-      if (proven !== true) throw new IsolationUnsafeError(proven === null);
-      const nonce = randomBytes(16).toString("hex");
-      const r = spawnSync(nodeExe, args, { windowsHide: true, env: lockedEnv(), input: JSON.stringify({ op, args: a, nonce }), encoding: "utf8", timeout: LIMIT_MS, maxBuffer: MAX_OUTPUT });
-      if (r.error) throw (r.error as NodeJS.ErrnoException).code === "ENOBUFS" ? new Error(FLOODED) : r.error;
-      return readReply(r.stdout ?? "", r.stderr ?? "", r.status, nonce);
+      if (proven !== true) throw refusal(proven);
+      return runLockedSync(nodeExe, args, op, a);
     },
   };
 }
