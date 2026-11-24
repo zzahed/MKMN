@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import type { Settings } from "../shared/types";
 import { readBool, readObj, readSetting } from "../shared/settingsSchema";
-import { MAX_STEPS, MAX_TAGS, SKILL_CATEGORIES, categoryOf, cleanTags, skillFromMarkdown, skillProblems, skillSize, skillToMarkdown, slug, type Skill } from "../core/skills";
+import { MAX_STEPS, MAX_TAGS, SKILL_CATEGORIES, categoryOf, cleanTags, skillFromMarkdown, skillProblems, skillSize, skillToMarkdown, slug, type Skill, triggerForInput, triggerFromInput } from "../core/skills";
 import { allSkills, defaultSkills } from "../core/skillsDefault";
 import { MAX_LIBS, libSlug, libraryFromFile, libraryFromZipFile, readLibraryZip, type SkillLibrary, type ZipLibrary } from "../core/skillLibs";
 import { api } from "./api";
@@ -21,6 +21,10 @@ export function Skills({ settings, onSave, onOpenDocs, tabs }: { tabs?: ReactNod
   const [category, setCategory] = useState<string | null>(null);
   const [addMenu, setAddMenu] = useState(false);
   const [pickIcon, setPickIcon] = useState(false);
+  /** Advanced starts open when the skill already uses it, decided once per skill opened: never re-decided while typing. */
+  const [advOpen, setAdvOpen] = useState(false);
+  /** The "start by itself" box as typed: plain words or a pattern (see triggerFromInput). */
+  const [whenText, setWhenText] = useState("");
   const [iconQuery, setIconQuery] = useState("");
   const [fetching, setFetching] = useState<string | null>(null);
   const [zip, setZip] = useState<{ lib: ZipLibrary; pick: string } | null>(null);
@@ -35,7 +39,7 @@ export function Skills({ settings, onSave, onOpenDocs, tabs }: { tabs?: ReactNod
     .filter((s) => (!category || categoryOf(s) === category) && (!filter.trim() || `${s.name} ${s.description} ${s.tags.join(" ")}`.toLowerCase().includes(filter.trim().toLowerCase().replace(/^#/, ""))));
   const installed = new Set(everything.map((s) => s.id));
 
-  const open = (s: Skill, fresh: boolean) => { setEditing(s); setIsNew(fresh); setTagText(s.tags.join(", ")); setModelText(s.models.join(", ")); setError(null); setPickIcon(false); setIconQuery(""); };
+  const open = (s: Skill, fresh: boolean) => { setEditing(s); setIsNew(fresh); setTagText(s.tags.join(", ")); setModelText(s.models.join(", ")); setError(null); setPickIcon(false); setIconQuery(""); setAdvOpen(!!s.when || (s.libraries ?? []).length > 0 || s.models.length > 0); setWhenText(triggerForInput(s.when)); };
   const uniqueId = (name: string) => { const taken = new Set(everything.map((x) => x.id)); let id = slug(name), n = 2; while (taken.has(id)) id = `${slug(name)}-${n++}`; return id; };
   /** Public libraries are downloaded once, here, when the skill is saved or imported; the code is then kept with the skill. */
   const download = async (l: SkillLibrary): Promise<SkillLibrary | string> => {
@@ -79,7 +83,7 @@ export function Skills({ settings, onSave, onOpenDocs, tabs }: { tabs?: ReactNod
   const setLib = (i: number, patch: Partial<SkillLibrary>) => setEditing((e) => (e ? { ...e, libraries: (e.libraries ?? []).map((x, k) => (k === i ? { ...x, ...patch } : x)) } : e));
   const save = async () => {
     if (!editing) return;
-    const first: Skill = { ...editing, builtin: undefined, tags: cleanTags(tagText.split(/[,\s]+/)), models: modelText.split(",").map((x) => x.trim()).filter(Boolean) };
+    const first: Skill = { ...editing, builtin: undefined, when: triggerFromInput(whenText), tags: cleanTags(tagText.split(/[,\s]+/)), models: modelText.split(",").map((x) => x.trim()).filter(Boolean) };
     const got = await withLibraries(first);
     if (typeof got === "string") { setError(`This skill cannot be saved: ${got}`); return; }
     const s = got;
@@ -90,7 +94,10 @@ export function Skills({ settings, onSave, onOpenDocs, tabs }: { tabs?: ReactNod
     setEditing(null);
   };
   /** Deleting a skill of the app uninstalls it (it can be put back here); deleting one of yours removes it for good. */
-  const remove = async (s: Skill) => { await onSave({ skills: mine.filter((x) => x.id !== s.id), removedSkills: s.core && !removed.includes(s.id) ? [...removed, s.id] : removed }); };
+  const remove = async (s: Skill) => {
+    // a built-in skill is only uninstalled (it stays in the list to put back); one you wrote is gone for good
+    if (!s.core && !confirm(`Delete the skill "${s.name}"?\n\nThis cannot be undone. To keep a copy, export it as a .md file first.`)) return;
+    await onSave({ skills: mine.filter((x) => x.id !== s.id), removedSkills: s.core && !removed.includes(s.id) ? [...removed, s.id] : removed }); };
   const imported = async (f: File) => {
     const r = skillFromMarkdown(await f.text());
     if (typeof r === "string") { setError(`${f.name}: ${r}.`); return; }
@@ -116,8 +123,8 @@ export function Skills({ settings, onSave, onOpenDocs, tabs }: { tabs?: ReactNod
         <div className="skill-head">
           <button type="button" className="skill-icon big" onClick={() => setPickIcon(!pickIcon)} aria-expanded={pickIcon} title="Choose an icon"><Glyph id={shown} size={28} /></button>
           <div style={{ flex: 1 }}>
-            <input value={editing.name} maxLength={60} placeholder="Name" onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
-            <input value={editing.description} maxLength={160} placeholder="What it does, in one sentence" onChange={(e) => setEditing({ ...editing, description: e.target.value })} />
+            <input value={editing.name} maxLength={60} placeholder="Name" aria-label="Skill name" onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
+            <input value={editing.description} maxLength={160} placeholder="What it does, in one sentence" aria-label="What the skill does" onChange={(e) => setEditing({ ...editing, description: e.target.value })} />
           </div>
         </div>
         {pickIcon && (
@@ -133,24 +140,26 @@ export function Skills({ settings, onSave, onOpenDocs, tabs }: { tabs?: ReactNod
           </div>
         )}
         <label className="small muted">Tags (up to {MAX_TAGS}, separated by commas). They also decide its category.</label>
-        <input value={tagText} onChange={(e) => setTagText(e.target.value)} placeholder="writing, study, code" />
-        <label className="small muted">Load by itself when the request contains… (a regular expression, optional, e.g. \b(invoice|bill)\b). Leave empty to use the skill only with /.</label>
-        <input value={editing.when ?? ""} onChange={(e) => setEditing({ ...editing, when: e.target.value || undefined })} placeholder="\b(word one|word two)\b" />
-        <label className="small muted">Shared rules, kept for every step</label>
-        <textarea rows={3} value={editing.instructions} onChange={(e) => setEditing({ ...editing, instructions: e.target.value })} />
+        <input value={tagText} onChange={(e) => setTagText(e.target.value)} placeholder="writing, study, code" aria-label="Tags" />
+        <label className="small muted">Rules for every step (optional)</label>
+        <textarea rows={3} value={editing.instructions} aria-label="Rules for every step" onChange={(e) => setEditing({ ...editing, instructions: e.target.value })} />
         <label className="small muted">Steps ({editing.steps.length} / {MAX_STEPS})</label>
         {editing.steps.map((st, i) => (
           <div key={i} className="skill-step">
             <div style={{ display: "flex", gap: 6 }}>
-              <input style={{ flex: 1 }} value={st.title} placeholder={`Step ${i + 1} title`} onChange={(e) => setStep(i, { title: e.target.value })} />
-              <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">↑</button>
-              <button type="button" onClick={() => move(i, 1)} disabled={i === editing.steps.length - 1} aria-label="Move down">↓</button>
-              <button type="button" onClick={() => setEditing({ ...editing, steps: editing.steps.filter((_, k) => k !== i) })} disabled={editing.steps.length === 1} aria-label="Remove the step"><Glyph id="x" size={14} /></button>
+              <input style={{ flex: 1 }} value={st.title} placeholder={`Step ${i + 1} title`} aria-label={`Step ${i + 1} title`} onChange={(e) => setStep(i, { title: e.target.value })} />
+              <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label={`Move step ${i + 1} up`}>↑</button>
+              <button type="button" onClick={() => move(i, 1)} disabled={i === editing.steps.length - 1} aria-label={`Move step ${i + 1} down`}>↓</button>
+              <button type="button" onClick={() => setEditing({ ...editing, steps: editing.steps.filter((_, k) => k !== i) })} disabled={editing.steps.length === 1} aria-label={`Remove step ${i + 1}`}><Glyph id="x" size={14} /></button>
             </div>
-            <textarea rows={3} value={st.prompt} placeholder="What the model does in this step" onChange={(e) => setStep(i, { prompt: e.target.value })} />
+            <textarea rows={3} value={st.prompt} placeholder="What the assistant does in this step" aria-label={`Step ${i + 1}: what the assistant does`} onChange={(e) => setStep(i, { prompt: e.target.value })} />
           </div>
         ))}
         <button type="button" disabled={editing.steps.length >= MAX_STEPS} onClick={() => setEditing({ ...editing, steps: [...editing.steps, { title: "", prompt: "" }] })}>+ Add a step</button>
+        <details className="skill-adv" open={advOpen} onToggle={(e) => setAdvOpen(e.currentTarget.open)}>
+        <summary className="small"><strong>Advanced</strong> <span className="muted">· start by itself, code libraries, recommended models</span></summary>
+        <label className="small muted">Start by itself when a message contains any of these words, separated by commas (optional; a regular expression also works). Leave empty to start the skill only by typing / and its name.</label>
+        <input value={whenText} onChange={(e) => setWhenText(e.target.value)} placeholder="invoice, bill" aria-label="Words that start the skill by itself" />
         <label className="small muted" style={{ display: "block", marginTop: 10 }}>Libraries ({(editing.libraries ?? []).length} / {MAX_LIBS}): public ones are downloaded once when you save, custom ones are pasted here. Pages that use them get the code inside the file.</label>
         {(editing.libraries ?? []).map((l, i) => (
           <div key={i} className="skill-step">
@@ -187,14 +196,15 @@ export function Skills({ settings, onSave, onOpenDocs, tabs }: { tabs?: ReactNod
           <button type="button" disabled={(editing.libraries ?? []).length >= MAX_LIBS} onClick={() => libFileRef.current?.click()}><Glyph id="upload" size={14} /> From a file or a zip on this PC</button>
         </div>
         <label className="small muted" style={{ display: "block", marginTop: 10 }}>Recommended models (ids, best first, optional)</label>
-        <input value={modelText} onChange={(e) => setModelText(e.target.value)} placeholder="qwen3-4b-thinking-2507" />
+        <input value={modelText} onChange={(e) => setModelText(e.target.value)} placeholder="qwen3-4b-thinking-2507" aria-label="Recommended models" />
+        </details>
         <p className="muted small">{size.label}</p>
         {error && <p className="error small">{error}</p>}
         <div style={{ display: "flex", gap: 8 }}>
           <button className="primary" onClick={() => void save()}>Save</button>
           <button onClick={() => setEditing(null)}>Cancel</button>
           <button type="button" style={{ marginLeft: "auto" }} onClick={() => {
-            const s: Skill = { ...editing, builtin: undefined, tags: cleanTags(tagText.split(/[,\s]+/)), models: modelText.split(",").map((x) => x.trim()).filter(Boolean) };
+            const s: Skill = { ...editing, builtin: undefined, when: triggerFromInput(whenText), tags: cleanTags(tagText.split(/[,\s]+/)), models: modelText.split(",").map((x) => x.trim()).filter(Boolean) };
             const bad = skillProblems(s);
             if (bad.length) setError(`This skill cannot be exported yet: ${bad.join(", ")}.`); else { setError(null); exportSkill({ ...s, id: s.id || slug(s.name) }); }
           }}><Glyph id="download" size={14} /> Export as .md</button>
@@ -220,7 +230,7 @@ export function Skills({ settings, onSave, onOpenDocs, tabs }: { tabs?: ReactNod
                 : <>
                   <button type="button" className="icon-btn" title="Edit" aria-label="Edit" onClick={() => open(s, false)}><Glyph id="pen" size={16} /></button>
                   <button type="button" className="icon-btn" title="Duplicate" aria-label="Duplicate" onClick={() => open({ ...s, builtin: undefined, core: undefined, id: "" }, true)}><Glyph id="copy" size={16} /></button>
-                  <button type="button" className="icon-btn" title={s.core ? "Uninstall" : "Delete"} aria-label={s.core ? "Uninstall" : "Delete"} onClick={() => void remove(s)}><Glyph id="trash" size={16} /></button>
+                  <button type="button" className="icon-btn" title={s.core ? "Uninstall (you can put it back from this list)" : "Delete"} aria-label={s.core ? `Uninstall ${s.name}` : `Delete ${s.name}`} onClick={() => void remove(s)}><Glyph id="trash" size={16} /></button>
                   <button type="button" className="icon-btn" title="Export as .md" aria-label="Export as .md" onClick={() => exportSkill(s)}><Glyph id="download" size={16} /></button>
                 </>}
             </div>
@@ -232,7 +242,7 @@ export function Skills({ settings, onSave, onOpenDocs, tabs }: { tabs?: ReactNod
     <div className="skills-wrap">
       <div className="skills-bar">
         {tabs}
-        <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search skills or #tags" />
+        <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search skills or #tags" aria-label="Search skills" />
         <div className="menu-anchor">
           <button type="button" className="primary add-skill" onClick={() => setAddMenu(!addMenu)} aria-haspopup="menu" aria-expanded={addMenu} title="Add a skill"><Glyph id="plus" size={16} /> Add skill</button>
           {addMenu && (
@@ -244,6 +254,7 @@ export function Skills({ settings, onSave, onOpenDocs, tabs }: { tabs?: ReactNod
         </div>
         <input ref={fileRef} type="file" accept=".md,.txt,text/markdown,text/plain" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void imported(f); e.target.value = ""; }} />
       </div>
+      <p className="muted small">A skill is a saved recipe the assistant follows step by step, such as writing a cover letter or planning a trip. Use one by typing / and its name in a chat; some also start by themselves when a message matches.</p>
       <div className="skill-cats">
         {SKILL_CATEGORIES.map((c) => {
           const n = list.filter((s) => categoryOf(s) === c.id).length;
@@ -261,7 +272,7 @@ export function Skills({ settings, onSave, onOpenDocs, tabs }: { tabs?: ReactNod
         {list.map(row)}
         {!list.length && <p className="muted">No skill matches.</p>}
       </div>
-      <label className="check small"><input type="checkbox" checked={readBool(settings, "skillAutoModel")} onChange={(e) => void onSave({ skillAutoModel: e.target.checked })} /> Switch to the model a skill recommends when it is installed</label>
+      <label className="check small"><input type="checkbox" checked={readBool(settings, "skillAutoModel")} onChange={(e) => void onSave({ skillAutoModel: e.target.checked })} /> When I start a skill, switch to the model it recommends (if that model is installed)</label>
       <p style={{ marginTop: 14 }}><button className="linklike" onClick={onOpenDocs}>Read the full documentation to write your own skills →</button></p>
     </div>
   );

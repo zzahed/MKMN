@@ -14,9 +14,9 @@ export function taskSummary(t: ScheduledTask, now: number, projects: Project[], 
   const at = t.enabled && !validateSchedule(t.schedule, now) ? nextRun(t.schedule, now) : null;
   const when = !t.enabled ? "Paused: it will not run until you turn it on" : at ? `Next run: ${new Date(at).toLocaleString()}` : "It will not run: the time is in the past";
   const own = t.modelId ? models.find((m) => m.entry.id === t.modelId)?.entry.name ?? t.modelId : null;
-  const model = own ? `Model: ${own}` : selectedModelName ? `Model: the selected one (now ${selectedModelName})` : "Model: the selected one (none is selected yet)";
+  const model = own ? `Model: ${own}` : selectedModelName ? `Model: the one chosen in Local Models (now ${selectedModelName})` : "Model: the one chosen in Local Models (none chosen yet)";
   const proj = projects.find((p) => p.id === t.projectId);
-  const project = proj ? `Project: ${proj.name}, its current files and instructions (kept up to date when you edit the project)` : "Project: none";
+  const project = proj ? `Project: ${proj.name} (uses its latest instructions and files)` : "Project: none";
   return { when, model, project };
 }
 
@@ -52,15 +52,16 @@ function Editor({ task, projects, models, selectedModelName, onSave, onCancel }:
         <textarea rows={4} value={t.prompt} onChange={(e) => setT({ ...t, prompt: e.target.value })} placeholder="Summarize my project notes and list the three most important things to do today. Put the list in a document file." />
       </label>
       <div className="row">
-        <label>Project (context)
+        <label>Project (optional)
           <select value={t.projectId ?? ""} onChange={(e) => setT({ ...t, projectId: e.target.value || null })}>
             <option value="">None</option>
             {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
+          <span className="muted small">The task uses the project's instructions and reference files.</span>
         </label>
         <label>Model
           <select value={t.modelId ?? ""} onChange={(e) => setT({ ...t, modelId: e.target.value || null })}>
-            <option value="">Selected model</option>
+            <option value="">The model chosen in Local Models</option>
             {models.filter((m) => m.installed && !m.hidden).map((m) => <option key={m.entry.id} value={m.entry.id}>{m.entry.name}</option>)}
           </select>
         </label>
@@ -99,7 +100,7 @@ function Editor({ task, projects, models, selectedModelName, onSave, onCancel }:
       {(() => { const sum = taskSummary(t, Date.now(), projects, models, selectedModelName); return (
         <div className="task-summary small" aria-live="polite"><strong>{sum.when}</strong><span>{sum.model}</span><span>{sum.project}</span></div>
       ); })()}
-      <p className="muted small">Tasks run while MKMN is running. Closing the window quits the app by default. To keep tasks on schedule, keep MKMN open or choose the notification area under “When I close the window” in Settings → General → App settings.</p>
+      <p className="muted small">Tasks run only while MKMN is open. By default, closing the window quits MKMN. To keep tasks running, leave MKMN open, or in Settings › App settings set “When I close the window” to keep it in the notification area.</p>
       {err && <div className="error-box">{err}</div>}
       <div className="row"><button className="primary" onClick={() => void save()}>Save task</button><button className="ghost" onClick={onCancel}>Cancel</button></div>
     </div>
@@ -135,7 +136,7 @@ function TaskCard({ t, projects, artifacts, onEdit, onToggle, onRun, onDelete, o
         <button className="ghost" onClick={onEdit}>Edit</button>
         {t.runs.length > 0 && <button className="ghost" onClick={() => setShowRuns(!showRuns)}>{showRuns ? "Hide results" : `Results (${t.runs.length})`}</button>}
         <div className="spacer" />
-        <button className="linkbtn" onClick={() => { if (confirm(`Delete "${t.name}"?`)) onDelete(); }}>Delete</button>
+        <button className="linkbtn" onClick={() => { if (confirm(`Delete the task "${t.name}"?\n\nIts past results are deleted too. Files it made stay in Files.\n\nThis cannot be undone.`)) onDelete(); }}>Delete</button>
       </div>
       {showRuns && (
         <div className="runs">
@@ -172,11 +173,11 @@ export function Tasks({ tasks, projects, artifacts, models, hasModel, selectedMo
   return (
     <div className="page">
       <div className="page-head">
-        <div><h1>Tasks</h1><p className="muted">Prompts the assistant runs by itself on a schedule, in the background, using your NPU. Results and any artifacts land here.</p></div>
+        <div><h1>Tasks</h1><p className="muted">Instructions the assistant carries out by itself on a schedule, such as a morning summary. Results appear here, and any files it makes appear in Files.</p></div>
         {!editing && <button className="primary" onClick={() => setEditing(blank())}>＋ New task</button>}
       </div>
       {/* only tasks that use the app's selected model need one: a task with its own model runs */}
-      {!hasModel && tasks.some((t) => !t.modelId) && <div className="banner soft" style={{ borderRadius: 10, margin: "8px 0" }}>No model is selected, so tasks that use the selected model cannot run yet. Pick one in Models, or give the task its own model.</div>}
+      {!hasModel && tasks.some((t) => !t.modelId) && <div className="banner soft" style={{ borderRadius: 10, margin: "8px 0" }}>No model is chosen yet, so tasks set to use the chosen model cannot run. Choose one in Local Models, or give the task its own model.</div>}
       {editing && <Editor key={editing.id} task={editing} projects={projects} models={models} selectedModelName={selectedModelName} onCancel={() => setEditing(null)} onSave={async (t) => { await onSave(t); setEditing(null); }} />}
       {sorted.length === 0 && !editing ? (
         <div className="empty-box"><p>No tasks. Examples: a daily summary of your project notes, a weekly study plan, an hourly reminder to stretch with a joke.</p></div>
