@@ -20,8 +20,8 @@ describe("the v0.0.3-rc.2 candidate version", () => {
 
   it("builds the pilot for device testing on manual dispatch", () => {
     const workflow = readFileSync(".github/workflows/release.yml", "utf8");
-    expect(workflow).toMatch(/^on:\s*\r?\n  workflow_dispatch:\s*\r?\n/m);
-    expect(workflow).not.toMatch(/^  push:|^\s*contents: write|gh release create/m);
+    expect(workflow).toMatch(/^on:\s*\r?\n {2}workflow_dispatch:\s*\r?\n/m);
+    expect(workflow).not.toMatch(/^ {2}push:|^\s*contents: write|gh release create/m);
     expect(workflow).toMatch(/Validate-Installer\.ps1" -Release/);
     expect(workflow).toContain("uses: actions/attest-build-provenance@");
     expect(workflow).toContain('--source-digest "$GITHUB_SHA"');
