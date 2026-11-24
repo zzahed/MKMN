@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { execFile, execFileSync, spawn } from "node:child_process";
+import { execFile, execFileSync, spawn, spawnSync } from "node:child_process";
 import { createServer, type AddressInfo } from "node:net";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -8,7 +8,7 @@ import { runExamples, smokeRun } from "../src/core/construct/sandbox";
 import { runCases } from "../src/core/benchChecks";
 import { codeChecks } from "../src/core/labCode";
 import { IsolationUnsafeError, lockedNodeArgs, setIsolation } from "../src/core/isolate";
-import { codeDirs, lockedNodeRunner, probeVerdict, proveNetworkDenied, proveNetworkDeniedSync } from "../src/sidecar/isolation";
+import { codeDirs, ISOLATION_PROBE, lockedEnv, lockedNodeRunner, probeVerdict, proveNetworkDenied, proveNetworkDeniedSync } from "../src/sidecar/isolation";
 
 /**
  * Code a model wrote was run with node:vm INSIDE the sidecar: Node says vm is not a
@@ -99,6 +99,17 @@ describe("generated code runs in a locked-down process", () => {
       victim.kill();
       rmSync(target, { force: true });
     }
+  }, 60_000);
+
+  // F3: Windows (libuv) copies its own list of variables into a child whose environment lacks
+  // them (USERNAME, USERPROFILE, PATH, TEMP...), so an empty-looking environment still named the
+  // person and their profile folder. They are now passed blank, which libuv leaves as they are.
+  it("in the locked-down process an escape finds no user name, profile folder, temp folder or PATH", async () => {
+    const escape = `(function () { var e = this.constructor.constructor("return process")().env; ` +
+      `return ["USERNAME", "USERPROFILE", "HOMEPATH", "USERDOMAIN", "LOGONSERVER", "TEMP", "TMP", "PATH"].map(function (k) { return k + "=" + (e[k] || ""); }).join(","); })()`;
+    setIsolation(lockedNodeRunner(process.execPath, worker, codeDirs(path.join(dist, "sidecar"))));
+    const r = await runExamples([], "function f() { return 1; }", [{ call: escape, expect: '"x"' }]);
+    expect(gave(r.failures)).toBe("USERNAME=,USERPROFILE=,HOMEPATH=,USERDOMAIN=,LOGONSERVER=,TEMP=,TMP=,PATH=");
   }, 60_000);
 
   it("a process with the same locked flags has no node:sqlite at all", () => {
@@ -195,6 +206,25 @@ describe("generated code runs only on a runtime that is proven to block the netw
     expect(() => runner.runSync("runExamples", [])).toThrow(/could not confirm/);
     expect(probes).toBe(2);
   });
+
+  // F4: the probe used to try only one TCP connection, so a runtime that blocked the network but
+  // let generated code write files, start programs or start workers passed as safe.
+  it("the probe proves every restriction the runner relies on, and names the first one a runtime lacks", () => {
+    const run = (flags: string[]) => {
+      const r = spawnSync(process.execPath, [...flags, "-e", ISOLATION_PROBE], { windowsHide: true, encoding: "utf8", timeout: 30_000, env: lockedEnv() });
+      return String(r.stdout).trim();
+    };
+    const locked = lockedNodeArgs(dirs(), "-e").slice(0, -1);
+    expect(run(locked)).toBe("ERR_ACCESS_DENIED");
+    expect(run([])).toBe("SQLITE_AVAILABLE");
+    expect(run(["--no-experimental-sqlite"])).toBe("FS_WRITE_OPEN");
+    expect(run([...locked, "--allow-fs-write=*"])).toBe("FS_WRITE_OPEN");
+    expect(run([...locked, "--allow-child-process"])).toBe("CHILD_PROCESS_OPEN");
+    expect(run([...locked, "--allow-worker"])).toBe("WORKER_OPEN");
+    expect(run([...locked, "--allow-net"])).toMatch(/^E(?!RR_)[A-Z0-9]+$/); // the network is open: a socket error, ECONNREFUSED
+    for (const out of ["FS_WRITE_OPEN", "CHILD_PROCESS_OPEN", "WORKER_OPEN"]) expect(probeVerdict(out)).toBe(false);
+    for (const out of ["FS_WRITE_UNKNOWN", "CHILD_PROCESS_UNKNOWN", "WORKER_UNKNOWN"]) expect(probeVerdict(out)).toBeNull();
+  }, 120_000);
 
   it("a locked process cannot resolve a name, send UDP or fetch either", async () => {
     const run = (code: string) => new Promise<string>((resolve) => {
