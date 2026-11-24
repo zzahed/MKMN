@@ -1,6 +1,31 @@
 import { describe, expect, it } from "vitest";
 import defaults from "../src/core/skills-default.json";
-import { autoSkill, patternRisk, skillFromMarkdown, skillProblems, SKILL_MATCH_CHARS, triggerFromInput, type Skill } from "../src/core/skills";
+import { autoSkill, patternRisk, skillFromMarkdown, skillPattern, skillProblems, SKILL_MATCH_CHARS, triggerFromInput, type Skill } from "../src/core/skills";
+
+describe("the u flag is the app's own, never forced by a hand-written pattern", () => {
+  // fourth review: [\\p{] put the text "\p{" in a class, forced u, and u made "." ~100x slower on Arabic
+  const forced = "(?:.|.)".repeat(6) + ".".repeat(252) + String.raw`[\\p{]`;
+
+  it("a hand-written pattern compiles without u, whatever text it holds", () => {
+    expect(forced.length).toBe(300);
+    expect(patternRisk(forced)).toBeNull();
+    expect(skillPattern(forced, "gi").flags).toBe("gi");
+    expect(skillPattern(String.raw`\b(invoice|bill)\b`, "gi").flags).toBe("gi");
+  });
+
+  it("the plain-words form keeps u, so Arabic words have edges", () => {
+    expect(skillPattern(triggerFromInput("فاتورة")!, "gi").flags).toBe("giu");
+  });
+
+  it.each([["Arabic", "ب".repeat(1000)], ["lone surrogates", "\uD83D".repeat(1000)], ["emoji", "😀".repeat(500)], ["an Arabic message", "أريد فاتورة للعميل ".repeat(60)]])(
+    "the review's forced-u pattern stays quick on %s", (_name, input) => {
+      const s = { id: "s", name: "S", description: "A test skill", tags: [], models: [], instructions: "", steps: [{ title: "a", prompt: "b" }], when: forced } as unknown as Skill;
+      autoSkill([s], input, false); // warm the compile
+      const t0 = performance.now();
+      for (let k = 0; k < 3; k++) autoSkill([s], input, false);
+      expect((performance.now() - t0) / 3).toBeLessThan(40);
+    });
+});
 
 /**
  * A skill's "start by itself" pattern runs against every message, on the window's own

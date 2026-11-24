@@ -85,7 +85,9 @@ export function triggerForInput(when: string | undefined): string {
 /** A skill's pattern, compiled: the u flag when it uses Unicode classes (the words form), so a
  *  pattern written by hand under the old rules keeps compiling exactly as before. */
 export function skillPattern(when: string, flags: string): RegExp {
-  return new RegExp(when, when.includes("\\p{") ? `${flags}u` : flags);
+  // the u flag only for the app's own plain-words form: a hand-written pattern could carry the
+  // text "\p{" in a class ([\\p{]) to force it, and u makes "." far slower on Arabic or emoji
+  return new RegExp(when, isWordsForm(when) ? `${flags}u` : flags);
 }
 
 /** The most a "start by itself" pattern reads of a message: enough to recognise a request,
