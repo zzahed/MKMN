@@ -103,6 +103,52 @@ describe("setup and update bridge contract (sidecar-backed)", () => {
     expect(got).toHaveLength(1); // unsubscribed
   });
 
+  it.each(["setupDecline", "setupDismiss"] as const)("%s stays effective when a replacement sidecar checks setup", async (action) => {
+    await mockSidecar({ setupState: () => STATE, [action]: () => undefined });
+    const a = await api();
+    const got: SetupState[] = [];
+    const off = a.onSetup((st) => got.push(st));
+
+    await a[action]();
+    // A new sidecar has its own SetupService. Its startup check must not replace
+    // the current chat with onboarding after this window already skipped it.
+    eventHandler?.({ payload: { name: "setup", payload: STATE } });
+    expect(got).toEqual([{ ...STATE, active: false }]);
+    await expect(a.setupState()).resolves.toEqual({ ...STATE, active: false });
+    off();
+  });
+
+  it.each([
+    ["setupConfirm", []], ["setupRetry", ["voice-stt"]],
+    ["setupRunUnsigned", ["geniex"]], ["openGeniexDownload", []]
+  ] as const)("an explicit %s reopens setup after it was skipped", async (action, args) => {
+    await mockSidecar({
+      setupState: () => STATE, setupDecline: () => undefined,
+      setupConfirm: () => undefined, setupRetry: () => undefined, setupRunUnsigned: () => undefined
+    });
+    const a = await api();
+    await a.setupDecline();
+    await expect(a.setupState()).resolves.toMatchObject({ active: false });
+    await (a[action] as (...values: string[]) => Promise<void>)(...args);
+    await expect(a.setupState()).resolves.toMatchObject({ active: true });
+  });
+
+  it("does not hide setup when the decline request fails", async () => {
+    await mockSidecar({ setupState: () => STATE, setupDecline: () => { throw new Error("sidecar unavailable"); } });
+    const a = await api();
+    await expect(a.setupDecline()).rejects.toThrow("sidecar unavailable");
+    await expect(a.setupState()).resolves.toMatchObject({ active: true });
+  });
+
+  it("a fresh window still offers first-launch setup", async () => {
+    await mockSidecar({ setupState: () => STATE, setupDecline: () => undefined });
+    const a = await api();
+    await a.setupDecline();
+    await expect(a.setupState()).resolves.toMatchObject({ active: false });
+    const fresh = await api();
+    await expect(fresh.setupState()).resolves.toMatchObject({ active: true });
+  });
+
   it("the updater stays honest: every call answers the disabled state, update events reach onUpdate", async () => {
     const invoke = await mockSidecar({ updateState: () => UPDATE, updateCheck: () => UPDATE, updateForce: () => UPDATE, updateInstall: () => undefined });
     const a = await api();

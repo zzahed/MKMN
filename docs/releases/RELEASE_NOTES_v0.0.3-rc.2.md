@@ -9,6 +9,7 @@ This Windows 11 ARM64 release candidate is for the controlled HUMAIN pilot. The 
 - Harness recovery checks journal integrity, and the startup probe validates additional isolation invariants. The probe now runs when the application is launched from a Windows extended-length path. [Journal integrity](https://github.com/zzahed/MKMN/pull/56) · [Startup probe](https://github.com/zzahed/MKMN/pull/57) · [Windows paths](https://github.com/zzahed/MKMN/pull/59)
 
 - Generated presentations, documents, spreadsheets and pages now receive artifact quality scoring. [Quality harness](https://github.com/zzahed/MKMN/pull/60)
+- Restarting the local chat engine keeps optional setup dismissed in the current window, so onboarding does not interrupt a recovering chat. Setup can still be started explicitly from Settings.
 
 ## Installation and verification
 

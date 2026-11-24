@@ -406,6 +406,20 @@ const unknownHardware = (): HardwareProfile => ({
 
 export function createTauriApi(): MkmnApi {
   wireSidecarEvents();
+  // A replacement sidecar checks setup again. Keep this window's decision so
+  // that background check cannot replace an active chat with onboarding.
+  let setupDismissed = false;
+  const visibleSetup = (state: SetupState): SetupState => setupDismissed ? { ...state, active: false } : state;
+  const finishSetup = async (method: "setupDecline" | "setupDismiss"): Promise<void> => {
+    const previous = setupDismissed;
+    setupDismissed = true;
+    try { await sidecarCall(method); }
+    catch (error) { setupDismissed = previous; throw error; }
+  };
+  const startSetup = async (method: string, ...args: unknown[]): Promise<void> => {
+    setupDismissed = false;
+    await sidecarCall(method, ...args);
+  };
   const versionBook = new VersionBook(tauriHistories, tauriArtifactSource);
   // a scheduled task's artifacts, filed into the local store the pages read, with a version
   // snapshot like a hand-saved one, and the pages told to refresh
@@ -1194,7 +1208,7 @@ export function createTauriApi(): MkmnApi {
     async pickFolder(): Promise<string | null> { return sidecarCall<string | null>("pickFolder"); },
     async openGeniexDownload(): Promise<void> {
       // first-launch setup installs GenieX: pressing its install path again retries the step
-      await sidecarCall("setupRetry", "geniex");
+      await startSetup("setupRetry", "geniex");
     },
 
     async meters(): Promise<Meters> {
@@ -1252,17 +1266,18 @@ export function createTauriApi(): MkmnApi {
     },
 
     async setupState(): Promise<SetupState> {
-      return sidecarCall<SetupState>("setupState");
+      return visibleSetup(await sidecarCall<SetupState>("setupState"));
     },
     async setupSkip(id: string): Promise<void> { await sidecarCall("setupSkip", id); },
-    async setupRetry(id: string): Promise<void> { await sidecarCall("setupRetry", id); },
-    async setupRunUnsigned(id: string): Promise<void> { await sidecarCall("setupRunUnsigned", id); },
-    async setupDismiss(): Promise<void> { await sidecarCall("setupDismiss"); },
-    async setupConfirm(): Promise<void> { await sidecarCall("setupConfirm"); },
-    async setupDecline(): Promise<void> { await sidecarCall("setupDecline"); },
+    async setupRetry(id: string): Promise<void> { await startSetup("setupRetry", id); },
+    async setupRunUnsigned(id: string): Promise<void> { await startSetup("setupRunUnsigned", id); },
+    async setupDismiss(): Promise<void> { await finishSetup("setupDismiss"); },
+    async setupConfirm(): Promise<void> { await startSetup("setupConfirm"); },
+    async setupDecline(): Promise<void> { await finishSetup("setupDecline"); },
     onSetup(cb: (st: SetupState) => void): () => void {
-      setupListeners.add(cb);
-      return () => setupListeners.delete(cb);
+      const listener = (state: SetupState) => cb(visibleSetup(state));
+      setupListeners.add(listener);
+      return () => setupListeners.delete(listener);
     },
 
     async updateState(): Promise<UpdateState> {
