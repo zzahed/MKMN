@@ -40,7 +40,7 @@ export function Artifacts({ artifacts, projects, openId, onOpen, onDelete, onExp
         <strong>{a.title}</strong>
         <div className="muted small">{kindLabel(a)}{child ? "" : ` · ${a.source.type === "task" ? "task" : "chat"}${pname(a.projectId) ? ` · ${pname(a.projectId)}` : ""} · ${new Date(a.updated).toLocaleString()}`}</div>
       </div>
-      {!child && <button className="linkbtn" onClick={(e) => { e.stopPropagation(); if (confirm(`Delete "${a.title}" and all its versions?`)) { onDelete(a.id); if (a.id === openId) onOpen(null); } }}>Delete</button>}
+      {!child && <button className="linkbtn" onClick={(e) => { e.stopPropagation(); if (confirm(`Delete "${a.title}" and all its versions?\n\nThis cannot be undone.`)) { onDelete(a.id); if (a.id === openId) onOpen(null); } }}>Delete</button>}
     </div>
   );
 
@@ -49,7 +49,7 @@ export function Artifacts({ artifacts, projects, openId, onOpen, onDelete, onExp
       <div className="page list-side">
         <h1>Files</h1>
         <p className="muted">Pages, documents, code and images the assistant made for you. Ask for one in any chat ("make me a landing page", "write a script that…") or from a scheduled task.</p>
-        <div className="searchbar"><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search files" /></div>
+        <div className="searchbar"><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search files" aria-label="Search files" /></div>
         <Seg style={{ alignSelf: "flex-start", marginBottom: 12 }}>{KINDS.map((k) => <button key={k.id} className={kind === k.id ? "on" : ""} onClick={() => setKind(k.id)}>{k.label}</button>)}</Seg>
         {shown.length === 0 ? (
           <div className="empty-box"><p>{artifacts.length === 0 ? "Nothing here yet. Try asking in a chat: “Build a small pomodoro timer as a web page”." : "No file matches."}</p></div>
@@ -66,7 +66,7 @@ export function Artifacts({ artifacts, projects, openId, onOpen, onDelete, onExp
                       <strong>{e.title}</strong>
                       <div className="muted small">{e.files.length} files · {e.main.source.type === "task" ? "task" : "chat"}{pname(e.main.projectId) ? ` · ${pname(e.main.projectId)}` : ""} · {new Date(e.updated).toLocaleString()}</div>
                     </div>
-                    <button className="linkbtn" onClick={(ev) => { ev.stopPropagation(); if (confirm(`Delete "${e.title}" and its ${e.files.length} files?`)) { e.files.forEach((f) => onDelete(f.id)); if (e.files.some((f) => f.id === openId)) onOpen(null); } }}>Delete</button>
+                    <button className="linkbtn" onClick={(ev) => { ev.stopPropagation(); if (confirm(`Delete "${e.title}" and its ${e.files.length} files?\n\nThis cannot be undone.`)) { e.files.forEach((f) => onDelete(f.id)); if (e.files.some((f) => f.id === openId)) onOpen(null); } }}>Delete</button>
                   </div>
                   {isOpen && <div className="art-children">{e.files.map((f) => row(f, true))}</div>}
                 </div>

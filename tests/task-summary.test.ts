@@ -31,7 +31,7 @@ describe("the task editor says what the task will do before it is saved", () => 
     expect(taskSummary(base(), now, projects, models, null).model).toMatch(/none is selected/);
   });
   it("names the project and that its files stay current", () => {
-    expect(taskSummary(base({ projectId: "p1" }), now, projects, models, null).project).toMatch(/^Project: Notes, its current files/);
+    expect(taskSummary(base({ projectId: "p1" }), now, projects, models, null).project).toBe("Project: Notes (uses its latest instructions and files)");
     expect(taskSummary(base(), now, projects, models, null).project).toBe("Project: none");
   });
 });
