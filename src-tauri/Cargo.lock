@@ -2172,7 +2172,7 @@ dependencies = [
 
 [[package]]
 name = "mkmn"
-version = "0.0.3-rc.1"
+version = "0.0.3-rc.2"
 dependencies = [
  "log",
  "reqwest",

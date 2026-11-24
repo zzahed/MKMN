@@ -6,8 +6,8 @@ import { readFileSync } from "node:fs";
  * and refuses to run when the others disagree, so this test fails on the same
  * mismatch before a 20-minute build does.
  */
-describe("the v0.0.3-rc.1 candidate version", () => {
-  const version = "0.0.3-rc.1";
+describe("the v0.0.3-rc.2 candidate version", () => {
+  const version = "0.0.3-rc.2";
   const pkg = JSON.parse(readFileSync("package.json", "utf8")).version;
   const tauri = JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8")).version;
   const cargo = /\[package\][\s\S]*?^version\s*=\s*"([^"]+)"/m.exec(readFileSync("src-tauri/Cargo.toml", "utf8"))?.[1];
@@ -16,6 +16,15 @@ describe("the v0.0.3-rc.1 candidate version", () => {
 
   it("is the same in every manifest and in the live check", () => {
     expect({ pkg, tauri, cargo, lock, live }).toEqual({ pkg: version, tauri: version, cargo: version, lock: version, live: version });
+  });
+
+  it("builds the pilot for device testing on manual dispatch", () => {
+    const workflow = readFileSync(".github/workflows/release.yml", "utf8");
+    expect(workflow).toMatch(/^on:\s*\r?\n  workflow_dispatch:\s*\r?\n/m);
+    expect(workflow).not.toMatch(/^  push:|^\s*contents: write|gh release create/m);
+    expect(workflow).toMatch(/Validate-Installer\.ps1" -Release/);
+    expect(workflow).toContain("uses: actions/attest-build-provenance@");
+    expect(workflow).toContain('--source-digest "$GITHUB_SHA"');
   });
 
   it("has release notes and a candidate pointer without claiming stable publication", () => {
