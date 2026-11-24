@@ -1043,19 +1043,19 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
           <span className="small"><button type="button" className="link" onClick={() => selectTab("library")}>Models library</button></span>
         </div>
         <div className="perf-tile">
-          <span className="muted small">Execution mode</span>
+          <span className="muted small">Runs on</span>
           <strong>{inAuto ? `Automatic — currently ${COMPUTE_LABEL[settings.compute]}` : COMPUTE_LABEL[settings.compute]}</strong>
         </div>
         <div className="perf-tile">
-          <span className="muted small">Model retention</span>
-          <strong>{rt.idleReleaseSec === 0 ? "Kept loaded when idle" : `Released after ${Math.round(rt.idleReleaseSec / 60)} min idle`}</strong>
+          <span className="muted small">When not in use</span>
+          <strong>{rt.idleReleaseSec === 0 ? "Kept ready" : `Memory freed after ${Math.round(rt.idleReleaseSec / 60)} min`}</strong>
         </div>
         <div className="perf-tile">
-          <span className="muted small">Memory fit</span>
+          <span className="muted small">Fits in memory</span>
           <strong>{gate.phase === "loading" || gate.phase === "stale" || gate.phase === "refreshing" ? "Measuring…"
-            : gate.phase === "failed" ? "Could not measure — retry in Memory use"
-            : gate.phase === "unavailable" ? "No estimate available"
-            : mem.phase === "fits" ? "Fits the safe limit" : "Above the safe limit"}</strong>
+            : gate.phase === "failed" ? "Couldn't check: see Advanced › Memory use"
+            : gate.phase === "unavailable" ? "Unknown on this PC"
+            : mem.phase === "fits" ? "Yes" : "Too large: see Advanced › Memory use"}</strong>
         </div>
       </section>
       <section id="sec-models-compute" tabIndex={-1}>
@@ -1063,23 +1063,45 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
       </section>
 
       <section id="sec-models-retention" tabIndex={-1}>
-        <h2>Model retention</h2>
-        <p className="muted small">How long the model stays loaded when you are not talking to it. <Dot c={changed} k="idleReleaseSec" /><Dot c={changed} k="startupTimeoutSec" /></p>
+        <h2>Keep the model ready</h2>
+        <p className="muted small">A loaded model answers at once but holds memory. Freeing it saves memory; the next message then waits while it loads again. <Dot c={changed} k="idleReleaseSec" /><Dot c={changed} k="startupTimeoutSec" /></p>
         <div className="row">
           <label className="small">
-            <span>Release model when idle</span>
+            <span>Free its memory when not in use</span>
             <select
               value={rt.idleReleaseSec}
               onChange={(e) => void save(retentionPatch(Number(e.target.value)))}
             >
-              <option value={0}>Never — keep it loaded</option>
-              <option value={60}>After 1 minute idle</option>
-              <option value={300}>After 5 minutes idle</option>
-              <option value={900}>After 15 minutes idle</option>
+              <option value={0}>Never: keep it ready</option>
+              <option value={60}>After 1 minute</option>
+              <option value={300}>After 5 minutes (recommended)</option>
+              <option value={900}>After 15 minutes</option>
             </select>
           </label>
+          <button type="button" className="ghost" onClick={() => void save(retentionPatch(300))}>Reset</button>
+        </div>
+        <label className="switch-row small">
+          <input
+            type="checkbox"
+            role="switch"
+            checked={readBool(settings, "warmUpWhileTyping")}
+            onChange={(e) => void save({ warmUpWhileTyping: e.target.checked })}
+          />
+          <span>Start loading the model while I type <Dot c={changed} k="warmUpWhileTyping" /></span>
+        </label>
+        <p className="muted small">
+          Answers start sooner, but the model uses memory and power as soon as you start typing, even if you never send the message. Off by default.
+        </p>
+        <p className="muted small">
+          {rt.idleReleaseSec === 0
+            ? "The model stays ready, so every message starts at once, but it keeps using memory."
+            : `The model's memory is freed after ${Math.round(rt.idleReleaseSec / 60)} minute${rt.idleReleaseSec === 60 ? "" : "s"} without use. The next message then takes about 10 to 25 seconds longer while it loads.`}
+        </p>
+        <details style={{ marginTop: 6 }}>
+          <summary className="small"><strong>Advanced: start-up time limit</strong> <span className="muted">· for slow models</span></summary>
+          <div className="row">
           <label className="small">
-            <span>Startup check timeout</span>
+            <span>Longest wait for a model to start</span>
             <select
               value={readNum(settings, "startupTimeoutSec")}
               onChange={(e) => void save({ startupTimeoutSec: parseInt(e.target.value, 10) })}
@@ -1092,39 +1114,28 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
               <option value={300}>300 seconds</option>
             </select>
           </label>
-          <button type="button" className="ghost" onClick={() => void save(retentionPatch(300))}>Reset</button>
-        </div>
-        <label className="switch-row small">
-          <input
-            type="checkbox"
-            role="switch"
-            checked={readBool(settings, "warmUpWhileTyping")}
-            onChange={(e) => void save({ warmUpWhileTyping: e.target.checked })}
-          />
-          <span>Warm up model while typing <Dot c={changed} k="warmUpWhileTyping" /></span>
-        </label>
-        <p className="muted small">
-          Starts loading the chat's local model as soon as you type the first character, so less time passes after Send. The model may use memory and power before you send anything, also for a draft you never send. Off by default.
-        </p>
-        <p className="muted small">
-          {rt.idleReleaseSec === 0
-            ? "The selected model stays in memory, so every message starts instantly, at the cost of the memory it holds."
-            : `The model is released after ${Math.round(rt.idleReleaseSec / 60)} minute${rt.idleReleaseSec === 60 ? "" : "s"} idle to free memory. The first message after a release reloads it (about 10-25 s on the NPU).`}
-        </p>
+          </div>
+          <p className="muted small">If a model takes longer than this to start, MKMN stops waiting and says so. Raise it only if a large model keeps timing out.</p>
+        </details>
       </section>
 
+      {/* The group's folded Advanced: the sections whose keys the schema marks advanced
+          (memory cap, conversation length, cache, power, draft decoding, loading). A search
+          result or deep link into one opens the fold first. */}
+      <details className="set-adv">
+        <summary className="small"><strong>Advanced</strong> <span className="muted">· memory, conversation length, power and experimental speed-ups</span></summary>
       <section id="sec-models-memory" tabIndex={-1}>
         <h2>Memory use <Dot c={changed} k="npuBudgetOverrideGB" /></h2>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <p className="muted small" style={{ margin: 0 }}>What the selected model is expected to occupy before it loads.</p>
+          <p className="muted small" style={{ margin: 0 }}>How much memory the selected model is expected to need, checked before it loads.</p>
           <span className={`tag ${(gate.phase === "failed" || mem.phase === "over") && gate.phase !== "stale" && gate.phase !== "refreshing" ? "status-warn" : mem.phase === "fits" && (gate.phase === "ready" || gate.phase === "refreshing" || gate.phase === "stale") ? "status-ok" : ""}`}>
             {gate.phase === "loading" ? "Measuring…"
               : gate.phase === "refreshing" ? "Refreshing…"
               : gate.phase === "stale" ? "Configuration changed — measuring…"
               : gate.phase === "failed" ? "Couldn't measure"
               : gate.phase === "unavailable" ? "No estimate available"
-              : mem.phase === "fits" ? "✓ Fits the safe limit"
-              : "⚠ Above the safe limit"}
+              : mem.phase === "fits" ? "✓ Fits"
+              : "⚠ Too large"}
           </span>
         </div>
 
@@ -1135,18 +1146,18 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
         )}
         {gate.phase === "failed" && (
           <p className="warn small" role="status">
-            The memory request failed, so there is nothing to show.{" "}
-            <button type="button" className="ghost" onClick={() => estimateGate.retry()}>Retry</button>
+            The memory check did not finish.{" "}
+            <button type="button" className="ghost" onClick={() => estimateGate.retry()}>Try again</button>
           </p>
         )}
         {gate.phase === "unavailable" && <p className="muted small" role="status">This machine did not return usable memory readings, so no estimate is shown.</p>}
 
         {memHasNumbers ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8, marginTop: 8 }}>
-            <div className="stat"><div className="muted small">Model weights</div><div style={{ fontSize: 16, fontWeight: 700 }}>{mem.weightsGB} GB</div></div>
-            <div className="stat"><div className="muted small">Conversation cache ({readSetting(settings, "kvType")})</div><div style={{ fontSize: 16, fontWeight: 700 }}>{mem.kvCacheGB} GB</div></div>
-            <div className="stat"><div className="muted small">Runtime scratchpad</div><div style={{ fontSize: 16, fontWeight: 700 }}>{mem.scratchpadGB} GB</div></div>
-            <div className="stat"><div className="muted small">Total required</div><div style={{ fontSize: 16, fontWeight: 700 }}>{mem.totalRequiredGB} GB</div></div>
+            <div className="stat"><div className="muted small">The model itself</div><div style={{ fontSize: 16, fontWeight: 700 }}>{mem.weightsGB} GB</div></div>
+            <div className="stat"><div className="muted small">Conversation memory</div><div style={{ fontSize: 16, fontWeight: 700 }}>{mem.kvCacheGB} GB</div></div>
+            <div className="stat"><div className="muted small">Working space</div><div style={{ fontSize: 16, fontWeight: 700 }}>{mem.scratchpadGB} GB</div></div>
+            <div className="stat"><div className="muted small">Total needed</div><div style={{ fontSize: 16, fontWeight: 700 }}>{mem.totalRequiredGB} GB</div></div>
           </div>
         ) : null}
         {gate.phase === "loading" && <p className="muted small" role="status">Measuring the memory the model needs…</p>}
@@ -1154,7 +1165,7 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
         {mem.availableRamGB !== null ? (
           <div style={{ background: "var(--code-bg)", borderRadius: 6, padding: "8px 12px", marginTop: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: 12 }}>
-              <span className="muted">Available RAM (measured, refreshed about every 30 s):</span>
+              <span className="muted">Free memory on this PC (checked about every 30 s):</span>
               <strong>{mem.availableRamGB} GB available / {mem.totalRamGB ?? "unknown"} total</strong>
             </div>
             {mem.barPercent !== null && (
@@ -1164,7 +1175,7 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
             )}
           </div>
         ) : (
-          <p className="muted small" style={{ marginTop: 8 }}>Available RAM is not reported by this machine right now.</p>
+          <p className="muted small" style={{ marginTop: 8 }}>This PC is not reporting its free memory right now.</p>
         )}
         {mem.note && <p className="muted small" style={{ marginTop: 4 }}>{mem.note}</p>}
 
@@ -1199,32 +1210,32 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
       )}
 
       <section id="sec-models-context" tabIndex={-1}>
-        <h2>Conversation length &amp; cache <Dot c={changed} k="nctxMode" /><Dot c={changed} k="kvType" /><Dot c={changed} k="kvInRam" /></h2>
-        <p className="muted small">How many tokens one conversation can hold, and how precisely the cache is kept.</p>
+        <h2>Conversation memory <Dot c={changed} k="nctxMode" /><Dot c={changed} k="kvType" /><Dot c={changed} k="kvInRam" /></h2>
+        <p className="muted small">How much of a conversation the model keeps in mind at once. Longer uses more memory.</p>
         <div className="row">
           <label className="small">
-            <span>Context window</span>
+            <span>Conversation length</span>
             <select
               value={readSetting(settings, "nctxMode")}
               disabled={selectedIsCompiled}
               onChange={(e) => void save({ nctxMode: e.target.value as Settings["nctxMode"] })}
             >
-              <option value="auto">Auto (memory-managed)</option>
-              <option value="2048">2048 tokens (low memory)</option>
-              <option value="4096">4096 tokens (standard)</option>
-              <option value="8192">8192 tokens (extended)</option>
+              <option value="auto">Automatic (recommended)</option>
+              <option value="2048">Short: about 1,500 words, least memory</option>
+              <option value="4096">Standard: about 3,000 words</option>
+              <option value="8192">Long: about 6,000 words, most memory</option>
             </select>
           </label>
           <button type="button" className="ghost" disabled={selectedIsCompiled} onClick={() => void save({ nctxMode: "auto", kvType: "f16", kvInRam: false })}>Reset</button>
         </div>
         {selectedIsCompiled && (
           <div className="muted small" role="note">
-            The selected model is a compiled bundle: its context and cache are baked into the model itself, so these settings do not apply to it.
-            The choices are kept for when you pick a model they do apply to.
+            The selected model was built for the NPU with a fixed conversation length, so these settings do not apply to it.
+            Your choices are kept for models they do apply to.
           </div>
         )}
         <details style={{ marginTop: 6 }}>
-          <summary className="small"><strong>Advanced: cache storage and precision</strong> <span className="muted">· how much memory the cache takes</span></summary>
+          <summary className="small"><strong>Technical: conversation memory precision</strong> <span className="muted">· trade a little quality for less memory</span></summary>
           <div className="row">
             <label className="small">
               <span>Cache precision</span>
@@ -1240,14 +1251,14 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
             </label>
             <label className="check small">
               <input type="checkbox" disabled={selectedIsCompiled} checked={readBool(settings, "kvInRam")} onChange={(e) => void save({ kvInRam: e.target.checked })} />
-              <span>Keep the conversation cache in RAM when the NPU runs short</span>
+              <span>Keep conversation memory in the PC's main memory when the NPU runs short</span>
             </label>
           </div>
           {!selectedIsCompiled && <div className="muted small">A smaller precision halves (or quarters) the cache memory; F16 keeps the most fidelity. One setting for every runtime.</div>}
         </details>
         {server && (server.state === "ready" || server.state === "busy") ? (
           <div className="muted small" role="status">
-            Effective now: context {server.contextKind === "compiled" ? "compiled into the model" : server.servedNctx ? `${server.servedNctx} tokens` : "model default"}
+            In use now: conversation length {server.contextKind === "compiled" ? "fixed by the model" : server.servedNctx ? `${server.servedNctx} tokens` : "the model's default"}
             {server.servedKvType ? ` · cache ${server.servedKvType}` : ""}{typeof server.servedKvInRam === "boolean" ? ` · cache in RAM: ${server.servedKvInRam ? "yes" : "no"}` : ""}.
           </div>
         ) : (
@@ -1264,15 +1275,17 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
               value={readSetting(settings, "powerProfile")}
               onChange={(e) => void save({ powerProfile: e.target.value as Settings["powerProfile"] })}
             >
-              <option value="auto">Auto (burst on AC, saver on battery)</option>
-              <option value="burst">Burst (maximum performance)</option>
-              <option value="high_performance">High performance</option>
-              <option value="sustained_high_performance">Sustained high performance</option>
+              <option value="auto">Automatic: fastest when plugged in, saves battery otherwise (recommended)</option>
+              <option value="burst">Fastest</option>
               <option value="balanced">Balanced</option>
-              <option value="low_balanced">Low balanced</option>
-              <option value="power_saver">Power saver (less heat, saves battery)</option>
-              <option value="high_power_saver">High power saver</option>
-              <option value="low_power_saver">Low power saver (quietest, slowest)</option>
+              <option value="power_saver">Battery saver: less heat, slower</option>
+              <optgroup label="More modes">
+                <option value="high_performance">High performance</option>
+                <option value="sustained_high_performance">Sustained high performance</option>
+                <option value="low_balanced">Low balanced</option>
+                <option value="high_power_saver">High power saver</option>
+                <option value="low_power_saver">Low power saver: quietest, slowest</option>
+              </optgroup>
             </select>
           </label>
           <button type="button" className="ghost" onClick={() => void save({ powerProfile: "auto" })}>Reset</button>
@@ -1280,14 +1293,11 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
         <p className="muted small">
           {powerInfo === null ? "Checking the power supply…" :
             (readSetting(settings, "powerProfile")) === "auto"
-              ? (powerInfo?.onAcPower ? "On AC power: burst performance is available." : "On battery: power saving is active.")
-              : (readSetting(settings, "powerProfile") === "burst" ? "Pins the NPU clocks to maximum frequency for the lowest latency." : "The runtime runs the NPU clocks in the mode chosen above (all eight are the runtime's own modes).")}
+              ? (powerInfo?.onAcPower ? "Plugged in: running at full speed." : "On battery: saving power.")
+              : (readSetting(settings, "powerProfile") === "burst" ? "Always runs the NPU at full speed. Answers are fastest; the PC may get warmer." : "The NPU runs in the mode chosen above.")}
         </p>
       </section>
 
-      {/* The group's folded Advanced: the sections that hold only advanced keys. */}
-      <details className="set-adv">
-        <summary className="small"><strong>Advanced</strong> <span className="muted">· experimental speed-ups</span></summary>
       <section id="sec-models-speculative" tabIndex={-1}>
         <h2>Speculative decoding <Dot c={changed} k="speculativeDecoding.enabled" /></h2>
         <details>

@@ -90,7 +90,7 @@ export function RuntimePanel({ settings, onSave, changed }: { settings: Settings
   return (
     <section>
       <h2>Where the chat model runs</h2>
-      <p className="muted small">Automatic decides before each request from this device's own measurements (speed, memory, energy) and keeps one configuration for the whole answer. Manual pins the hardware.</p>
+      <p className="muted small">Auto picks the best part of this PC's chip for each message, from how this PC has performed before. Manual lets you choose it yourself.</p>
 
       <div className="role-row">
         <div><strong>Mode</strong>{dot("computeMode")}</div>
@@ -115,20 +115,20 @@ export function RuntimePanel({ settings, onSave, changed }: { settings: Settings
           </div>
           <div className="muted small">{AUTO_GOALS.find((g) => g.id === goal)?.why}</div>
           <div className="card-lite" style={{ marginTop: 8 }}>
-            <strong className="small">What the last request picked</strong>
+            <strong className="small">Last choice</strong>
             {adaptive?.last ? (
               <div className="small" style={{ marginTop: 4 }}>
                 <div>{adaptive.last.label}</div>
                 {adaptive.last.reason.map((r, i) => <div key={i} className="muted small">{r}</div>)}
                 {adaptive.last.gatedOut.length > 0 && (
                   <details className="small" style={{ marginTop: 4 }}>
-                    <summary className="muted">{adaptive.last.gatedOut.length} configuration{adaptive.last.gatedOut.length === 1 ? "" : "s"} not available right now</summary>
+                    <summary className="muted">{adaptive.last.gatedOut.length} option{adaptive.last.gatedOut.length === 1 ? "" : "s"} not available right now</summary>
                     {adaptive.last.gatedOut.map((g) => <div key={g.id} className="muted small">{COMPUTE_LABEL[g.compute as keyof typeof COMPUTE_LABEL] ?? g.compute}: {g.why}</div>)}
                   </details>
                 )}
               </div>
             ) : (
-              <div className="muted small" style={{ marginTop: 4 }}>No request has been served yet in Auto mode: the next chat message will be measured and the choice shown here.</div>
+              <div className="muted small" style={{ marginTop: 4 }}>No message sent in Auto yet. After your next message, the choice appears here.</div>
             )}
           </div>
         </>
@@ -150,7 +150,7 @@ export function RuntimePanel({ settings, onSave, changed }: { settings: Settings
             />
           </div>
           {cur && <div className={cur.available ? "muted small" : "warn small"}>{cur.available ? cur.note : `${cur.note} You can still choose it.`}</div>}
-          {choice.id === "hybrid" && <div className="muted small">CPU + NPU is GenieX's hybrid: most layers run on the NPU and the rest on the CPU. It works with GGUF models; a compiled QAIRT bundle has no hybrid path.</div>}
+          {choice.id === "hybrid" && <div className="muted small">CPU + NPU splits the model between the two: most of it on the NPU, the rest on the CPU. It works with most downloaded models, but not with models built only for the NPU.</div>}
           {info && <div className="muted small">{info.note}</div>}
         </>
       )}
@@ -158,11 +158,10 @@ export function RuntimePanel({ settings, onSave, changed }: { settings: Settings
       {!off && (
         <div className="card-lite npu-note" style={{ marginTop: 10 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <strong className="npu-note-title">⚡ Qualcomm Hexagon NPU Accelerated</strong>
-            <span className="tag">HTP Native</span>
+            <strong className="npu-note-title">⚡ Runs on the NPU</strong>
           </div>
           <div className="muted small" style={{ marginTop: 4 }}>
-            Prioritizes Qualcomm-optimized <code>W4A16</code> weights and ARM64 vector-aligned <code>Q4_0_4_4</code> quants for direct HTP residency and maximum token throughput.
+            The NPU is the part of this PC's chip made for AI. It answers quickly and uses little power. MKMN prefers model versions built for it.
           </div>
         </div>
       )}
