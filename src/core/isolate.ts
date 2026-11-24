@@ -31,14 +31,27 @@ export function isolation(): IsolationRunner | null { return current; }
  *  and the reply it sends. The contexts generated code runs in keep builtins of their own, which
  *  it may change as before. That freeze is experimental in Node, so its warning is not printed. */
 export function lockedNodeArgs(readDirs: string[], script: string): string[] {
-  return ["--permission", "--no-experimental-sqlite", "--frozen-intrinsics", "--disable-warning=ExperimentalWarning", ...readDirs.map((d) => `--allow-fs-read=${d}`), script];
+  return ["--permission", "--no-experimental-sqlite", "--frozen-intrinsics", "--disable-warning=ExperimentalWarning", ...readDirs.map((d) => `--allow-fs-read=${plainPath(d)}`), plainPath(script)];
+}
+
+/** A Windows verbatim path ("\\?\C:\..." or "\\?\UNC\server\share\...") in its plain form; any
+ *  other path as it is. The installed app starts the sidecar with verbatim paths, and Node's
+ *  permission model does not match a verbatim --allow-fs-read against the plain path it checks:
+ *  the locked process could not read its own code and every check stopped with exit 1. */
+export function plainPath(p: string): string {
+  if (p.startsWith("\\\\?\\UNC\\")) return `\\\\${p.slice(8)}`;
+  if (p.startsWith("\\\\?\\")) return p.slice(4);
+  return p;
 }
 
 /** Raised instead of running generated code on a Node.js that does not enforce the network ban,
- *  or, with `unconfirmed`, when the check could not tell this time (it is asked again next run). */
+ *  or, with `unconfirmed`, when the check could not tell this time (it is asked again next run).
+ *  `workerProblem` is what the locked worker said when it did not start (asked again next run too). */
 export class IsolationUnsafeError extends Error {
-  constructor(unconfirmed = false) {
-    super(unconfirmed
+  constructor(unconfirmed = false, workerProblem?: string) {
+    super(workerProblem
+      ? `Generated code is paused: MKMN's isolated checker did not start on this PC (${workerProblem}). It checks again on the next run.`
+      : unconfirmed
       ? "Generated code is paused: MKMN could not confirm that this Node.js runtime blocks network access. It checks again on the next run."
       : "Generated code is turned off: this Node.js runtime cannot keep it away from the network and your files.");
     this.name = "IsolationUnsafeError";

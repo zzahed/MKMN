@@ -14,6 +14,10 @@ permissions:
 jobs:
   windows-arm64:
     runs-on: windows-11-arm
+    permissions:
+      contents: read
+      id-token: write # Sigstore signing for build provenance attestation
+      attestations: write # write the attestation to the repo's attestation store
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
@@ -90,6 +94,10 @@ jobs:
           "commit=$env:GITHUB_SHA" | Set-Content -Path "dist/MKMN-$version-build.txt" -Encoding ascii
           "version=$version" | Add-Content -Path "dist/MKMN-$version-build.txt" -Encoding ascii
           "installer_sha256=$sha" | Add-Content -Path "dist/MKMN-$version-build.txt" -Encoding ascii
+      - name: Attest build provenance for the installer
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/MKMN-*-arm64-Setup.exe
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: MKMN-Windows-ARM64-unsigned

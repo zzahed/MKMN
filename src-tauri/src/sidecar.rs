@@ -96,6 +96,7 @@ impl SidecarHost {
                 return PathBuf::from(p);
             }
         if let Ok(exe) = self.app.path().resource_dir() {
+            let exe = plain_path(&exe);
             for candidate in [exe.join("Runtime").join("node.exe"), exe.join("node.exe")] {
                 if candidate.is_file() {
                     return candidate;
@@ -111,7 +112,7 @@ impl SidecarHost {
                 return Some(PathBuf::from(p));
             }
         if let Ok(exe) = self.app.path().resource_dir() {
-            let bundled = exe.join("Runtime").join("sidecar").join("main.js");
+            let bundled = plain_path(&exe).join("Runtime").join("sidecar").join("main.js");
             if bundled.is_file() {
                 return Some(bundled);
             }
@@ -430,16 +431,22 @@ fn validate_site_open(target: &str, root: &std::path::Path) -> Result<PathBuf, S
     }
     // canonicalize answers with a verbatim path on Windows ("\\?\\C:\\..."), which the
     // system's opener does not take: hand it back the plain form.
-    let plain = canonical.to_string_lossy();
-    let plain = if let Some(rest) = plain.strip_prefix(r"\\?\UNC\") {
-        format!(r"\\{}", rest)
+    Ok(plain_path(&canonical))
+}
+
+/// A Windows verbatim path ("\\?\C:\..." or "\\?\UNC\server\share\...") in its plain form;
+/// any other path as it is. The resource folder comes back verbatim on Windows, and a sidecar
+/// started from it passed verbatim folders to Node's permission model, which does not match
+/// them: every isolated check of generated code stopped with exit 1.
+pub(crate) fn plain_path(path: &std::path::Path) -> PathBuf {
+    let text = path.to_string_lossy();
+    if let Some(rest) = text.strip_prefix(r"\\?\UNC\") {
+        PathBuf::from(format!(r"\\{}", rest))
+    } else if let Some(rest) = text.strip_prefix(r"\\?\") {
+        PathBuf::from(rest)
     } else {
-        plain
-            .strip_prefix(r"\\?\")
-            .map(str::to_string)
-            .unwrap_or_else(|| plain.to_string())
-    };
-    Ok(PathBuf::from(plain))
+        path.to_path_buf()
+    }
 }
 
 /// The patch the sidecar sends for a settings save: `callHost(..., "saveSettings", [patch])`
@@ -902,6 +909,15 @@ fn reveal_target_problem(target: &str) -> Result<(), String> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn plain_path_drops_the_verbatim_prefix_and_keeps_other_paths() {
+        use std::path::Path;
+        assert_eq!(plain_path(Path::new(r"\\?\C:\Program Files\MKMN")), PathBuf::from(r"C:\Program Files\MKMN"));
+        assert_eq!(plain_path(Path::new(r"\\?\UNC\server\share\MKMN")), PathBuf::from(r"\\server\share\MKMN"));
+        assert_eq!(plain_path(Path::new(r"C:\Program Files\MKMN")), PathBuf::from(r"C:\Program Files\MKMN"));
+        assert_eq!(plain_path(Path::new(r"\\server\share")), PathBuf::from(r"\\server\share"));
+    }
 
     #[test]
     fn reveal_path_takes_only_an_existing_absolute_path() {
