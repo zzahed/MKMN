@@ -87,6 +87,92 @@ export function skillPattern(when: string, flags: string): RegExp {
   return new RegExp(when, when.includes("\\p{") ? `${flags}u` : flags);
 }
 
+/** The most a "start by itself" pattern reads of a message: enough to recognise a request,
+ *  and it keeps even an allowed pattern with open-ended repeats quick on a pasted book. */
+export const SKILL_MATCH_CHARS = 1000;
+/** Open-ended repeats (+, *, {n,}) a pattern may hold: each one multiplies the work. */
+const MAX_OPEN_REPEATS = 2;
+/** Open-ended repeats of an atom that matches almost anything (., [^…], \S, \W, \D): two of
+ *  them in a row cost the cube of the message length (.*.* took 0.8 s on 1,000 characters). */
+const MAX_BROAD_REPEATS = 1;
+
+/** How a quantifier at p[j] repeats what it follows: "open" (+, *, {n,}), "bounded" ({n,m} or {n}
+ *  with more than one), or null (none, or ? and {0,1}, which never repeat); len = its length. */
+function quantifierAt(p: string, j: number): { kind: "open" | "bounded" | null; len: number } {
+  const c = p[j];
+  let kind: "open" | "bounded" | null = null, len = 0;
+  if (c === "+" || c === "*") { kind = "open"; len = 1; }
+  else if (c === "?") { len = 1; }
+  else if (c === "{") {
+    const m = /^\{(\d+)(,(\d*))?\}/.exec(p.slice(j));
+    if (m) {
+      len = m[0].length;
+      const lo = Number(m[1]), comma = m[2] !== undefined, hi = m[3] === undefined || m[3] === "" ? null : Number(m[3]);
+      kind = comma && hi === null ? "open" : Math.max(lo, hi ?? lo) > 1 ? "bounded" : null;
+    }
+  }
+  if (len && (p[j + len] === "?" || p[j + len] === "+")) len++; // lazy or possessive mark
+  return { kind, len };
+}
+
+/**
+ * Why a skill's pattern could make the window freeze, or null when it is safe to run on
+ * every message. A pattern is run on the window's own thread, so one that backtracks
+ * catastrophically on a crafted message ("aaaa…!") would hang MKMN. Refused: a repeated
+ * group that itself repeats or holds alternatives ((a+)+, (a|aa)+), back-references (\1),
+ * and more than two open-ended repeats (.*.*.*). The plain-words form and the built-in
+ * skills' patterns pass.
+ */
+export function patternRisk(p: string): string | null {
+  if (/\\[1-9]|\\k</.test(p)) return "it refers back to an earlier part of itself";
+  const groups: { risky: boolean }[] = [];
+  let open = 0, broadOpen = 0;
+  /** A repeat inside a group makes that group risky to repeat again. */
+  const markInner = () => { if (groups.length) groups[groups.length - 1].risky = true; };
+  for (let i = 0; i < p.length; i++) {
+    const c = p[i];
+    let atomEnd = i; // the atom ends here; a quantifier may follow it
+    if (c === "\\") {
+      // an escape is one atom; \p{…}, \u{…} and \x… carry their own braces
+      if ((p[i + 1] === "p" || p[i + 1] === "P" || p[i + 1] === "u") && p[i + 2] === "{") atomEnd = p.indexOf("}", i + 2);
+      else atomEnd = i + 1;
+      if (atomEnd < 0) return null; // an unfinished escape: RegExp itself refuses it
+    } else if (c === "[") {
+      let j = i + 1;
+      if (p[j] === "^") j++;
+      if (p[j] === "]") j++;
+      while (j < p.length && p[j] !== "]") j += p[j] === "\\" ? 2 : 1;
+      atomEnd = j;
+    } else if (c === "(") {
+      groups.push({ risky: false });
+      // skip the group's opening marks (?: (?= (?! (?<= (?<! (?<name>
+      if (p[i + 1] === "?") {
+        if (p[i + 2] === "<" && p[i + 3] !== "=" && p[i + 3] !== "!") i = p.indexOf(">", i + 3);
+        else i += p[i + 2] === "<" ? 3 : 2;
+      }
+      continue;
+    } else if (c === "|") {
+      markInner();
+      continue;
+    } else if (c === ")") {
+      const g = groups.pop();
+      const q = quantifierAt(p, i + 1);
+      if (q.kind && g?.risky) return "it repeats a part that itself repeats or has alternatives";
+      if (q.kind === "open" && ++open > MAX_OPEN_REPEATS) return "it has too many open-ended repeats";
+      if (q.kind || g?.risky) markInner();
+      i += q.len;
+      continue;
+    }
+    const q = quantifierAt(p, atomEnd + 1);
+    const broad = c === "." || (c === "[" && p[i + 1] === "^") || (c === "\\" && "SWD".includes(p[i + 1]));
+    if (q.kind === "open" && broad && ++broadOpen > MAX_BROAD_REPEATS) return "it has more than one open-ended repeat that matches almost anything";
+    if (q.kind === "open" && ++open > MAX_OPEN_REPEATS) return "it has too many open-ended repeats";
+    if (q.kind) markInner();
+    i = atomEnd + q.len;
+  }
+  return null;
+}
+
 export function cleanTags(tags: string[]): string[] {
   const seen = new Set<string>();
   for (const t of tags) {
@@ -110,6 +196,8 @@ export function skillProblems(s: Skill): string[] {
   if (s.when) {
     if (s.when.length > 300) out.push("its \"start by itself\" words are longer than 300 characters");
     try { skillPattern(s.when, "i"); } catch { out.push("its \"start by itself\" words or pattern are not valid: check them, or leave the box empty"); }
+    const risk = patternRisk(s.when);
+    if (risk) out.push(`its "start by itself" pattern could make MKMN freeze (${risk}). Use plain words separated by commas instead`);
   }
   out.push(...libraryProblems(s.libraries));
   return out;
@@ -192,12 +280,16 @@ export function categoryOf(s: Pick<Skill, "tags">): SkillCategoryId {
  */
 export function autoSkill(skills: Skill[], request: string, hasFiles: boolean): Skill | null {
   let best: Skill | null = null, bestLen = 0;
+  // the start of the message is enough to recognise a request, and keeps every pattern quick
+  const head = request.slice(0, SKILL_MATCH_CHARS);
   for (const s of skills) {
     // the skills that come with the app are split by whether files are in the chat; a skill of the person's own applies in both cases
     if (!s.when || (s.core && (s.id === "edit-files") !== hasFiles)) continue;
+    // a pattern that could freeze the window is never run (a skill saved before this check, or edited by hand)
+    if (patternRisk(s.when)) continue;
     let re: RegExp;
     try { re = skillPattern(s.when, "gi"); } catch { continue; }
-    const len = Math.max(0, ...(request.match(re) ?? []).map((m) => m.length));
+    const len = Math.max(0, ...(head.match(re) ?? []).map((m) => m.length));
     // at equal length a skill of the person's own wins over a default one
     if (len > bestLen || (len > 0 && len === bestLen && best?.core && !s.core)) { best = s; bestLen = len; }
   }
