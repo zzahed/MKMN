@@ -549,7 +549,7 @@ describe("Models and the settings journey", () => {
 describe("the Files panel follows an index build to its end", () => {
   it("keeps polling while the index stays \"indexing\", until it is ready", async () => {
     let polls = 0;
-    const withFile = { ...PROJECT, files: [{ id: "f1", name: "notes.txt", content: "The annex opens at nine. ".repeat(40) }] };
+    const withFile = { ...PROJECT, files: [{ id: "f1", name: "notes.txt", content: "The annex opens at nine. ".repeat(400) }] }; // longer than the read-at-once limit, so the preparing status shows
     boot(makeApi({
       projects: async () => [{ ...withFile }],
       knowledgeStatus: async () => { polls++; return polls <= 3 ? { state: "indexing", progress: { done: 0, of: 1 } } : { state: "ready" }; },
@@ -560,9 +560,64 @@ describe("the Files panel follows an index build to its end", () => {
     fireEvent.click(railBtn("Projects"));
     await waitFor(() => expect(document.querySelector(".card.clickable")).toBeTruthy());
     fireEvent.click([...document.querySelectorAll(".card.clickable")].find((c) => c.textContent!.includes("Alpha project")) as HTMLElement);
-    await waitFor(() => expect(screen.getByText(/Search index: ready/)).toBeTruthy(), { timeout: 9000 });
+    await waitFor(() => expect(screen.getByText(/Your files are ready/)).toBeTruthy(), { timeout: 9000 });
     expect(polls).toBeGreaterThanOrEqual(4);
   }, 12000);
+});
+
+describe("the Reference files card says only what is true in each state", () => {
+  const openAlpha = async () => {
+    await settle();
+    await screen.findByRole("button", { name: "Standalone chat" });
+    fireEvent.click(railBtn("Projects"));
+    await waitFor(() => expect(document.querySelector(".card.clickable")).toBeTruthy());
+    fireEvent.click([...document.querySelectorAll(".card.clickable")].find((c) => c.textContent!.includes("Alpha project")) as HTMLElement);
+  };
+
+  it("over the limit and failed: a plain message and Try again, and no file claims to be prepared", async () => {
+    const big = { ...PROJECT, files: [{ id: "f1", name: "notes.txt", content: "The annex opens at nine. ".repeat(400) }] };
+    boot(makeApi({
+      projects: async () => [{ ...big }],
+      knowledgeStatus: async () => ({ state: "failed", error: "index build: tokenizer error." }),
+      knowledgeBuild: async () => ({ state: "failed" }),
+    }), CONVS);
+    await openAlpha();
+    const status = await screen.findByText(/Your files could not be prepared/, {}, { timeout: 5000 });
+    expect(status.textContent).not.toMatch(/token|index/i); // the raw error stays out of the sentence
+    expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+    expect(screen.getByText(/Too long to read all at once/)).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/being prepared/);
+    expect(screen.queryByRole("progressbar")).toBeNull(); // no meter over the limit
+  });
+
+  it("too many files: names the cause and offers no Try again, which could not help", async () => {
+    const big = { ...PROJECT, files: [{ id: "f1", name: "notes.txt", content: "The annex opens at nine. ".repeat(400) }] };
+    boot(makeApi({
+      projects: async () => [{ ...big }],
+      knowledgeStatus: async () => ({ state: "failed", error: "This project holds 250 files; the search index takes at most 200." }),
+      knowledgeBuild: async () => ({ state: "failed" }),
+    }), CONVS);
+    await openAlpha();
+    await screen.findByText(/more than 200 files/, {}, { timeout: 5000 });
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+  });
+
+  it("under the limit: a meter, no preparing status and no Try again, even if preparing failed", async () => {
+    const small = { ...PROJECT, files: [{ id: "f1", name: "notes.txt", content: "The annex opens at nine." }] };
+    boot(makeApi({
+      projects: async () => [{ ...small }],
+      knowledgeStatus: async () => ({ state: "failed", error: "boom" }),
+      knowledgeBuild: async () => ({ state: "failed" }),
+    }), CONVS);
+    await openAlpha();
+    const meter = await screen.findByRole("progressbar");
+    expect(Number(meter.getAttribute("aria-valuenow"))).toBeGreaterThanOrEqual(1); // never "0%" with a file in it
+    expect(screen.getByText(/of what the assistant can read at once/)).toBeTruthy();
+    expect(screen.getByText(/reads all of it in every chat in this project/)).toBeTruthy();
+    await new Promise((r) => setTimeout(r, 300));
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    expect(document.querySelector('.proj-side [role="status"]')?.textContent).toBe("");
+  });
 });
 
 describe("deleting a chat can be undone", () => {
