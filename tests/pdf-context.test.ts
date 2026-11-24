@@ -38,7 +38,8 @@ describe("pdf errors", () => {
     // own text, and even a cut-down message could carry a fragment of it
     const long = describePdfError("report.pdf", new Error(`Cannot use 'in' operator with page text: ${"x".repeat(400)}`));
     expect(long).not.toContain("Cannot use 'in' operator");
-    expect(long).toContain("error category");
+    expect(long).toContain("Save it again as a PDF"); // a next step first
+    expect(long).toContain("Code for support: other"); // the sanitized category stays, for support
   });
 });
 

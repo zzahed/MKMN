@@ -114,11 +114,11 @@ export function describePdfError(name: string, e: unknown): string {
   if (en === "AbortError" || /aborted|was stopped|worker was destroyed/i.test(msg)) return `${name}: reading was stopped.`;
   if (en === "PasswordException" || /password/i.test(msg)) return `${name}: this PDF is protected by a password. Open it, remove the protection (print it to a new PDF) and attach that one.`;
   if (en === "InvalidPDFException" || /invalid pdf|corrupt|damaged/i.test(msg)) return `${name}: this file is damaged or is not a readable PDF.`;
-  if (en === "MissingPDFException" || en === "UnexpectedResponseException") return `${name}: the PDF's pages could not be found in the file.`;
+  if (en === "MissingPDFException" || en === "UnexpectedResponseException") return `${name}: the PDF's pages could not be found in the file. Save it again as a PDF, then add it again.`;
   if (/fake worker|setting up fake worker|worker/i.test(msg)) return `${name}: the PDF reader could not start in this window. Try again; if it keeps failing, restart the app.`;
   // an unknown error: no part of its raw message is shown — a parser message can quote the document's
   // own text, and truncating it cannot guarantee that none survives. The sanitized category is shown instead.
-  return `${name}: could not be read (error category: ${pdfErrorCategory(e)}).`;
+  return `${name}: could not be read. Save it again as a PDF, then add it again. (Code for support: ${pdfErrorCategory(e)})`;
 }
 
 /** Short category of a PDF failure for diagnostics — no name, no content, safe to log. */
