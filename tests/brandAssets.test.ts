@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { inflateSync } from "zlib";
 import { join, dirname, resolve } from "path";
 import { setupOutcomeView, type SetupState, type SetupStep } from "../src/core/setupView";
@@ -7,6 +7,14 @@ import { initialSteps } from "../src/core/setup";
 import { noModelHeading } from "../src/core/settingsUi";
 
 const ROOT = resolve(join(__dirname, ".."));
+
+const rendererEntry = join(ROOT, "dist", "renderer", "index.html");
+it.skipIf(!existsSync(rendererEntry) && process.env.MKMN_REQUIRE_SIDECAR !== "1")(
+  "keeps the page editor and its stylesheet out of the initial renderer assets",
+  () => {
+    expect(readFileSync(rendererEntry, "utf8")).not.toMatch(/assets\/(?:puck|PageEditor)-[^"\s]+\.(?:js|css)/i);
+  },
+);
 
 // ---------------------------------------------------------------- ICO integrity
 // An ICO directory entry stores width and height as one byte each, where 0 means

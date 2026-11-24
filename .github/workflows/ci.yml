@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with: { node-version: 26, cache: pnpm }
+        with: { node-version-file: .node-version, cache: pnpm }
       - run: pnpm --ignore-workspace install --frozen-lockfile
       - run: pnpm rebuild esbuild
       - run: pnpm typecheck
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with: { node-version: 26, cache: pnpm }
+        with: { node-version-file: .node-version, cache: pnpm }
       - run: pnpm --ignore-workspace install --frozen-lockfile
       - run: pnpm rebuild esbuild
       # coverage is checked in windows-arm64-tests: its thresholds need the whole suite in one run
@@ -59,7 +59,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with: { node-version: 26, cache: pnpm }
+        with: { node-version-file: .node-version, cache: pnpm }
       - run: pnpm --ignore-workspace install --frozen-lockfile
       - run: pnpm rebuild esbuild
       - run: pnpm exec playwright install --with-deps chromium
@@ -80,7 +80,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with: { node-version: 26, cache: pnpm }
+        with: { node-version-file: .node-version, cache: pnpm }
       - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
         with: { toolchain: 1.100.0, targets: aarch64-pc-windows-msvc, components: clippy }
       - shell: pwsh
@@ -110,7 +110,7 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with: { node-version: 26 }
+        with: { node-version-file: .node-version }
       - run: pnpm audit --audit-level=high
       - run: cargo install cargo-audit --locked && cargo audit --file src-tauri/Cargo.lock
       - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0

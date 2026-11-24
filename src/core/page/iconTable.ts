@@ -23,6 +23,6 @@ export const isLoaded = (): boolean => landed;
 
 /** Loads the icon table once and keeps it for the session. */
 export function loadIcons(): Promise<void> {
-  ready ??= import("./icons.generated").then((m) => { paths = m.ICON_PATHS; tags = m.ICON_TAGS; landed = true; });
+  ready ??= import("./icons.generated.js").then((m) => { paths = m.ICON_PATHS; tags = m.ICON_TAGS; landed = true; });
   return ready;
 }

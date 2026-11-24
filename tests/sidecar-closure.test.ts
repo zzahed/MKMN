@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { builtinModules } from "node:module";
+import { execFileSync } from "node:child_process";
+import { tmpdir } from "node:os";
 import ts from "typescript";
 
 const ROOT = path.join(__dirname, "..");
@@ -53,6 +55,27 @@ describe("the packaged sidecar's dependencies", () => {
     expect(missing, "add these to the closure roots in scripts/stage-sidecar-closure.cjs").toEqual([]);
     // the voice worker resolves its package from the installed node_modules the installer writes directly
     for (const p of runtimePackages(["src/voice"]).keys()) expect(nsi).toContain(`File /r "node_modules\\${p}\\*.*"`);
+  });
+
+  it("removes dependencies left by an older bundle when restaging", () => {
+    const scratch = fs.mkdtempSync(path.join(tmpdir(), "mkmn-sidecar-closure-"));
+    try {
+      for (const name of ["acorn", "react", "react-dom", "ws", "onnxruntime-node"]) {
+        const dir = path.join(scratch, "node_modules", name);
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name }));
+      }
+      const ort = path.join(scratch, "node_modules", "onnxruntime-node", "bin", "napi-v6", "win32", "arm64");
+      fs.mkdirSync(ort, { recursive: true });
+      fs.writeFileSync(path.join(ort, "onnxruntime_binding.node"), "");
+      const staged = path.join(scratch, "dist", "sidecar-runtime", "node_modules");
+      fs.mkdirSync(path.join(staged, "@old", "dependency"), { recursive: true });
+
+      execFileSync(process.execPath, [path.join(ROOT, "scripts", "stage-sidecar-closure.cjs")], { cwd: scratch });
+      expect(fs.readdirSync(staged).sort()).toEqual(["acorn", "onnxruntime-node", "react", "react-dom", "ws"]);
+    } finally {
+      fs.rmSync(scratch, { recursive: true, force: true });
+    }
   });
 
   it("finds the runtime loads it must see (a dynamic import, a template-built name)", () => {

@@ -9,7 +9,10 @@ vi.mock("../src/core/page/iconTable", async (importOriginal) => {
   return { ...actual, iconPaths: () => ({}), iconTags: () => ({}), isLoaded: () => false, loadIcons: () => new Promise<void>(() => {}) };
 });
 // the visual editor itself is not under test here — only whether it is drawn at all
-vi.mock("@measured/puck", () => ({ Puck: () => <div data-testid="puck-stub" /> }));
+vi.mock("@puckeditor/core", () => ({
+  Puck: () => <div data-testid="puck-stub" />,
+  legacySideBarPlugin: () => ({ name: "legacy-side-bar" }),
+}));
 
 describe("while the icon table has not landed", () => {
   const spec: GameSpec = {

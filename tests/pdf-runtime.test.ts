@@ -49,7 +49,8 @@ describe("the PDF runtime", () => {
   });
 
   it("package.json declares Node 26 or later", () => {
-    expect(JSON.parse(readFileSync("package.json", "utf8")).engines?.node).toBe(">=26");
+    const minimum = JSON.parse(readFileSync("package.json", "utf8")).engines?.node.match(/^>=(\d+)(?:\.\d+\.\d+)?$/);
+    expect(Number(minimum?.[1])).toBeGreaterThanOrEqual(26);
   });
 
   it(".npmrc refuses installs on an older Node", () => {

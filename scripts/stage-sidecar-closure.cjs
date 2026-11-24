@@ -10,19 +10,25 @@
 const fs = require("fs");
 const path = require("path");
 
-const cwd = process.cwd();
-const dest = path.join(cwd, "dist", "sidecar-runtime", "node_modules");
+const cwd = fs.realpathSync(process.cwd());
+const output = path.join(cwd, "dist", "sidecar-runtime");
+const dest = path.join(output, "node_modules");
 // Roots: what the compiled sidecar/core modules require directly at runtime.
 // onnxruntime-node: the multilingual search model's runtime (src/core/knowledge/embed.ts),
 // loaded only when the person installed that model.
 const queue = ["acorn", "react", "react-dom", "ws", "onnxruntime-node"];
 // The installer is Windows ARM64 only: a package's binaries for other platforms are not shipped.
-const KEEP_BINARIES = { "onnxruntime-node": path.join("bin", "napi-v3", "win32", "arm64") };
+const ortBinaryRoot = path.join("bin", "napi-v6");
+const KEEP_BINARIES = { "onnxruntime-node": path.join(ortBinaryRoot, "win32", "arm64") };
 const seen = new Set();
 const depParents = []; // real parent dirs of copied packages: where their deps resolve
 const failures = [];
 
-fs.mkdirSync(dest, { recursive: true });
+// Clear old bundles so packages removed from the lockfile cannot get into an installer.
+fs.mkdirSync(output, { recursive: true });
+if (fs.realpathSync(output) !== output) throw new Error("The sidecar output directory must be inside this checkout");
+fs.rmSync(dest, { recursive: true, force: true });
+fs.mkdirSync(dest);
 
 while (queue.length) {
   const name = queue.shift();
@@ -59,12 +65,11 @@ while (queue.length) {
   const real = fs.realpathSync(path.dirname(resolved));
   const realParent = path.dirname(real);
   const target = path.join(dest, name);
-  fs.rmSync(target, { recursive: true, force: true });
   fs.cpSync(real, target, { recursive: true });
   if (KEEP_BINARIES[name]) {
     const keep = path.join(target, KEEP_BINARIES[name]);
     if (!fs.existsSync(keep)) { failures.push(`${name} (no ${KEEP_BINARIES[name]})`); continue; }
-    const root = path.join(target, "bin", "napi-v3");
+    const root = path.join(target, ortBinaryRoot);
     for (const os of fs.readdirSync(root)) {
       for (const arch of fs.readdirSync(path.join(root, os))) {
         const dir = path.join(root, os, arch);

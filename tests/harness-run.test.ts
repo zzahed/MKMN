@@ -76,6 +76,16 @@ describe("the harness run and its journal", () => {
     expect(steps.every((s) => typeof s.tokens.measured === "boolean")).toBe(true);
   });
 
+  it("closes the run iterator when it is disposed", async () => {
+    const step: StepDef<unknown, unknown> = { id: "first", kind: "model-call", input: null, schema: sString(), exec: () => ({ output: "first" }) };
+    const run = createRun([step, { ...step, id: "second" }], { pipeline: "test", journalFile: file("r-dispose.jsonl") });
+
+    expect((await run.next()).done).toBe(false);
+    await run[Symbol.asyncDispose]();
+    expect((await run.next()).done).toBe(true);
+    expect(run.steps).toHaveLength(1);
+  });
+
   it("feeds a schema fault back with its exact reason and spends the output retry budget apart from the transport budget", async () => {
     const seen: (string | undefined)[] = [];
     let calls = 0;

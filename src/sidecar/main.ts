@@ -848,7 +848,7 @@ async function foundryEntries(): Promise<CatalogEntry[]> {
       ...cached.map((v) => v.alias.toLowerCase()),
       ...offered.filter((v) => v.cached).map((v) => v.alias.toLowerCase())
     ]);
-    const { foundryCatalogEntries } = await import("../core/foundry");
+    const { foundryCatalogEntries } = await import("../core/foundry.js");
     const entries = foundryCatalogEntries(
       variants.map((v) => ({ alias: v.alias, device: v.device, task: v.task, sizeGB: v.sizeGB, modelId: v.modelId })),
       16

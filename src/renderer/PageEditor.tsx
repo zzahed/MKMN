@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { Puck, type Data } from "@measured/puck";
-import "@measured/puck/no-external.css";
+import { legacySideBarPlugin, Puck, type Data, type Viewports } from "@puckeditor/core";
+import "@puckeditor/core/no-external.css";
 import { fromPuckData, toPuckData, type PageSpec } from "../core/page/catalog";
 import { pageConfig } from "../core/page/blocks";
 import { pageToHtml } from "../core/page/html";
 import { isLoaded as iconsLoaded, loadIcons } from "../core/page/iconTable";
+
+const plugins = [legacySideBarPlugin()];
+const viewports: Viewports = [
+  { width: 360, height: "auto", icon: "Smartphone", label: "Small" },
+  { width: 768, height: "auto", icon: "Tablet", label: "Medium" },
+  { width: 1280, height: "auto", icon: "Monitor", label: "Large" },
+];
 
 /**
  * The visual editor of a page made from blocks (Puck, MIT): drag blocks, change their fields, add or remove sections, with the
@@ -31,6 +38,9 @@ export default function PageEditor({ spec, onSave, onClose }: { spec: PageSpec; 
       <Puck
         config={config}
         data={data}
+        plugins={plugins}
+        viewports={viewports}
+        dnd={{ behavior: "fluid", disableOutlineDrag: true }}
         headerTitle={spec.title || "Page"}
         headerPath="blocks"
         onPublish={async (d) => {

@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import type { Config } from "@measured/puck";
+import type { Config } from "@puckeditor/core";
 import { mixColor } from "../color";
 import { AOS_NAME, BLOCKS, ITEM_FIELDS, PAGE_TYPES, RADII, SPACING, BACKGROUNDS, fromPuckData, type Field, type PageSpec } from "./catalog";
 import { pageLook, type PageLook } from "./theme";

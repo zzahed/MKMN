@@ -300,6 +300,9 @@ export function createRun(defs: StepDef<unknown, unknown>[], opts: RunOptions): 
     [Symbol.asyncIterator]() {
       return api;
     },
+    [Symbol.asyncDispose]() {
+      return gen[Symbol.asyncDispose]();
+    },
   };
   Object.defineProperty(api, "outcomeError", {
     get: () => (settled.find((s) => s.status !== "ok")?.error) ?? cancelled,

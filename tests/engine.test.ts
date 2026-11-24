@@ -82,7 +82,6 @@ describe("engine or code by hand", () => {
   });
 });
 
-import { gamePage, parseGameSpec } from "../src/core/engine";
 describe("fit", () => {
   it("is read from the description and left out of the page", () => {
     const spec = parseGameSpec('{"fit":"hard","fit_reason":"x","things":[{"name":"a"}],"rules":[]}')!;

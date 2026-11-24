@@ -1,4 +1,0 @@
-{
-  "//": "Tells Node that these TypeScript files are ES modules when a script imports them directly (scripts/generate-settings-schema.mjs and the feature matrix read settingsSchema.ts). The sidecar build compiles this folder as CommonJS and ignores this file.",
-  "type": "module"
-}
