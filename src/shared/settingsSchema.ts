@@ -878,7 +878,7 @@ export function valueProblem(decl: SettingDecl, v: unknown): string | null {
       if (decl.max !== undefined && v > decl.max) return `above the maximum ${decl.max}`;
       return null;
     case "enum":
-      return decl.values?.includes(String(v)) ? null : `not one of: ${(decl.values ?? []).join(", ")}`;
+      return typeof v === "string" && decl.values?.includes(v) ? null : `not one of: ${(decl.values ?? []).join(", ")}`;
     case "model-ref":
       return v === null || typeof v === "string" ? null : `expected a model id or empty, got ${typeof v}`;
     case "string-list":

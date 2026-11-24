@@ -136,6 +136,7 @@ it.each([
   { name: "missing", settings: { selectedModelId: "m1" }, autoSend: true },
   { name: "null", settings: { ...SETTINGS, voice: null }, autoSend: true },
   { name: "partial", settings: { ...SETTINGS, voice: { autoSend: false } }, autoSend: false },
+  { name: "malformed", settings: { ...SETTINGS, voice: { sttCompute: { toString: null } } }, autoSend: true },
 ])("opens saved chats and Voice settings when voice settings are $name", async ({ settings, autoSend }) => {
   boot(makeApi({ settings: async () => settings }), [CONVS[2]]);
 
