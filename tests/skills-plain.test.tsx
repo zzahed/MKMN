@@ -16,10 +16,39 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 describe("start by itself, in plain words", () => {
   it("turns comma-separated words into the pattern a skill starts on, and back", () => {
     const when = triggerFromInput("invoice, bill , cover letter");
-    expect(when).toBe(String.raw`\b(invoice|bill|cover letter)\b`);
+    expect(when).toBe(String.raw`(?<![\p{L}\p{N}_])(?:invoice|bill|cover letter)(?![\p{L}\p{N}_])`);
     expect(triggerForInput(when)).toBe("invoice, bill, cover letter");
     expect(triggerFromInput("   ")).toBeUndefined();
     expect(triggerFromInput(" , ")).toBeUndefined();
+    // the earlier saved form still reads back as words
+    expect(triggerForInput(String.raw`\b(invoice|bill)\b`)).toBe("invoice, bill");
+  });
+
+  const skill = (when: string | undefined) => ({ id: "s", name: "S", description: "A test skill", tags: [], models: [], instructions: "", steps: [{ title: "a", prompt: "b" }], when }) as unknown as Skill;
+
+  it("Arabic words start a skill too, and only as whole words", () => {
+    const s = skill(triggerFromInput("فاتورة, invoice"));
+    expect(autoSkill([s], "أرسل لي هذه فاتورة الشهر", false)?.id).toBe("s");
+    expect(autoSkill([s], "الفاتورات كثيرة", false)).toBeFalsy(); // part of a longer word is not the word
+    expect(autoSkill([s], "Send the invoice", false)?.id).toBe("s");
+    expect(autoSkill([s], "invoices are due", false)).toBeFalsy();
+  });
+
+  it("words with symbols stay words: C++ is valid, and e.g. does not match 'eXgX'", () => {
+    const cpp = skill(triggerFromInput("C++"));
+    expect(skillProblems(cpp)).toEqual([]);
+    expect(autoSkill([cpp], "Help me with C++ templates", false)?.id).toBe("s");
+    const eg = skill(triggerFromInput("e.g., v1.2"));
+    expect(autoSkill([eg], "eXgX", false)).toBeFalsy();
+    expect(autoSkill([eg], "upgrade to v1.2 today", false)?.id).toBe("s");
+    expect(triggerForInput(eg.when)).toBe("e.g., v1.2");
+  });
+
+  it("a hand-written pattern compiles exactly as before (no u flag forced on it)", () => {
+    // \- is fine without u and a syntax error with it: old patterns must keep working
+    const old = skill(String.raw`\b(re\-send|bill)\b`);
+    expect(skillProblems(old)).toEqual([]);
+    expect(autoSkill([old], "please re-send it", false)?.id).toBe("s");
   });
 
   it("keeps a real regular expression exactly as written", () => {

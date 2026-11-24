@@ -46,27 +46,45 @@ export function skillSize(s: Pick<Skill, "instructions" | "steps" | "libraries">
   const level = tokens <= 500 ? 1 : tokens <= 1200 ? 2 : 3;
   // plain words for people; the token count stays in the object for whoever needs it
   // the levels follow the conversation length a model is set up for (8K and 16K tokens), not the model's size
-  const label = level === 1 ? "Short: works with any setting." : level === 2 ? "Medium: works best when the conversation length is Long." : "Long: needs a very long conversation setting.";
+  const label = level === 1 ? "Short: works with any setting." : level === 2 ? "Medium: works best when the conversation length is Long." : "Long: may be cut short unless the conversation length is Long.";
   return { tokens, level, label, short: level === 1 ? "short" : level === 2 ? "medium" : "long" };
 }
 
-const PATTERN_CHARS = /[\\^$.*+?()[\]{}|]/;
+/** Only these mark what a person typed as a regular expression: plain words such as "C++",
+ *  "e.g." or "v1.2" stay words (escaped), never a pattern by accident. */
+const REGEX_MARKS = /[\\(|]/;
+/** Word edges that know every script: `\b` without the u flag sees only Latin letters, so an
+ *  Arabic word never had an edge and never matched. */
+const WORD_START = String.raw`(?<![\p{L}\p{N}_])`;
+const WORD_END = String.raw`(?![\p{L}\p{N}_])`;
+const escapeRe = (w: string) => w.replace(/[.*+?^${}()|[\]\\]/g, (c) => `\\${c}`);
 
-/** What a person types into "start by itself": plain words separated by commas ("invoice, bill")
- *  become the pattern a skill starts on; anything with pattern characters is kept as written. */
+/** What a person types into "start by itself": plain words separated by commas ("invoice, bill",
+ *  "فاتورة") become the pattern a skill starts on, in any script; a regular expression is kept as written. */
 export function triggerFromInput(input: string): string | undefined {
   const t = input.trim();
   if (!t) return undefined;
-  if (PATTERN_CHARS.test(t)) return t;
+  if (!t.includes(",") && REGEX_MARKS.test(t)) return t;
   const words = t.split(",").map((w) => w.trim()).filter(Boolean);
-  return words.length ? `\\b(${words.join("|")})\\b` : undefined;
+  return words.length ? `${WORD_START}(?:${words.map(escapeRe).join("|")})${WORD_END}` : undefined;
 }
 
-/** The other way: a pattern made from plain words is shown as those words again. */
+/** The other way: a pattern made from plain words is shown as those words again
+ *  (also the earlier `\b(a|b)\b` form). */
 export function triggerForInput(when: string | undefined): string {
   if (!when) return "";
+  if (when.startsWith(`${WORD_START}(?:`) && when.endsWith(`)${WORD_END}`)) {
+    const body = when.slice(WORD_START.length + 3, when.length - WORD_END.length - 1);
+    return body.split(/(?<!\\)\|/).map((w) => w.replace(/\\(.)/g, "$1")).join(", ");
+  }
   const m = when.match(/^\\b\(([^\\^$.*+?()[\]{}]+)\)\\b$/);
   return m ? m[1].split("|").join(", ") : when;
+}
+
+/** A skill's pattern, compiled: the u flag when it uses Unicode classes (the words form), so a
+ *  pattern written by hand under the old rules keeps compiling exactly as before. */
+export function skillPattern(when: string, flags: string): RegExp {
+  return new RegExp(when, when.includes("\\p{") ? `${flags}u` : flags);
 }
 
 export function cleanTags(tags: string[]): string[] {
@@ -91,7 +109,7 @@ export function skillProblems(s: Skill): string[] {
   if (s.tags.length > MAX_TAGS) out.push(`it has more than ${MAX_TAGS} tags`);
   if (s.when) {
     if (s.when.length > 300) out.push("its \"start by itself\" words are longer than 300 characters");
-    try { new RegExp(s.when, "i"); } catch { out.push("its \"start by itself\" words or pattern are not valid: check them, or leave the box empty"); }
+    try { skillPattern(s.when, "i"); } catch { out.push("its \"start by itself\" words or pattern are not valid: check them, or leave the box empty"); }
   }
   out.push(...libraryProblems(s.libraries));
   return out;
@@ -178,7 +196,7 @@ export function autoSkill(skills: Skill[], request: string, hasFiles: boolean): 
     // the skills that come with the app are split by whether files are in the chat; a skill of the person's own applies in both cases
     if (!s.when || (s.core && (s.id === "edit-files") !== hasFiles)) continue;
     let re: RegExp;
-    try { re = new RegExp(s.when, "gi"); } catch { continue; }
+    try { re = skillPattern(s.when, "gi"); } catch { continue; }
     const len = Math.max(0, ...(request.match(re) ?? []).map((m) => m.length));
     // at equal length a skill of the person's own wins over a default one
     if (len > bestLen || (len > 0 && len === bestLen && best?.core && !s.core)) { best = s; bestLen = len; }
