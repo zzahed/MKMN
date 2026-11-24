@@ -3,11 +3,16 @@
 // start on Windows in its environment (lockedEnv), never the sidecar's own variables.
 
 import { execFile, spawn, spawnSync } from "child_process";
+import { randomBytes } from "crypto";
 import * as path from "path";
 import { IsolationUnsafeError, lockedNodeArgs, readReply, type IsolatedOp, type IsolationRunner } from "../core/isolate";
 
 /** Long enough for a page played 200 ticks with its scenes; a runaway loop dies with its process. */
 const LIMIT_MS = 60_000;
+/** What the process may print on stdout or stderr: a script printing in a loop would otherwise
+ *  grow the sidecar's memory without end. */
+const MAX_OUTPUT = 16 << 20;
+const FLOODED = "the isolated check printed more than 16 MiB and was stopped";
 
 /** On Windows libuv copies these from the sidecar into a child whose environment lacks them, so
  *  leaving them out still told generated code the person's name and profile folder. Passed
@@ -117,26 +122,33 @@ export function lockedNodeRunner(nodeExe = process.execPath, worker = path.join(
     async run(op: IsolatedOp, a: unknown[]): Promise<unknown> {
       const proven = await safe();
       if (proven !== true) throw new IsolationUnsafeError(proven === null);
+      const nonce = randomBytes(16).toString("hex");
       return new Promise((resolve, reject) => {
         const child = spawn(nodeExe, args, { windowsHide: true, env: lockedEnv(), stdio: ["pipe", "pipe", "pipe"] });
-        let out = "", err = "";
+        let out = "", err = "", flooded = false;
         const timer = setTimeout(() => { child.kill(); }, LIMIT_MS);
-        child.stdout.on("data", (d) => { out += d; });
-        child.stderr.on("data", (d) => { err += d; });
+        // what the process may print, on each stream, before it is stopped (as runSync's maxBuffer)
+        const take = (d: Buffer | string, add: (s: string) => number) => {
+          if (!flooded && add(String(d)) > MAX_OUTPUT) { flooded = true; child.kill(); }
+        };
+        child.stdout.on("data", (d) => take(d, (s) => (out += s).length));
+        child.stderr.on("data", (d) => take(d, (s) => (err += s).length));
         child.on("error", (e) => { clearTimeout(timer); reject(e); });
         child.on("close", (code) => {
           clearTimeout(timer);
-          try { resolve(readReply(out, err, code)); } catch (e) { reject(e); }
+          if (flooded) return reject(new Error(FLOODED));
+          try { resolve(readReply(out, err, code, nonce)); } catch (e) { reject(e); }
         });
-        child.stdin.end(JSON.stringify({ op, args: a }));
+        child.stdin.end(JSON.stringify({ op, args: a, nonce }));
       });
     },
     runSync(op: IsolatedOp, a: unknown[]): unknown {
       const proven = safeSync();
       if (proven !== true) throw new IsolationUnsafeError(proven === null);
-      const r = spawnSync(nodeExe, args, { windowsHide: true, env: lockedEnv(), input: JSON.stringify({ op, args: a }), encoding: "utf8", timeout: LIMIT_MS, maxBuffer: 16 << 20 });
-      if (r.error) throw r.error;
-      return readReply(r.stdout ?? "", r.stderr ?? "", r.status);
+      const nonce = randomBytes(16).toString("hex");
+      const r = spawnSync(nodeExe, args, { windowsHide: true, env: lockedEnv(), input: JSON.stringify({ op, args: a, nonce }), encoding: "utf8", timeout: LIMIT_MS, maxBuffer: MAX_OUTPUT });
+      if (r.error) throw (r.error as NodeJS.ErrnoException).code === "ENOBUFS" ? new Error(FLOODED) : r.error;
+      return readReply(r.stdout ?? "", r.stderr ?? "", r.status, nonce);
     },
   };
 }

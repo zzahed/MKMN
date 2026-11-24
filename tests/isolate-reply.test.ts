@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { isolation, IsolationUnsafeError, lockedNodeArgs, readReply, setIsolation, type IsolationRunner } from "../src/core/isolate";
+import { isolation, IsolationUnsafeError, lockedNodeArgs, readReply, replyPrefix, setIsolation, type IsolationRunner } from "../src/core/isolate";
 
 /**
  * The reply of the locked-down process that ran generated code. Only a well-formed
@@ -11,6 +11,19 @@ describe("readReply", () => {
   it("returns the value of an ok reply, read from the last line (the code may print before it)", () => {
     expect(readReply('console noise\r\n{"ok":true,"value":{"ok":true,"failures":[]}}\r\n', "", 0)).toEqual({ ok: true, failures: [] });
     expect(readReply('{"ok":true}', "", 0)).toBeUndefined();
+  });
+
+  it("with a nonce, reads only the line that starts with it, wherever it stands", () => {
+    const mine = `${replyPrefix("ab12")}"ok":true,"value":1}`;
+    expect(readReply(`noise\n${mine}\n{"ok":true,"value":2}\n`, "", 0, "ab12")).toBe(1);
+  });
+
+  it("with a nonce, a reply without it, with another one, or twice over is no reply", () => {
+    const stopped = /^the isolated check stopped/;
+    expect(() => readReply('{"ok":true,"value":{"ok":true,"failures":[]}}', "", 0, "ab12")).toThrow(stopped);
+    expect(() => readReply(`${replyPrefix("ffff")}"ok":true,"value":1}`, "", 0, "ab12")).toThrow(stopped);
+    const mine = `${replyPrefix("ab12")}"ok":true,"value":1}`;
+    expect(() => readReply(`${mine}\n${mine}`, "", 0, "ab12")).toThrow(stopped);
   });
 
   it("raises the error a failed reply carries", () => {
@@ -44,11 +57,11 @@ describe("readReply", () => {
 });
 
 describe("lockedNodeArgs", () => {
-  it("turns the permission model on, switches node:sqlite off and grants read access to the given folders only", () => {
+  it("turns the permission model on, switches node:sqlite off, freezes the builtins and grants read access to the given folders only", () => {
     expect(lockedNodeArgs(["C:\\app\\dist", "C:\\app\\node_modules"], "w.js"))
-      .toEqual(["--permission", "--no-experimental-sqlite", "--allow-fs-read=C:\\app\\dist", "--allow-fs-read=C:\\app\\node_modules", "w.js"]);
+      .toEqual(["--permission", "--no-experimental-sqlite", "--frozen-intrinsics", "--disable-warning=ExperimentalWarning", "--allow-fs-read=C:\\app\\dist", "--allow-fs-read=C:\\app\\node_modules", "w.js"]);
     const args = lockedNodeArgs([], "w.js");
-    expect(args).toEqual(["--permission", "--no-experimental-sqlite", "w.js"]);
+    expect(args).toEqual(["--permission", "--no-experimental-sqlite", "--frozen-intrinsics", "--disable-warning=ExperimentalWarning", "w.js"]);
     expect(args.join(" ")).not.toMatch(/allow-(fs-write|child-process|worker|addons|net|wasi)/);
   });
 });
