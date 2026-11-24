@@ -87,6 +87,170 @@ export function skillPattern(when: string, flags: string): RegExp {
   return new RegExp(when, when.includes("\\p{") ? `${flags}u` : flags);
 }
 
+/** The most a "start by itself" pattern reads of a message: enough to recognise a request,
+ *  and with the grammar below every allowed pattern stays quick (at worst the square of this). */
+export const SKILL_MATCH_CHARS = 1000;
+
+/** Repeats of varying length (+, *, {n,m}) one path through a pattern may hold: two in a row
+ *  cost the cube of the message length (\w*\w*! took 0.6 s on 1,000 characters). */
+const MAX_VARIABLE_REPEATS = 1;
+/** Repeats of varying length in the whole pattern, across its alternatives: each branch's
+ *  repeat is tried at every position (60 branches of \w*! cost 165 ms a message). */
+const MAX_TOTAL_REPEATS = 3;
+/** Ways a pattern can try to match at one position: alternatives add up, parts in a row
+ *  multiply, an optional part doubles. Overlapping alternatives in a row, (a|a)(a|a)…,
+ *  are exponential with no repeat at all (25 of them ran for more than 8 s). */
+const MAX_WAYS = 64;
+/** The longest pattern checked or run, in any form: the editor's own limit. */
+const MAX_PATTERN_CHARS = 300;
+/** The largest number a {n} or {n,m} may use. */
+const MAX_BOUND = 100;
+
+const WORD_LITERAL = /^(?:\\[.*+?^${}()|[\]\\]|[^.*+?^${}()|[\]\\])+$/;
+
+/** The plain-words form exactly as triggerFromInput builds it: escaped words in one alternation. */
+function isWordsForm(p: string): boolean {
+  if (!p.startsWith(`${WORD_START}(?:`) || !p.endsWith(`)${WORD_END}`)) return false;
+  const body = p.slice(WORD_START.length + 3, p.length - WORD_END.length - 1);
+  return body.split(/(?<!\\)\|/).every((w) => WORD_LITERAL.test(w));
+}
+
+class Refused extends Error {}
+
+/** What the pattern costs at one position: the varying repeats along its worst path, and the
+ *  number of ways it can try to match. */
+interface Cost { repeats: number; ways: number }
+const ONE: Cost = { repeats: 0, ways: 1 };
+
+/**
+ * Why a hand-written "start by itself" pattern could make the window freeze, or null when it
+ * is safe to run on every message. The pattern runs on the window's own thread, and a list of
+ * known dangerous shapes always misses one, so this ALLOWS a small grammar and refuses the rest:
+ *  - letters and escaped symbols, `.`, `^`, `$`, `\b`, `\d \w \s` (and capitals), character
+ *    classes, groups `( )` and `(?: )`, and `|`;
+ *  - a repeat (`+ * {n,m}`) only on a single character, escape or class, and at most one
+ *    repeat of varying length along any path through the pattern;
+ *  - `?` on a single item or on a group with no repeat inside;
+ *  - at most 64 ways to try a match at one position (alternatives add, parts in a row
+ *    multiply, `?` doubles) and at most three varying repeats in the whole pattern;
+ *  - no repeat on a group, no lookarounds, no back-references, no \p, \u, \x or \c;
+ *  - at most 300 characters, whatever its form.
+ * Every built-in skill's pattern and the plain-words form pass.
+ */
+export function patternRisk(p: string): string | null {
+  if (p.length > MAX_PATTERN_CHARS) return `it is longer than ${MAX_PATTERN_CHARS} characters`;
+  if (isWordsForm(p)) return null;
+  let i = 0, totalRepeats = 0;
+  const fail = (why: string): never => { throw new Refused(why); };
+  /** Two parts in a row: their repeats add up along the path, their ways multiply. */
+  const then = (a: Cost, b: Cost): Cost => ({ repeats: a.repeats + b.repeats, ways: a.ways * b.ways });
+  const check = (c: Cost): Cost => {
+    if (c.repeats > MAX_VARIABLE_REPEATS) fail("it repeats more than one part of varying length in a row");
+    if (c.ways > MAX_WAYS) fail("it has too many alternatives or optional parts");
+    return c;
+  };
+
+  /** A quantifier after a single item: what it adds to the cost; i moves past it. */
+  const quantifier = (): Cost => {
+    const c = p[i];
+    let cost: Cost = ONE;
+    if (c === "?") { i++; cost = { repeats: 0, ways: 2 }; }
+    else if (c === "+" || c === "*") { i++; cost = { repeats: 1, ways: 1 }; }
+    else if (c === "{") {
+      const m = /^\{(\d+)(,(\d*))?\}/.exec(p.slice(i));
+      if (!m) fail("it has a { that is not a count");
+      const lo = Number(m![1]), hi = m![2] === undefined ? lo : m![3] === "" ? null : Number(m![3]);
+      if (lo > MAX_BOUND || (hi !== null && hi > MAX_BOUND)) fail(`it repeats something more than ${MAX_BOUND} times`);
+      i += m![0].length;
+      if (hi === null || hi > lo) cost = { repeats: 1, ways: 1 };
+    } else return cost;
+    if (p[i] === "?") i++; // a lazy repeat costs the same
+    if (p[i] === "+" || p[i] === "*" || p[i] === "{" || (p[i] === "?" && cost.ways > 1)) fail("it repeats a repeat");
+    if (cost.repeats && ++totalRepeats > MAX_TOTAL_REPEATS) fail("it has too many parts of varying length");
+    return cost;
+  };
+
+  /** A character class from p[i] = "[" to its "]"; i moves past it. */
+  const charClass = () => {
+    i++;
+    if (p[i] === "^") i++;
+    // in JavaScript "[]" matches nothing and "[^]" matches anything: refused, never misread
+    if (p[i] === "]") fail("it has an empty character class");
+    while (i < p.length && p[i] !== "]") {
+      if (p[i] === "\\") {
+        const e = p[i + 1];
+        if (e === undefined || /[pPuxck0-9]/.test(e)) fail("it uses an escape that is not allowed here");
+        i += 2;
+      } else if (p[i] === "[") fail("it has a [ inside a character class");
+      else i++;
+    }
+    if (p[i] !== "]") fail("it has a character class that does not end");
+    i++;
+  };
+
+  const sequence = (): Cost => {
+    let cost: Cost = ONE;
+    while (i < p.length && p[i] !== "|" && p[i] !== ")") {
+      const c = p[i];
+      if (c === "(") {
+        i++;
+        if (p[i] === "?") {
+          if (p[i + 1] !== ":") fail("it uses a lookaround or a named group");
+          i += 2;
+        }
+        const inner = alternation();
+        if (p[i] !== ")") fail("it has a ( that does not close");
+        i++;
+        // any repeat of a group, even a fixed count such as (a?){50}, multiplies what is inside
+        if (p[i] === "+" || p[i] === "*" || p[i] === "{") fail("it repeats a group");
+        const q = quantifier();
+        if (q.ways > 1 && inner.repeats) fail("it makes optional a group that has a repeat inside");
+        // an optional group: skip it, or any of its own ways
+        cost = check(then(cost, q.ways > 1 ? { repeats: 0, ways: inner.ways + 1 } : inner));
+      } else if (c === "[") {
+        charClass();
+        cost = check(then(cost, quantifier()));
+      } else if (c === "\\") {
+        const e = p[i + 1];
+        if (e === undefined) fail("it ends with a \\");
+        if (e === "b" || e === "B") { i += 2; if (p[i] && "?+*{".includes(p[i])) fail("it repeats a word edge"); continue; }
+        if (!/[dDwWsStnr]/.test(e) && /[A-Za-z0-9]/.test(e)) fail("it uses an escape that is not allowed here");
+        i += 2;
+        cost = check(then(cost, quantifier()));
+      } else if (c === "^" || c === "$") {
+        i++;
+        if (p[i] && "?+*{".includes(p[i])) fail("it repeats an anchor");
+      } else if ("?+*{}]".includes(c)) {
+        fail("it has a repeat with nothing to repeat");
+      } else {
+        i++; // a letter, a digit, a space or another plain symbol, or "."
+        cost = check(then(cost, quantifier()));
+      }
+    }
+    return cost;
+  };
+
+  const alternation = (): Cost => {
+    // alternatives: the worst path's repeats, and every branch's ways added up
+    let all = sequence();
+    while (p[i] === "|") {
+      i++;
+      const b = sequence();
+      all = check({ repeats: Math.max(all.repeats, b.repeats), ways: all.ways + b.ways });
+    }
+    return all;
+  };
+
+  try {
+    alternation();
+    if (i < p.length) fail("it has a ) with no matching (");
+    return null;
+  } catch (e) {
+    if (e instanceof Refused) return e.message;
+    throw e;
+  }
+}
+
 export function cleanTags(tags: string[]): string[] {
   const seen = new Set<string>();
   for (const t of tags) {
@@ -110,6 +274,8 @@ export function skillProblems(s: Skill): string[] {
   if (s.when) {
     if (s.when.length > 300) out.push("its \"start by itself\" words are longer than 300 characters");
     try { skillPattern(s.when, "i"); } catch { out.push("its \"start by itself\" words or pattern are not valid: check them, or leave the box empty"); }
+    const risk = patternRisk(s.when);
+    if (risk) out.push(`its "start by itself" pattern could make MKMN freeze (${risk}). Use plain words separated by commas instead`);
   }
   out.push(...libraryProblems(s.libraries));
   return out;
@@ -192,12 +358,16 @@ export function categoryOf(s: Pick<Skill, "tags">): SkillCategoryId {
  */
 export function autoSkill(skills: Skill[], request: string, hasFiles: boolean): Skill | null {
   let best: Skill | null = null, bestLen = 0;
+  // the start of the message is enough to recognise a request, and keeps every pattern quick
+  const head = request.slice(0, SKILL_MATCH_CHARS);
   for (const s of skills) {
     // the skills that come with the app are split by whether files are in the chat; a skill of the person's own applies in both cases
     if (!s.when || (s.core && (s.id === "edit-files") !== hasFiles)) continue;
+    // a pattern that could freeze the window is never run (a skill saved before this check, or edited by hand)
+    if (patternRisk(s.when)) continue;
     let re: RegExp;
     try { re = skillPattern(s.when, "gi"); } catch { continue; }
-    const len = Math.max(0, ...(request.match(re) ?? []).map((m) => m.length));
+    const len = Math.max(0, ...(head.match(re) ?? []).map((m) => m.length));
     // at equal length a skill of the person's own wins over a default one
     if (len > bestLen || (len > 0 && len === bestLen && best?.core && !s.core)) { best = s; bestLen = len; }
   }
