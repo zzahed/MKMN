@@ -56,6 +56,8 @@ export interface JournalStep {
   validations: ValidationRecord[];
   tokens: StepUsage;
   error?: string;
+  /** The step's input: a run journals the whole settled record, and a resume checks it against the plan. */
+  input?: unknown;
 }
 
 export interface JournalRun {
@@ -120,21 +122,25 @@ export function appendEntry(file: string, entry: JournalEntry): void {
   appendFileSync(file, `${JSON.stringify(entry)}\n`, "utf8");
 }
 
-/** Read every well-formed line. A malformed line is skipped and counted, never rewritten. */
-export function readJournal(file: string): { entries: JournalEntry[]; malformed: number } {
-  if (!existsSync(file)) return { entries: [], malformed: 0 };
+/** Read every well-formed line. A malformed line is skipped and counted, never rewritten.
+ *  `torn` says the LAST line is one of them: what a process that died mid-write leaves. */
+export function readJournal(file: string): { entries: JournalEntry[]; malformed: number; torn: boolean } {
+  if (!existsSync(file)) return { entries: [], malformed: 0, torn: false };
   const entries: JournalEntry[] = [];
   let malformed = 0;
+  let torn = false;
   for (const line of readFileSync(file, "utf8").split("\n")) {
     const text = line.trim();
     if (!text) continue;
     try {
       entries.push(JSON.parse(text) as JournalEntry);
+      torn = false;
     } catch {
       malformed++;
+      torn = true;
     }
   }
-  return { entries, malformed };
+  return { entries, malformed, torn };
 }
 
 /** The settled step records of a journal, in order. */
@@ -145,10 +151,13 @@ export function settledSteps(file: string): JournalStep[] {
 /**
  * What a resume needs: the settled steps to replay, and the steps that were started
  * and never settled (their process died mid-step), which the resuming run marks
- * interrupted before executing them again.
+ * interrupted before executing them again. Also what the resume must refuse on: `corrupt`, the
+ * unreadable lines before the journal's end (a torn last line is not one), and `foreign`, the
+ * entries that belong to another run than `runId` (left out of settled and dangling).
  */
-export function resumeReplay(file: string): { settled: JournalStep[]; dangling: { seq: number; id: string }[] } {
-  const { entries } = readJournal(file);
+export function resumeReplay(file: string, runId?: string): { settled: JournalStep[]; dangling: { seq: number; id: string }[]; corrupt: number; foreign: number } {
+  const { entries: all, malformed, torn } = readJournal(file);
+  const entries = runId === undefined ? all : all.filter((e) => e.runId === runId);
   const settled = new Map<number, JournalStep>();
   const started = new Map<number, string>();
   for (const e of entries) {
@@ -161,5 +170,10 @@ export function resumeReplay(file: string): { settled: JournalStep[]; dangling: 
   const dangling = [...started]
     .map(([seq, id]) => ({ seq, id }))
     .sort((a, b) => a.seq - b.seq);
-  return { settled: [...settled.values()].sort((a, b) => a.seq - b.seq), dangling };
+  return {
+    settled: [...settled.values()].sort((a, b) => a.seq - b.seq),
+    dangling,
+    corrupt: malformed - (torn ? 1 : 0),
+    foreign: all.length - entries.length,
+  };
 }
