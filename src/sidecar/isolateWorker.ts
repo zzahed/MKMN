@@ -46,7 +46,8 @@ const exit = process.exit.bind(process);
 let nonce = "";
 
 function reply(r: IsolatedReply): void {
-  const bytes = toBytes(`${prefix(nonce)}${JSON.stringify(r).slice(1)}\n`, "utf8");
+  // on a line of its own: what the code printed last may not end with one
+  const bytes = toBytes(`\n${prefix(nonce)}${JSON.stringify(r).slice(1)}\n`, "utf8");
   for (let at = 0; at < bytes.length;) {
     try { at += writeSync(1, bytes, at, bytes.length - at); }
     catch (e) { if ((e as NodeJS.ErrnoException).code !== "EAGAIN") throw e; }

@@ -169,9 +169,19 @@ describe("the locked-down process's reply is the worker's, and its output is bou
     expect(r).toMatchObject({ ok: false });
   }, 60_000);
 
+  // CI on Linux: there stdout to a pipe is asynchronous, so the code's last unterminated output
+  // could still be on the line the reply was written to
+  it("output that does not end its line does not hide the real reply", async () => {
+    locked();
+    const r = await failing(esc(`p.getBuiltinModule("fs").writeSync(1, "no newline"); p.stdout.write("nor this");`));
+    expect(r).toMatchObject({ ok: false });
+  }, 60_000);
+
   it("output past the limit stops the check and is reported, on the async and the sync path", async () => {
     locked();
-    const flood = esc(`var s = "x".repeat(1 << 20); for (var i = 0; i < 40; i++) p.stdout.write(s);`);
+    // written synchronously (an asynchronous write may be dropped when the worker exits, as on Linux)
+    const flood = esc(`var fs = p.getBuiltinModule("fs"), b = p.getBuiltinModule("buffer").Buffer.alloc(1 << 20, 120); ` +
+      `for (var i = 0; i < 40; i++) for (var at = 0; at < b.length;) { try { at += fs.writeSync(1, b, at, b.length - at); } catch (e) { if (e.code !== "EAGAIN") throw e; } }`);
     const r = await failing(flood);
     expect(r).toBeInstanceOf(Error);
     expect((r as Error).message).toMatch(/printed more than 16 MiB and was stopped/);
