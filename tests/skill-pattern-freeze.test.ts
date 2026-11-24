@@ -50,6 +50,17 @@ const DANGEROUS: [string, string][] = [
   // second review: a stored pattern far over the editor's limit
   [String.raw`\w*!|`.repeat(2000) + "x", "a".repeat(1000)],
   [String.raw`\w*!|`.repeat(60) + "x", "a".repeat(1000)],
+  // third review: fixed counts the cost model treated as free, beside one allowed repeat
+  [".*" + "(?:.{100}|.{100})".repeat(6) + "!", "please send the invoice ".repeat(50)],
+  [String.raw`\w*` + String.raw`(?:\w{99}|\w{98}|\w{97}|\w{96})`.repeat(3) + "!", "a".repeat(1000)],
+  [String.raw`\w*` + String.raw`(?:\w{100}|\w{100})`.repeat(6) + "!", "a".repeat(1000)],
+  [String.raw`\w*?` + String.raw`(?:\w{99})?`.repeat(6) + "!", "a".repeat(1000)],
+  [String.raw`\s*` + String.raw`(?:\s{99})?`.repeat(6) + "x", " ".repeat(1000)],
+  [".*" + "(?:.{99})?".repeat(6) + "!", "a".repeat(1000)],
+  [String.raw`\w*\w{100}!`, "a".repeat(1000)],
+  [String.raw`.*.{100}!`, "a".repeat(1000)],
+  // and one repeat on its own, a shape a cost model once allowed
+  [String.raw`.*=x`, "a".repeat(1000)],
 ];
 
 describe("patterns that can freeze are refused", () => {
@@ -64,11 +75,24 @@ describe("patterns that can freeze are refused", () => {
     for (const s of withWhen) expect(patternRisk(s.when!), `${s.id}: ${s.when}`).toBeNull();
   });
 
-  it("the plain-words form, and ordinary hand-written patterns, are accepted", () => {
+  it("the plain-words form, and hand-written patterns without repeats, are accepted", () => {
     expect(patternRisk(triggerFromInput("invoice, bill, فاتورة, C++, e.g.")!)).toBeNull();
-    for (const p of [String.raw`\b(invoice|bill)\b`, String.raw`\b(simulat\w+|calculat\w+)\b`, String.raw`\bv\d+\.?\d?\b`, String.raw`[a-z]{2,8}`, String.raw`(?:re-?send|forward)`, String.raw`\btic[- ]?tac[- ]?toe\b`]) {
+    for (const p of [String.raw`\b(invoice|bill)\b`, String.raw`\bv\d\.?\d?\b`, String.raw`[a-z][a-z]`, String.raw`(?:re-?send|forward)`, String.raw`\btic[- ]?tac[- ]?toe\b`, String.raw`\b(?:invoices?|bills?)\b`]) {
       expect(patternRisk(p), p).toBeNull();
     }
+  });
+
+  it("any repeat in a hand-written pattern is refused, with a plain reason", () => {
+    for (const p of [String.raw`\b(simulat\w+|calculat\w+)\b`, String.raw`[a-z]{2,8}`, String.raw`a+`, String.raw`x*`, String.raw`\w{3}`]) {
+      expect(patternRisk(p), p).toMatch(/repeats a part/);
+    }
+  });
+
+  it("a built-in pattern is trusted only exactly as shipped", () => {
+    const list = defaults as Skill[];
+    const calc = list.find((s) => s.when?.includes("simulat"))!.when!;
+    expect(patternRisk(calc)).toBeNull();
+    expect(patternRisk(calc + " ")).not.toBeNull(); // edited by one character: checked like any other
   });
 
   it("symbols inside a class or escaped are not mistaken for structure", () => {
@@ -108,12 +132,13 @@ describe("a freezing pattern is never saved, imported or run", () => {
     expect(got?.id).toBe("good");
   });
 
-  /** The slowest shapes the grammar allows, on the worst input for each. */
+  /** The slowest shapes allowed: the busiest shipped patterns, and the most ways with no repeat. */
   it.each([
-    [String.raw`.*=x`, "a".repeat(200_000)],
-    [String.raw`[^.\n]{0,50}=x`, "a".repeat(200_000)],
-    [String.raw`a?b?c?d?\w+!`, "a".repeat(200_000)],
+    ...(defaults as Skill[]).filter((s) => s.when).map((s) => [s.when!, "write make create a ".repeat(10_000)] as [string, string]),
     [String.raw`\b(simulat\w+|converter|calculat\w+|bmi)\b`, "simulat".repeat(30_000)],
+    ["(?:a|a)".repeat(6) + "!", "a".repeat(200_000)],
+    ["(?:.|a)".repeat(6) + "!", "a".repeat(200_000)],
+    ["a?".repeat(6) + "a".repeat(100) + "!", "a".repeat(200_000)],
   ])("the allowed pattern %s stays quick on a huge message", (when, input) => {
     expect(patternRisk(when)).toBeNull();
     const t0 = performance.now();

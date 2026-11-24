@@ -158,7 +158,7 @@ export function Skills({ settings, onSave, onOpenDocs, tabs }: { tabs?: ReactNod
         <button type="button" disabled={editing.steps.length >= MAX_STEPS} onClick={() => setEditing({ ...editing, steps: [...editing.steps, { title: "", prompt: "" }] })}>+ Add a step</button>
         <details className="skill-adv" open={advOpen} onToggle={(e) => setAdvOpen(e.currentTarget.open)}>
         <summary className="small"><strong>Advanced</strong> <span className="muted">· start by itself, code libraries, recommended models</span></summary>
-        <label className="small muted">Start by itself when a message contains any of these words, separated by commas (optional; a regular expression also works). Leave empty to start the skill only by typing / and its name.</label>
+        <label className="small muted">Start by itself when a message contains any of these words, separated by commas (optional; a simple regular expression without +, * or {"{…}"} also works). Leave empty to start the skill only by typing / and its name.</label>
         <input value={whenText} onChange={(e) => setWhenText(e.target.value)} placeholder="invoice, bill" aria-label="Words that start the skill by itself" />
         <label className="small muted" style={{ display: "block", marginTop: 10 }}>Libraries ({(editing.libraries ?? []).length} / {MAX_LIBS}): public ones are downloaded once when you save, custom ones are pasted here. Pages that use them get the code inside the file.</label>
         {(editing.libraries ?? []).map((l, i) => (
