@@ -26,17 +26,20 @@ export function codeDirs(sidecarDir: string): string[] {
 /** A locked process tries one TCP connection and prints how it ended. Nothing needs to listen:
  *  a runtime that enforces the ban answers ERR_ACCESS_DENIED before any packet is sent, and one
  *  that does not answers ECONNREFUSED (or CONNECTED). */
-const PROBE = `const s = require("net").connect(9, "127.0.0.1"); s.on("connect", () => { console.log("CONNECTED"); s.destroy(); }); s.on("error", (e) => console.log(e.code));`;
+/** First it checks that node:sqlite is gone (it writes files past the permission model, so a
+ *  runtime that ignores --no-experimental-sqlite is unsafe however the network test ends). */
+const PROBE = `if (process.getBuiltinModule("node:sqlite")) console.log("SQLITE_AVAILABLE"); else { const s = require("net").connect(9, "127.0.0.1"); s.on("connect", () => { console.log("CONNECTED"); s.destroy(); }); s.on("error", (e) => console.log(e.code)); }`;
 const PROBE_MS = 10_000;
 /**
- * What the probe printed. Only ERR_ACCESS_DENIED proves the ban (true). CONNECTED or a socket
- * error code (ECONNREFUSED, EACCES...) proves the network open (false). No output, a timeout, a
- * crash or anything else cannot tell (null): never taken as proof, and asked again next run.
+ * What the probe printed. Only ERR_ACCESS_DENIED proves the ban (true). CONNECTED, a socket
+ * error code (ECONNREFUSED, EACCES...) or SQLITE_AVAILABLE proves the runtime unsafe (false). No
+ * output, a timeout, a crash or anything else cannot tell (null): never taken as proof, and asked
+ * again next run.
  */
 export function probeVerdict(stdout: unknown): boolean | null {
   const out = String(stdout ?? "").trim();
   if (out === "ERR_ACCESS_DENIED") return true;
-  if (/^(?:CONNECTED|E(?!RR_)[A-Z0-9]+)$/.test(out)) return false;
+  if (/^(?:CONNECTED|SQLITE_AVAILABLE|E(?!RR_)[A-Z0-9]+)$/.test(out)) return false;
   return null;
 }
 

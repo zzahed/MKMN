@@ -1,7 +1,8 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { execFile, execFileSync } from "node:child_process";
+import { execFile, execFileSync, spawn } from "node:child_process";
 import { createServer, type AddressInfo } from "node:net";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import * as path from "node:path";
 import { runExamples, smokeRun } from "../src/core/construct/sandbox";
 import { runCases } from "../src/core/benchChecks";
@@ -76,6 +77,35 @@ describe("generated code runs in a locked-down process", () => {
     expect([...ran.keys()][0]).toBe(checks[0]); // keyed by the caller's own check
   }, 60_000);
 
+  // Security pre-review 2026-11-24, F1 and F2: node:sqlite opened, attached and wrote files outside
+  // the permission model's file-system rules, and process.kill reached every process of the user.
+  it("in the locked-down process an escape can neither write a file through SQLite nor signal another process", async () => {
+    const target = path.join(tmpdir(), `mkmn-isolation-${process.pid}.db`);
+    rmSync(target, { force: true });
+    const victim = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], { stdio: "ignore", windowsHide: true });
+    try {
+      const sqlTarget = target.replace(/\\/g, "/").replace(/'/g, "''");
+      const escape = `(function () { var p = this.constructor.constructor("return process")(); var r = []; ` +
+        `try { var s = p.getBuiltinModule("node:sqlite"); if (!s) r.push("sqlite:none"); else { new s.DatabaseSync(":memory:").exec("vacuum into '${sqlTarget}'"); r.push("sqlite:wrote"); } } catch (e) { r.push("sqlite:" + (e.code || "error")); } ` +
+        `try { p.kill(${victim.pid}, 0); r.push("kill:signalled"); } catch (e) { r.push("kill:" + (e.code || "error")); } ` +
+        `try { p._kill(${victim.pid}, 0); r.push("rawkill:signalled"); } catch (e) { r.push("rawkill:" + (e.code || "error")); } ` +
+        `return r.join(","); })()`;
+      setIsolation(lockedNodeRunner(process.execPath, worker, codeDirs(path.join(dist, "sidecar"))));
+      const r = await runExamples([], "function f() { return 1; }", [{ call: escape, expect: '"x"' }]);
+      expect(gave(r.failures)).toBe("sqlite:none,kill:ERR_ACCESS_DENIED,rawkill:ERR_ACCESS_DENIED");
+      expect(existsSync(target)).toBe(false);
+      expect(victim.exitCode).toBeNull();
+    } finally {
+      victim.kill();
+      rmSync(target, { force: true });
+    }
+  }, 60_000);
+
+  it("a process with the same locked flags has no node:sqlite at all", () => {
+    const out = execFileSync(process.execPath, [...lockedNodeArgs(codeDirs(path.join(dist, "sidecar")), "-e"), `console.log(typeof process.getBuiltinModule("node:sqlite"))`], { windowsHide: true, encoding: "utf8" });
+    expect(out.trim()).toBe("undefined");
+  }, 60_000);
+
   it("a loop that never ends is stopped and reported, not left running", async () => {
     setIsolation(lockedNodeRunner(process.execPath, worker, codeDirs(path.join(dist, "sidecar"))));
     const r = await runExamples([], "function spin() { while (true) {} }", [{ call: "spin()", expect: "1" }]);
@@ -98,7 +128,7 @@ describe("generated code runs only on a runtime that is proven to block the netw
     const first = await runner.run("runExamples", []).catch((e: Error) => e);
     expect(first).toBeInstanceOf(IsolationUnsafeError);
     expect((first as Error).name).toBe("IsolationUnsafeError");
-    expect((first as Error).message).toBe("Generated code is turned off: this Node.js runtime cannot block network access.");
+    expect((first as Error).message).toBe("Generated code is turned off: this Node.js runtime cannot keep it away from the network and your files.");
     expect(() => runner.runSync("runExamples", [])).toThrow(IsolationUnsafeError);
     await expect(runner.run("runExamples", [])).rejects.toThrow(IsolationUnsafeError);
     expect(probes).toBe(1); // asked once, then remembered
@@ -137,6 +167,8 @@ describe("generated code runs only on a runtime that is proven to block the netw
     expect(probeVerdict("ECONNREFUSED")).toBe(false);
     expect(probeVerdict("CONNECTED")).toBe(false);
     expect(probeVerdict("EACCES")).toBe(false);
+    expect(probeVerdict("SQLITE_AVAILABLE")).toBe(false); // the file-system bypass of F1 is open
+    expect(probeVerdict("SQLITE_AVAILABLE\nERR_ACCESS_DENIED")).toBeNull();
     expect(probeVerdict("")).toBeNull();
     expect(probeVerdict(undefined)).toBeNull();
     expect(probeVerdict("node:internal/modules/cjs/loader:1\nError: boom")).toBeNull();

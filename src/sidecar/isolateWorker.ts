@@ -21,6 +21,17 @@ const OPS: Record<IsolatedOp, (...args: never[]) => unknown> = {
   runCases: runCasesHere,
 };
 
+// The permission model does not cover signals: process.kill (and the raw process._kill under it)
+// would let an escape stop the sidecar or any other program of the person. This process never
+// signals anything, so both are replaced, for good, before any generated code runs. The binding
+// they come from is closed by the permission model, so the originals cannot be fetched again.
+function refuseSignal(): never {
+  throw Object.assign(new Error("Access to this API has been restricted: generated code may not signal other processes."), { code: "ERR_ACCESS_DENIED" });
+}
+for (const name of ["kill", "_kill"]) {
+  Object.defineProperty(process, name, { value: refuseSignal, writable: false, configurable: false, enumerable: false });
+}
+
 function reply(r: IsolatedReply): void {
   process.stdout.write(`${JSON.stringify(r)}\n`, () => process.exit(0));
 }
