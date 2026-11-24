@@ -100,9 +100,34 @@ screen:
 Pass criteria met for this screen: no internal terms visible, one unit,
 every action named by a verb, every input labelled.
 
+## Review rounds
+
+Round 1 failed both independent reviews (code and UX). Fixed in round 2:
+
+- A failed preparation showed "being prepared" on every file. Now only
+  queued, preparing and changed files say so; covered by a render test.
+- The raw error text from preparing could show internal words. It is never
+  shown now; a known cause (too many files) is named in plain words.
+- The delete confirmation read as if the folder on disk were deleted. It now
+  says the folder and original files are not touched, and that chats,
+  scheduled tasks and made files are kept.
+- "No files added: chats will use your instructions only" was wrong with a
+  linked folder or no instructions. Now "No reference files yet", with the
+  folder mentioned when one is linked.
+- The meter now says what the percentage is of, never shows 0% with a file in
+  it, and the over-limit line says roughly how many words the current model
+  reads at a time.
+- Unsupported files (images, archives) get one clear message instead of "split
+  it"; several failures at once are all listed; untitled notes are named by
+  their first words; made files use the same kind names as the Files page.
+
+Still open, moved to phase 4 (#62) because the helpers are shared with chat
+attachments: `noPdfText` ("no selectable text (a scan?)… vision model") and
+the `describePdfError` fallback ("error category: …").
+
 ## Phases
 
 1. **Projects** — done in this branch (P1–P13).
 2. **Settings and Local Models** — S3, S4.
 3. **Skills, Tasks, Files** — S1, S2, S5.
-4. **Errors, status and setup** — S6, S7, S8.
+4. **Errors, status and setup** — S6, S7, S8, and the shared PDF messages above.

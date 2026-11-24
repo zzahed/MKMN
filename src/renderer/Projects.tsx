@@ -11,20 +11,27 @@ import type { Conversation } from "./store";
 import { api } from "./api";
 import { ICONS, Icon } from "./Icon";
 import { PinIcon } from "./Icons";
+import { kindLabel } from "./ArtifactView";
 
 const MAX_FILE = 1_000_000;
 
 /** One line beside the two starting actions: how many files, and whether they are
  *  ready to be read with the next question (sent whole, or searched once indexed). */
-export function filesReadiness(count: number, indexState: string | null, overBudget: boolean): string {
-  if (count === 0) return "No files added: chats will use your instructions only";
+export function filesReadiness(count: number, indexState: string | null, overBudget: boolean, hasFolder = false): string {
+  if (count === 0) return hasFolder ? "No reference files yet · linked folder available" : "No reference files yet";
   const n = `${count} reference file${count === 1 ? "" : "s"}`;
-  if (!overBudget) return `${n} · ready, read in full in every chat`;
-  if (indexState === "ready") return `${n} · ready, the matching parts are read for each question`;
-  if (indexState === "failed") return `${n} · could not be prepared: try again under Reference files`;
+  if (!overBudget) return `${n} · ready. The assistant reads all of it in every chat.`;
+  if (indexState === "ready") return `${n} · ready. The assistant looks up the parts that match each question.`;
+  if (indexState === "failed") return `${n} · could not be prepared. See Reference files.`;
   // no status to read (not reported yet, or the store is out of reach): say what will happen, claim nothing
-  if (indexState === null) return `${n} · the matching parts are read for each question`;
-  return `${n} · preparing your files…`;
+  if (indexState === null) return `${n} · the assistant looks up the parts that match each question.`;
+  return `${n} · preparing them. You can start a chat now.`;
+}
+
+/** An untitled note is named by its first words, so several notes can be told apart. */
+export function noteTitleFrom(text: string): string {
+  const words = text.trim().split(/\s+/);
+  return words.slice(0, 6).join(" ") + (words.length > 6 ? "…" : "");
 }
 
 export function newProject(): Project {
@@ -39,13 +46,22 @@ export function wordCount(text: string): number {
   return text.match(/\S+/g)?.length ?? 0;
 }
 
+/** Why preparing failed, in plain words. The raw error is never shown: it can carry internal terms. */
+export function preparingFailure(error: string | null): string {
+  const most = error?.match(/at most (\d+)/);
+  if (most) return `Your files could not be prepared because this project has more than ${most[1]} files. Remove some, or split them across projects.`;
+  return "Your files could not be prepared. Try again. If it keeps failing, remove the file you added last.";
+}
+
+/** The one message for a file that cannot be added to a project. */
+export const cannotAdd = (name: string) => `“${name}” can't be added. You can add PDFs, Word, Excel and PowerPoint files, and text files such as .txt or .csv.`;
+
 /** A file's size in plain words: its pages when the file has pages, and its words. */
 export function describeFileSize(words: number, pages: number, scannedPages: number): string {
   const parts: string[] = [];
-  if (pages > 0) parts.push(`${pages.toLocaleString()} page${pages === 1 ? "" : "s"}`);
-  if (scannedPages > 0) parts.push(`${scannedPages.toLocaleString()} scanned`);
-  parts.push(`about ${words.toLocaleString()} word${words === 1 ? "" : "s"}`);
-  return parts.join(" · ");
+  if (pages > 0) parts.push(`${pages.toLocaleString()} page${pages === 1 ? "" : "s"}${scannedPages > 0 ? ` (${scannedPages.toLocaleString()} read from scans)` : ""}`);
+  if (words > 0) parts.push(`about ${words.toLocaleString()} word${words === 1 ? "" : "s"}`);
+  return parts.length ? parts.join(" · ") : "no readable text";
 }
 
 function ProjectEditor({ project, convs, tasks, artifacts, contextTokens, onChange, onBack, onDelete, onPin, onArchive, onNewChat, onOpenChat, onPinChat, onArchiveChat, onOpenTasks, onOpenArtifact }: {
@@ -94,6 +110,8 @@ function ProjectEditor({ project, convs, tasks, artifacts, contextTokens, onChan
     if (!list) return;
     setErr(null);
     const added: ProjectFile[] = [];
+    const failed: string[] = [];
+    const fail = (m: string) => { failed.push(m); };
     pdfReadAbort.current?.abort();
     const pdfAbort = new AbortController();
     pdfReadAbort.current = pdfAbort;
@@ -107,28 +125,32 @@ function ProjectEditor({ project, convs, tasks, artifacts, contextTokens, onChan
           let ocrProblem: string | null = null;
           const text = await (await import("./pdf")).readPdf(f, { signal: pdfAbort.signal, onOcrProblem: (m) => { ocrProblem ??= m; } });
           if (pdfAbort.signal.aborted) break; // superseded mid-read: nothing of this run is kept
-          if (!text.trim()) setErr(ocrProblem ?? noPdfText(f.name));
+          if (!text.trim()) fail(ocrProblem ?? noPdfText(f.name));
           else added.push({ id: crypto.randomUUID(), name: f.name, content: text });
-        } catch (e) { if (pdfAbort.signal.aborted) break; setErr(describePdfError(f.name, e)); }
+        } catch (e) { if (pdfAbort.signal.aborted) break; fail(describePdfError(f.name, e)); }
         continue;
       }
       if (classifyFile(f.name, f.type) === "document") {
-        try { added.push({ id: crypto.randomUUID(), name: f.name, content: await (await import("./docs")).readDocument(f) }); } catch (e) { setErr((e as Error).message); }
+        try { added.push({ id: crypto.randomUUID(), name: f.name, content: await (await import("./docs")).readDocument(f) }); } catch (e) { fail((e as Error).message); }
         continue;
       }
-      if (f.size > MAX_FILE) { setErr(`“${f.name}” is larger than 1 MB. Split it into smaller files, or paste only the part you need under “Paste text instead”.`); continue; }
+      const kind = classifyFile(f.name, f.type);
+      if (kind === "unsupported" || kind === "image") { fail(cannotAdd(f.name)); continue; }
+      if (f.size > MAX_FILE) { fail(`“${f.name}” is larger than 1 MB. Split it into smaller files, or paste only the part you need under “Paste text instead”.`); continue; }
       const text = await f.text();
-      if (text.includes("\u0000")) { setErr(`“${f.name}” cannot be read. You can add PDFs, Word documents, and plain-text files such as .txt, .md, .csv, .json or code.`); continue; }
+      if (text.includes("\u0000")) { fail(cannotAdd(f.name)); continue; }
       added.push({ id: crypto.randomUUID(), name: f.name, content: text });
     }
     if (pdfReadAbort.current === pdfAbort) pdfReadAbort.current = null;
     if (pdfAbort.signal.aborted) return; // a newer run owns the notice: this one keeps nothing
+    if (failed.length === 1) setErr(failed[0]);
+    else if (failed.length > 1) setErr(`${failed.length} files could not be added:\n${failed.join("\n")}`);
     if (added.length) setDraft((d) => ({ ...d, files: [...d.files, ...added] }));
     if (fileRef.current) fileRef.current.value = "";
   };
   const addNote = () => {
     if (!noteText.trim()) return;
-    setDraft((d) => ({ ...d, files: [...d.files, { id: crypto.randomUUID(), name: noteName.trim() || "Note", content: noteText }] }));
+    setDraft((d) => ({ ...d, files: [...d.files, { id: crypto.randomUUID(), name: noteName.trim() || noteTitleFrom(noteText), content: noteText }] }));
     setNoteName(""); setNoteText("");
   };
 
@@ -141,6 +163,8 @@ function ProjectEditor({ project, convs, tasks, artifacts, contextTokens, onChan
   const budget = knowledgeBudget(contextTokens);
   const used = knowledgeSize(draft);
   const pct = Math.min(100, Math.round((used / budget) * 100));
+  /** The meter shows only while everything fits: never 0% with files in it, never 100% while still under the limit. */
+  const shownPct = Math.min(99, Math.max(1, pct));
 
   // The knowledge index (D7): what it is per file (sections, pages, pages read
   // from scans — cut the same way the index cuts them) and what the store says
@@ -202,7 +226,7 @@ function ProjectEditor({ project, convs, tasks, artifacts, contextTokens, onChan
         <button className="linkbtn" onClick={onBack}>Projects</button><span className="muted">/</span><span>{draft.name || "Untitled project"}</span>
         <span className="grow" />
         {project.archived && <span className="muted small">Archived</span>}
-        <button className={`linkbtn ${project.pinned ? "on" : ""}`} onClick={onPin} disabled={project.archived} title={project.pinned ? "Stop keeping this project at the top of your list" : "Keep this project at the top of your list"}>{project.pinned ? "Unpin" : "Pin"}</button>
+        <button className={`linkbtn ${project.pinned ? "on" : ""}`} onClick={onPin} disabled={project.archived} title={project.archived ? "Restore the project to pin it" : project.pinned ? "Stop keeping this project at the top of your list" : "Keep this project at the top of your list"}>{project.pinned ? "Unpin" : "Pin"}</button>
         <button className="linkbtn" onClick={onArchive} title={project.archived ? "Put this project back in your list" : "Hide this project from your list. Nothing is deleted, and you can restore it later."}>{project.archived ? "Restore" : "Archive"}</button>
       </div>
       <div className="proj-cols">
@@ -210,11 +234,11 @@ function ProjectEditor({ project, convs, tasks, artifacts, contextTokens, onChan
           <input className="title-input" value={draft.name} onChange={(e) => patch({ name: e.target.value })} aria-label="Project name" />
           <input className="wide" value={draft.description} onChange={(e) => patch({ description: e.target.value })} placeholder="Short description (optional)" aria-label="Project description" />
           <div className="proj-ask">
-            <textarea rows={3} value={ask} placeholder={`Ask anything to start a chat in ${draft.name || "this project"}`} aria-label="Start a chat in this project"
+            <textarea rows={3} value={ask} placeholder={`Ask anything to start a chat in ${draft.name && draft.name !== "Untitled project" ? draft.name : "this project"}`} aria-label="Start a chat in this project"
               onChange={(e) => setAsk(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); start(); } }} />
             <div className="proj-ask-foot">
-              <span className="muted small proj-ready">{filesReadiness(draft.files.length, indexState, used > budget)}</span>
+              <span className="muted small proj-ready">{filesReadiness(draft.files.length, indexState, used > budget, !!draft.folder)}</span>
               <span className="row tight">
                 <button className="ghost" onClick={() => fileRef.current?.click()}>Add files</button>
                 <button className="primary" onClick={start}>Start chat</button>
@@ -240,7 +264,7 @@ function ProjectEditor({ project, convs, tasks, artifacts, contextTokens, onChan
           <div className="side-card">
             <div className="side-card-head"><h2>Instructions</h2><button className="linkbtn" onClick={() => setEditInstr((v) => !v)} aria-label={editInstr ? "Done editing instructions" : "Edit instructions"}>{editInstr ? "Done" : "Edit"}</button></div>
             {editInstr
-              ? <textarea rows={7} autoFocus value={draft.instructions} onChange={(e) => patch({ instructions: e.target.value })} aria-label="Project instructions" placeholder="e.g. You are my Arabic tutor. Answer in Arabic first, then give the English translation." />
+              ? <><textarea rows={7} autoFocus value={draft.instructions} onChange={(e) => patch({ instructions: e.target.value })} aria-label="Project instructions" placeholder="e.g. You are my Arabic tutor. Answer in Arabic first, then give the English translation." /><p className="muted small">Changes save automatically.</p></>
               : <p className="muted small clip3">{draft.instructions.trim() || "Optional. Tell the assistant how to help in this project, for example its role, tone or answer format. It follows these in every chat here."}</p>}
           </div>
 
@@ -253,33 +277,32 @@ function ProjectEditor({ project, convs, tasks, artifacts, contextTokens, onChan
                 each question is searched and only the matching parts are read. Search covers
                 the over-limit case, so nothing here uses a warning colour. */}
             {draft.files.length > 0 && (used > budget
-              ? <p className="muted small">Too long to read all at once. For each question, the assistant looks up the parts of these files that match it.</p>
+              ? <p className="muted small">Too long to read all at once: the current model reads about {(Math.round(budget / 6 / 100) * 100).toLocaleString()} words at a time. For each question, the assistant looks up the parts that match.</p>
               : <>
                   <div className="meter-line">
-                    <div className="track" role="progressbar" aria-label="Space used by reference files" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}><div className="fill" style={{ width: `${pct}%` }} /></div>
-                    <span className="small muted">{pct}% used</span>
+                    <div className="track" role="progressbar" aria-label="How much of what the assistant can read at once your reference files use" aria-valuemin={0} aria-valuemax={100} aria-valuenow={shownPct}><div className="fill" style={{ width: `${shownPct}%` }} /></div>
+                    <span className="small muted">{used / budget < 0.01 ? "Less than 1%" : `${shownPct}%`} of what the assistant can read at once</span>
                   </div>
                   <p className="muted small">Short enough to read in full: the assistant reads all of it in every chat in this project.</p>
                 </>)}
             {/* Preparing (the search index) matters only when the files are too long to
                 read whole; under the limit it would be noise. */}
-            {indexState && used > budget && (
-              <p className="muted small" role="status">
-                {indexState === "ready" ? "Your files are ready."
+            {/* One live region, always mounted, so a screen reader announces each change. */}
+            <p className={`muted small ${indexState && used > budget ? "" : "sr-only"}`} role="status" aria-live="polite">
+              {indexState && used > budget && (indexState === "ready" ? "Your files are ready."
                   : indexState === "indexing" ? <>Preparing your files{indexProgress ? `: ${indexProgress.done} of ${indexProgress.of} done` : ""}…</>
                   : indexState === "stale" ? "Your files changed. Preparing them again…"
                   : indexState === "queued" ? "Waiting to prepare your files…"
-                  : <>Your files could not be prepared{indexError ? ` (${indexError})` : ""}. Try again, or remove the file that causes the problem.</>}
-              </p>
-            )}
+                  : preparingFailure(indexError))}
+            </p>
             {indexState === "failed" && used > budget && <button className="linkbtn" onClick={retryIndex}>Try again</button>}
             {overlaps.length > 0 && overlaps.map(([a, b]) => (
-              <p key={`${a}\u0000${b}`} className="muted small">“{a}” and “{b}” cover much of the same content, so an answer may quote either one.</p>
+              <p key={`${a}\u0000${b}`} className="muted small">“{a}” and “{b}” cover much of the same content, so an answer may quote either one. If one is an older copy, remove it.</p>
             ))}
             <div className="side-files">
               {draft.files.map((f) => {
                 const s = fileStats.get(f.id);
-                const preparing = used > budget && indexState !== null && indexState !== "ready" && indexState !== "stale";
+                const preparing = used > budget && (indexState === "queued" || indexState === "indexing" || indexState === "stale");
                 return (
                   <div key={f.id} className="side-file knowledge-file">
                     <div className="grow clip-col">
@@ -295,7 +318,7 @@ function ProjectEditor({ project, convs, tasks, artifacts, contextTokens, onChan
               })}
               {draft.files.length === 0 && <div className="muted small">Add notes, reports or PDFs the assistant should know about. It can use them in every chat in this project. They stay on this computer.</div>}
             </div>
-            {err && <div className="error-box">{err}</div>}
+            {err && <div className="error-box" role="alert" style={{ whiteSpace: "pre-line" }}>{err}</div>}
             <details className="sysprompt"><summary className="small muted">Paste text instead</summary>
               <input className="wide" value={noteName} onChange={(e) => setNoteName(e.target.value)} placeholder="Title (optional)" aria-label="Note title" style={{ margin: "6px 0" }} />
               <textarea rows={4} value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder="Paste text here" aria-label="Note text" />
@@ -306,21 +329,21 @@ function ProjectEditor({ project, convs, tasks, artifacts, contextTokens, onChan
           <div className="side-card">
             <div className="side-card-head"><h2>Linked folder</h2><button className="linkbtn" onClick={() => void pickFolder()}>{draft.folder ? "Change folder" : "Choose folder"}</button></div>
             {draft.folder
-              ? <div className="side-file"><span className="clip grow" title={draft.folder}>{draft.folder}</span><button className="linkbtn" title="Unlink this folder. Nothing in it is deleted." onClick={() => patch({ folder: undefined })}>Unlink</button></div>
-              : <p className="muted small">Optional. Let the assistant read a folder on this computer in this project's chats. It can open and read the files there, but never changes or deletes them.</p>}
+              ? <><div className="side-file"><span className="clip grow" title={draft.folder}>{draft.folder}</span><button className="linkbtn" title="Unlink this folder. Nothing in it is deleted." onClick={() => patch({ folder: undefined })}>Unlink</button></div><p className="muted small">The assistant can read this folder. It never changes or deletes anything.</p></>
+              : <p className="muted small">Optional. When a question needs it, the assistant can look in a folder on this computer and read the files there. It never changes or deletes anything.</p>}
           </div>
 
           {(myArts.length > 0 || myTasks.length > 0) && (
             <div className="side-card">
               <div className="side-card-head"><h2>Made in this project</h2></div>
               <div className="side-files">
-                {myArts.map((a) => <div key={a.id} className="side-file clickable" {...rowAction(() => onOpenArtifact(a.id))}><span className="clip grow">{a.title}</span><span className="muted small">{a.kind}</span></div>)}
+                {myArts.map((a) => <div key={a.id} className="side-file clickable" {...rowAction(() => onOpenArtifact(a.id))}><span className="clip grow">{a.title}</span><span className="muted small">{kindLabel(a)}</span></div>)}
                 {myTasks.map((t) => <div key={t.id} className="side-file clickable" {...rowAction(onOpenTasks)}><span className="clip grow">{t.name}</span><span className="muted small">{describeSchedule(t.schedule)}</span></div>)}
               </div>
             </div>
           )}
 
-          <button className="danger" onClick={() => { if (confirm(`Delete the project "${draft.name}"?\n\nIts instructions, reference files and linked folder are removed. Its chats stay in your chat list, without this project's instructions and files.\n\nThis cannot be undone. To hide the project instead, use Archive.`)) { gone.current = true; onDelete(); } }}>Delete project</button>
+          <button className="danger" onClick={() => { if (confirm(`Delete the project "${draft.name}"?\n\nThis deletes the project's instructions and its copies of your reference files, and unlinks the folder. The folder and your original files are not touched. Its chats, scheduled tasks and the files it made are kept, but they will no longer use this project's instructions or files.\n\nThis cannot be undone. To hide the project instead, choose Cancel and use Archive.`)) { gone.current = true; onDelete(); } }}>Delete project</button>
         </aside>
       </div>
     </div>

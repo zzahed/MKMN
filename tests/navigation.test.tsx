@@ -565,6 +565,49 @@ describe("the Files panel follows an index build to its end", () => {
   }, 12000);
 });
 
+describe("the Reference files card says only what is true in each state", () => {
+  const openAlpha = async () => {
+    await settle();
+    await screen.findByRole("button", { name: "Standalone chat" });
+    fireEvent.click(railBtn("Projects"));
+    await waitFor(() => expect(document.querySelector(".card.clickable")).toBeTruthy());
+    fireEvent.click([...document.querySelectorAll(".card.clickable")].find((c) => c.textContent!.includes("Alpha project")) as HTMLElement);
+  };
+
+  it("over the limit and failed: a plain message and Try again, and no file claims to be prepared", async () => {
+    const big = { ...PROJECT, files: [{ id: "f1", name: "notes.txt", content: "The annex opens at nine. ".repeat(400) }] };
+    boot(makeApi({
+      projects: async () => [{ ...big }],
+      knowledgeStatus: async () => ({ state: "failed", error: "index build: tokenizer error." }),
+      knowledgeBuild: async () => ({ state: "failed" }),
+    }), CONVS);
+    await openAlpha();
+    const status = await screen.findByText(/Your files could not be prepared/, {}, { timeout: 5000 });
+    expect(status.textContent).not.toMatch(/token|index/i); // the raw error stays out of the sentence
+    expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+    expect(screen.getByText(/Too long to read all at once/)).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/being prepared/);
+    expect(screen.queryByRole("progressbar")).toBeNull(); // no meter over the limit
+  });
+
+  it("under the limit: a meter, no preparing status and no Try again, even if preparing failed", async () => {
+    const small = { ...PROJECT, files: [{ id: "f1", name: "notes.txt", content: "The annex opens at nine." }] };
+    boot(makeApi({
+      projects: async () => [{ ...small }],
+      knowledgeStatus: async () => ({ state: "failed", error: "boom" }),
+      knowledgeBuild: async () => ({ state: "failed" }),
+    }), CONVS);
+    await openAlpha();
+    const meter = await screen.findByRole("progressbar");
+    expect(Number(meter.getAttribute("aria-valuenow"))).toBeGreaterThanOrEqual(1); // never "0%" with a file in it
+    expect(screen.getByText(/of what the assistant can read at once/)).toBeTruthy();
+    expect(screen.getByText(/reads all of it in every chat in this project/)).toBeTruthy();
+    await new Promise((r) => setTimeout(r, 300));
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    expect(document.querySelector('.proj-side [role="status"]')?.textContent).toBe("");
+  });
+});
+
 describe("deleting a chat can be undone", () => {
   it("a deleted chat comes back, in its place, with Undo", async () => {
     boot(makeApi(), CONVS);

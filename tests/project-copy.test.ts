@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { describeFileSize, wordCount } from "../src/renderer/Projects";
+import { cannotAdd, describeFileSize, noteTitleFrom, preparingFailure, wordCount } from "../src/renderer/Projects";
 
 /**
  * The Projects screen in plain English (docs/design/usability-audit.md, P1–P13):
@@ -43,11 +43,11 @@ describe("Projects speaks plain English", () => {
   });
 
   it("says that deleting a project cannot be undone and offers Archive instead", () => {
-    expect(src).toMatch(/This cannot be undone\. To hide the project instead, use Archive\./);
+    expect(src).toMatch(/This cannot be undone\. To hide the project instead, choose Cancel and use Archive\./);
   });
 
   it("says the linked folder is read, never changed or deleted", () => {
-    expect(src).toContain("never changes or deletes them");
+    expect(src).toContain("It never changes or deletes anything.");
   });
 });
 
@@ -58,7 +58,33 @@ describe("file sizes people can picture", () => {
   });
   it("gives pages when there are pages, then words", () => {
     expect(describeFileSize(28000, 44, 0)).toBe(`44 pages · about ${(28000).toLocaleString()} words`);
-    expect(describeFileSize(1, 1, 1)).toBe("1 page · 1 scanned · about 1 word");
+    expect(describeFileSize(1, 1, 1)).toBe("1 page (1 read from scans) · about 1 word");
     expect(describeFileSize(250, 0, 0)).toBe("about 250 words");
+    expect(describeFileSize(0, 3, 3)).toBe("3 pages (3 read from scans)"); // no "about 0 words"
+    expect(describeFileSize(0, 0, 0)).toBe("no readable text");
+  });
+});
+
+describe("failures in plain words", () => {
+  it("never shows the raw error, and names a known cause", () => {
+    expect(preparingFailure("index build: tokenizer exploded")).not.toMatch(/index|token/i);
+    expect(preparingFailure(null)).toMatch(/^Your files could not be prepared\. Try again\./);
+    expect(preparingFailure("This project holds 250 files; the search index takes at most 200. Split the files.")).toBe(
+      "Your files could not be prepared because this project has more than 200 files. Remove some, or split them across projects.");
+  });
+  it("one message for a file that cannot be added, naming the kinds that work", () => {
+    expect(cannotAdd("photo.png")).toBe("“photo.png” can't be added. You can add PDFs, Word, Excel and PowerPoint files, and text files such as .txt or .csv.");
+  });
+  it("names an untitled note by its first words", () => {
+    expect(noteTitleFrom("  Quarterly review is on Tuesday at nine in room four ")).toBe("Quarterly review is on Tuesday at…");
+    expect(noteTitleFrom("Short note")).toBe("Short note");
+  });
+});
+
+describe("delete names what is kept and what is lost", () => {
+  it("says the folder and original files are not touched, and that it cannot be undone", () => {
+    expect(src).toContain("The folder and your original files are not touched.");
+    expect(src).toContain("Its chats, scheduled tasks and the files it made are kept");
+    expect(src).toContain("This cannot be undone.");
   });
 });

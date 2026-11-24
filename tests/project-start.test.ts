@@ -19,17 +19,18 @@ describe("a project page starts with Add files and Start chat", () => {
   });
 
   it("says whether the files are ready", () => {
-    expect(filesReadiness(0, null, false)).toBe("No files added: chats will use your instructions only");
-    expect(filesReadiness(1, null, false)).toBe("1 reference file · ready, read in full in every chat");
-    expect(filesReadiness(3, "ready", true)).toBe("3 reference files · ready, the matching parts are read for each question");
-    expect(filesReadiness(3, "indexing", true)).toMatch(/preparing your files/);
-    expect(filesReadiness(3, "failed", true)).toMatch(/could not be prepared: try again/);
+    expect(filesReadiness(0, null, false)).toBe("No reference files yet");
+    expect(filesReadiness(0, null, false, true)).toBe("No reference files yet · linked folder available");
+    expect(filesReadiness(1, null, false)).toBe("1 reference file · ready. The assistant reads all of it in every chat.");
+    expect(filesReadiness(3, "ready", true)).toBe("3 reference files · ready. The assistant looks up the parts that match each question.");
+    expect(filesReadiness(3, "indexing", true)).toBe("3 reference files · preparing them. You can start a chat now.");
+    expect(filesReadiness(3, "failed", true)).toBe("3 reference files · could not be prepared. See Reference files.");
     // no status known: no claim that the files are being prepared
-    expect(filesReadiness(3, null, true)).toBe("3 reference files · the matching parts are read for each question");
+    expect(filesReadiness(3, null, true)).toBe("3 reference files · the assistant looks up the parts that match each question.");
   });
 
   it("never shows internal words (index, tokens) in the readiness line", () => {
-    for (const [n, st, over] of [[0, null, false], [1, null, false], [3, "ready", true], [3, "indexing", true], [3, "failed", true], [3, "queued", true]] as const) {
+    for (const [n, st, over] of [[0, null, false], [1, null, false], [3, "ready", true], [3, "indexing", true], [3, "failed", true], [3, "queued", true], [3, null, true]] as const) {
       expect(filesReadiness(n, st, over)).not.toMatch(/index|token|budget|context/i);
     }
   });

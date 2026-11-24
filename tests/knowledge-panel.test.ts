@@ -138,7 +138,7 @@ describe("the panel speaks the truth (source pins on Projects.tsx and the api)",
 
   it("the meter shows a percentage only while everything fits, never a raw count over the limit", () => {
     expect(proj).not.toMatch(/Math\.round\(used \/ 1000\)\}k \//);
-    expect(proj).toContain("{pct}% used");
+    expect(proj).toContain("of what the assistant can read at once");
     expect(proj).toContain('role="progressbar"');
   });
 
