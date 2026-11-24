@@ -40,7 +40,16 @@ const DANGEROUS: [string, string][] = [
   [String.raw`(?=\w*\w*!)`, "a".repeat(1000)],
   [String.raw`[a-z]*[a-z]*!`, "a".repeat(1000)],
   [String.raw`[a-z]+[a-z]+!`, "a".repeat(1000)],
-  [String.raw`a?a?a?a?a?aaaaa`, "aaaaa"],
+  [String.raw`a?a?a?a?a?a?a?aaaaaaa`, "aaaaaaa"],
+  // second review: overlapping alternatives in a row, no repeat at all
+  ["(a|a)".repeat(25) + "!", "a".repeat(1000)],
+  [String.raw`(?:\w|a)`.repeat(22) + "!", "a".repeat(1000)],
+  ["(?:a|aa)".repeat(18) + "!", "a".repeat(1000)],
+  ["(?:a|a)".repeat(20) + "!", "a".repeat(1000)],
+  ["(?:.|a)".repeat(20) + "!", "a".repeat(1000)],
+  // second review: a stored pattern far over the editor's limit
+  [String.raw`\w*!|`.repeat(2000) + "x", "a".repeat(1000)],
+  [String.raw`\w*!|`.repeat(60) + "x", "a".repeat(1000)],
 ];
 
 describe("patterns that can freeze are refused", () => {
