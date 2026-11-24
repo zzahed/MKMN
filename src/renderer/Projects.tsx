@@ -295,7 +295,8 @@ function ProjectEditor({ project, convs, tasks, artifacts, contextTokens, onChan
                   : indexState === "queued" ? "Waiting to prepare your files…"
                   : preparingFailure(indexError))}
             </p>
-            {indexState === "failed" && used > budget && <button className="linkbtn" onClick={retryIndex}>Try again</button>}
+            {/* Try again only when trying again can help: never for too many files */}
+            {indexState === "failed" && used > budget && !/at most \d+/.test(indexError ?? "") && <button className="linkbtn" onClick={retryIndex}>Try again</button>}
             {overlaps.length > 0 && overlaps.map(([a, b]) => (
               <p key={`${a}\u0000${b}`} className="muted small">“{a}” and “{b}” cover much of the same content, so an answer may quote either one. If one is an older copy, remove it.</p>
             ))}

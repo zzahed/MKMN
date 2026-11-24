@@ -590,6 +590,18 @@ describe("the Reference files card says only what is true in each state", () => 
     expect(screen.queryByRole("progressbar")).toBeNull(); // no meter over the limit
   });
 
+  it("too many files: names the cause and offers no Try again, which could not help", async () => {
+    const big = { ...PROJECT, files: [{ id: "f1", name: "notes.txt", content: "The annex opens at nine. ".repeat(400) }] };
+    boot(makeApi({
+      projects: async () => [{ ...big }],
+      knowledgeStatus: async () => ({ state: "failed", error: "This project holds 250 files; the search index takes at most 200." }),
+      knowledgeBuild: async () => ({ state: "failed" }),
+    }), CONVS);
+    await openAlpha();
+    await screen.findByText(/more than 200 files/, {}, { timeout: 5000 });
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+  });
+
   it("under the limit: a meter, no preparing status and no Try again, even if preparing failed", async () => {
     const small = { ...PROJECT, files: [{ id: "f1", name: "notes.txt", content: "The annex opens at nine." }] };
     boot(makeApi({
