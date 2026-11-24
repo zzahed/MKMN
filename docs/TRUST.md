@@ -36,8 +36,32 @@ A real code-signing certificate is normally paid, but OSS projects can get one
 **free** through the **SignPath Foundation** (https://signpath.org/). MKMN
 qualifies: MIT-licensed, public GitHub repo, real release history. A signed
 installer is what removes the "Windows protected your PC" SmartScreen wall.
-Apply once, then sign the NSIS installer in CI or in `scripts\Build-Windows.ps1`
-with `signtool`.
+
+The release workflow already has the signing step wired in
+(`.github/workflows/release.yml` → *Sign the installer (Authenticode)*). It is
+**inert until you add a certificate**, then signs the installer (SHA-256 digest,
+RFC-3161 timestamp) before the hash and attestation are computed, so the
+published hash and provenance describe the signed binary.
+
+To turn it on with a PFX certificate, add two repository secrets
+(Settings → Secrets and variables → Actions):
+
+| Secret | Value |
+| --- | --- |
+| `WINDOWS_CODESIGN_PFX_BASE64` | Base64 of your `.pfx` file |
+| `WINDOWS_CODESIGN_PFX_PASSWORD` | The PFX password |
+
+```powershell
+# Produce the base64 to paste into WINDOWS_CODESIGN_PFX_BASE64
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("mycert.pfx")) | Set-Clipboard
+```
+
+> **SignPath's cloud signing** is an alternative that signs via their hosted
+> service instead of a PFX in CI. If you go that route, replace the signtool step
+> with SignPath's GitHub action rather than setting these secrets.
+
+Once a signed build ships, the `*-unsigned` artifact and release names in the
+workflow are worth renaming to match — purely cosmetic, left as-is for now.
 
 ### 2. Submit clean builds to Microsoft (free)
 Submit each release installer at
@@ -51,7 +75,7 @@ carries reputation with it.
 
 ---
 
-## How anyone can verify an MKMN release (share this with users)
+## Verifying a release (share this with users)
 
 **Checksum:**
 ```powershell

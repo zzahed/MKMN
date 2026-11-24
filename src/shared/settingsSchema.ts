@@ -233,7 +233,7 @@ export const SETTINGS_SCHEMA = [
     values: ["auto", "burst", "high_performance", "sustained_high_performance", "balanced", "low_balanced", "power_saver", "high_power_saver", "low_power_saver"],
     scope: "app", level: "advanced", group: "models", applies: "model-reload",
     label: "Power mode", description: "Peak speed, steady speed, or by power source.",
-    tooltip: "\"By power source\" picks peak speed on mains power and adapts on battery. The other names are the runtime's own clock modes, quietest first: low power saver, power saver, high power saver, low balanced, balanced, high performance, sustained high performance, burst.",
+    tooltip: "\"By power source\" stays quiet: balanced on mains power and quieter on battery; choose burst for peak speed. The other names are the runtime's own clock modes, quietest first: low power saver, power saver, high power saver, low balanced, balanced, high performance, sustained high performance, burst.",
     oldWords: ["power mode", "battery", "clock", "power profile", "burst", "balanced", "saver"],
     legacy: { tab: "models", section: "sec-models-power" },
   },

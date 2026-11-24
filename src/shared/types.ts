@@ -208,6 +208,8 @@ export interface PowerStatusInfo {
   batteryPercent?: number;
   powerSaverRecommended: boolean;
   acLineStatus: number;
+  /** Windows Energy Saver (battery saver) is on. */
+  energySaverOn?: boolean;
 }
 
 export interface BenchmarkResult {

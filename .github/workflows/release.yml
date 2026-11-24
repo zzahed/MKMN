@@ -79,6 +79,41 @@ jobs:
         run: |
           powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\Validate-Installer.ps1" -Release
           exit $LASTEXITCODE
+      - name: Sign the installer (Authenticode)
+        # Inert until a certificate is configured: with no WINDOWS_CODESIGN_PFX_BASE64
+        # secret the step logs a notice and leaves the installer unsigned. When the
+        # secret is present the installer is signed BEFORE the SHA-256 and attestation
+        # steps below, so the published hash and provenance describe the signed binary.
+        shell: pwsh
+        env:
+          MKMN_SIGN_PFX_BASE64: ${{ secrets.WINDOWS_CODESIGN_PFX_BASE64 }}
+          MKMN_SIGN_PFX_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PFX_PASSWORD }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          if ([string]::IsNullOrWhiteSpace($env:MKMN_SIGN_PFX_BASE64)) {
+            Write-Host "::notice::No code-signing certificate configured (secret WINDOWS_CODESIGN_PFX_BASE64 is empty); leaving the installer unsigned."
+            exit 0
+          }
+          $version = (node -p "require('./package.json').version").Trim()
+          $installer = "dist/MKMN-$version-arm64-Setup.exe"
+          if (-not (Test-Path -LiteralPath $installer)) { throw "No installer to sign: $installer" }
+          # signtool ships with the Windows SDK. Prefer the arm64 build, then x64.
+          $signtool = Get-ChildItem -Path "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match '\\(arm64|x64)\\signtool\.exe$' } |
+            Sort-Object FullName | Select-Object -Last 1
+          if (-not $signtool) { throw "signtool.exe not found in the Windows SDK." }
+          $pfx = Join-Path $env:RUNNER_TEMP "mkmn-codesign.pfx"
+          try {
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:MKMN_SIGN_PFX_BASE64))
+            & $signtool.FullName sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /f $pfx /p $env:MKMN_SIGN_PFX_PASSWORD $installer
+            if ($LASTEXITCODE -ne 0) { throw "signtool sign failed ($LASTEXITCODE)" }
+            & $signtool.FullName verify /pa /v $installer
+            if ($LASTEXITCODE -ne 0) { throw "signtool verify failed ($LASTEXITCODE)" }
+          }
+          finally {
+            Remove-Item -LiteralPath $pfx -Force -ErrorAction SilentlyContinue
+          }
+          Write-Host "::notice::Installer signed with Authenticode and verified."
       - name: Write SHA-256 and build provenance
         shell: pwsh
         run: |

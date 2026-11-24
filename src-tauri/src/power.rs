@@ -13,6 +13,9 @@ pub struct PowerStatusInfo {
     pub power_saver_recommended: bool,
     #[serde(rename = "acLineStatus")]
     pub ac_line_status: u8,
+    /// Windows Energy Saver (battery saver) is on: the person asked the whole PC to save power.
+    #[serde(rename = "energySaverOn", default)]
+    pub energy_saver_on: bool,
 }
 
 /// 0 = system may sleep, 1 = sleep inhibited.
@@ -43,7 +46,10 @@ fn ensure_inhibit_owner_thread() {
                         }
                         applied = requested;
                     }
-                    std::thread::park_timeout(std::time::Duration::from_millis(500));
+                    // Every change unparks this thread (set_sleep_inhibit), and an unpark that
+                    // lands before the park makes it return at once, so there is nothing to poll
+                    // for: a timed park only woke the CPU twice a second for the whole session.
+                    std::thread::park();
                 }
             })
             .expect("failed to spawn sleep-inhibit owner thread")
@@ -70,12 +76,14 @@ pub fn get_power_status() -> PowerStatusInfo {
         } else {
             None
         };
-        let power_saver = !on_ac && battery.is_some_and(|b| b <= 20);
+        let energy_saver_on = status.SystemStatusFlag == 1;
+        let power_saver = energy_saver_on || (!on_ac && battery.is_some_and(|b| b <= 20));
         PowerStatusInfo {
             on_ac_power: on_ac,
             battery_percent: battery,
             power_saver_recommended: power_saver,
             ac_line_status: status.ACLineStatus,
+            energy_saver_on,
         }
     } else {
         // Fallback: assume AC power if query fails
@@ -84,6 +92,7 @@ pub fn get_power_status() -> PowerStatusInfo {
             battery_percent: None,
             power_saver_recommended: false,
             ac_line_status: 255,
+            energy_saver_on: false,
         }
     }
 }
@@ -102,21 +111,48 @@ pub fn resolve_effective_power_mode(requested: &str) -> &'static str {
         "high_performance" => "high_performance",
         "auto" | "adaptive" => {
             let p = get_power_status();
-            if p.on_ac_power {
-                "burst"
-            } else if p.battery_percent.is_some_and(|b| b <= 25) {
-                "power_saver"
-            } else {
-                "sustained_high_performance"
-            }
+            auto_power_mode(p.on_ac_power, p.battery_percent, p.energy_saver_on)
         }
         _ => "sustained_high_performance",
     }
 }
 
+/// "Automatic" is quiet-first: the NPU never runs at its peak clocks unless the person
+/// picks "burst" themselves, because peak clocks over a long answer are what heat the PC
+/// and spin the fans up. Plugged in it runs balanced; on battery it steps further down as
+/// the charge falls. Windows Energy Saver wins over everything: the person asked the
+/// whole PC to save power.
+pub fn auto_power_mode(on_ac: bool, battery_percent: Option<u8>, energy_saver_on: bool) -> &'static str {
+    if energy_saver_on {
+        return "power_saver";
+    }
+    if on_ac {
+        return "balanced";
+    }
+    match battery_percent {
+        Some(b) if b <= 25 => "power_saver",
+        Some(b) if b <= 50 => "high_power_saver",
+        _ => "low_balanced",
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::resolve_effective_power_mode;
+    use super::{auto_power_mode, resolve_effective_power_mode};
+
+    #[test]
+    fn auto_saves_power_on_battery_and_under_energy_saver() {
+        // never the peak clocks on its own: those are what spin the fans up
+        assert_eq!(auto_power_mode(true, Some(100), false), "balanced");
+        assert_eq!(auto_power_mode(true, None, false), "balanced");
+        assert_eq!(auto_power_mode(false, Some(90), false), "low_balanced");
+        assert_eq!(auto_power_mode(false, None, false), "low_balanced");
+        assert_eq!(auto_power_mode(false, Some(50), false), "high_power_saver");
+        assert_eq!(auto_power_mode(false, Some(25), false), "power_saver");
+        // Energy Saver is the person's own request: it wins on mains power too
+        assert_eq!(auto_power_mode(true, Some(100), true), "power_saver");
+        assert_eq!(auto_power_mode(false, Some(90), true), "power_saver");
+    }
 
     #[test]
     fn every_geniex_power_mode_passes_through() {

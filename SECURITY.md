@@ -12,6 +12,12 @@ and what an attacker could do with it.
 You will get a reply in the report thread. Once a fix is released, the report
 can be published as a security advisory, with credit to you if you want it.
 
+## Verifying a release
+
+Each installer ships with a SHA-256 checksum and a Sigstore build-provenance
+attestation. See [docs/TRUST.md](docs/TRUST.md) for how to verify a download and
+how MKMN is signed and distributed.
+
 ## Supported versions
 
 Security fixes go into the latest release only. Update to it before you report.

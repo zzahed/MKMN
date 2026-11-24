@@ -1094,7 +1094,7 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
           <span>Start loading the model while I type <Dot c={changed} k="warmUpWhileTyping" /></span>
         </label>
         <p className="muted small">
-          Answers start sooner, but the model uses memory and power as soon as you start typing, even if you never send the message. Off by default.
+          Answers start sooner, but the model uses memory and power as soon as you start typing, even if you never send the message. Off by default, to save memory and power.
         </p>
         <p className="muted small">
           {rt.idleReleaseSec === 0
@@ -1102,7 +1102,7 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
             : `The model's memory is freed after ${Math.round(rt.idleReleaseSec / 60)} minute${rt.idleReleaseSec === 60 ? "" : "s"} without use. The next message then waits while the model loads: usually 10 to 25 seconds on the NPU, longer for large models.`}
         </p>
         <details style={{ marginTop: 6 }}>
-          <summary className="small"><strong>Advanced: start-up time limit</strong> <span className="muted">· for slow models</span></summary>
+          <summary className="small"><strong>Start-up time limit</strong> <span className="muted">· for slow models</span></summary>
           <div className="row">
           <label className="small">
             <span>Longest wait for a model to start</span>
@@ -1283,7 +1283,7 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
               value={readSetting(settings, "powerProfile")}
               onChange={(e) => void save({ powerProfile: e.target.value as Settings["powerProfile"] })}
             >
-              <option value="auto">Automatic: fastest when plugged in, steady on battery, saves power below 25% (recommended)</option>
+              <option value="auto">Automatic: quiet, balanced when plugged in, saves more on battery, below 25% or in Energy Saver (recommended)</option>
               <option value="burst">Fastest</option>
               <option value="balanced">Balanced</option>
               <option value="power_saver">Battery saver: less heat, slower</option>
@@ -1301,7 +1301,9 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
         <p className="muted small">
           {powerInfo === null ? "Checking the power supply…" :
             (readSetting(settings, "powerProfile")) === "auto"
-              ? (powerInfo?.onAcPower ? "Plugged in: full speed. Applies the next time the model loads." : "On battery: steady speed, and below 25% battery it saves power. Applies the next time the model loads.")
+              ? (powerInfo?.energySaverOn ? "Windows Energy Saver is on: the NPU saves power. Applies the next time the model loads."
+                : powerInfo?.onAcPower ? "Plugged in: balanced speed, so the fans stay quiet. Choose Burst for full speed. Applies the next time the model loads."
+                : "On battery: quieter still below 50% battery, and power saving below 25%. Applies the next time the model loads.")
               : (readSetting(settings, "powerProfile") === "burst" ? "Always runs the NPU at full speed. Answers are fastest; the PC may get warmer." : "The NPU runs in the mode chosen above.")}
         </p>
       </section>

@@ -319,3 +319,10 @@ describe("source pins — the review's fixes stay fixed", () => {
     expect(read("src/renderer/mock.ts")).toMatch(/humainModels/);
   });
 });
+
+describe("retention with no stored value", () => {
+  it("falls back to the 5-minute default instead of NaN", () => {
+    expect(retentionFromIdle(undefined, undefined).idleReleaseSec).toBe(300);
+    expect(retentionFromIdle(undefined, Number.NaN).idleReleaseSec).toBe(300);
+  });
+});

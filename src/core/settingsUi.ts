@@ -231,8 +231,10 @@ export interface RetentionChoice {
  * after that many seconds. `idleReleaseSec` is authoritative once it exists; a stored
  * file that only has the legacy `keepaliveSec` keeps working until the UI saves.
  */
-export function retentionFromIdle(idleReleaseSec: number | undefined, legacyKeepaliveSec: number): RetentionChoice {
-  const idle = typeof idleReleaseSec === "number" && Number.isFinite(idleReleaseSec) && idleReleaseSec >= 0 ? idleReleaseSec : legacyKeepaliveSec;
+export function retentionFromIdle(idleReleaseSec: number | undefined, legacyKeepaliveSec: number | undefined): RetentionChoice {
+  const ok = (n: number | undefined): n is number => typeof n === "number" && Number.isFinite(n) && n >= 0;
+  // A settings file with neither key (a fresh profile) gets the schema default, 5 minutes.
+  const idle = ok(idleReleaseSec) ? idleReleaseSec : ok(legacyKeepaliveSec) ? legacyKeepaliveSec : 300;
   return {
     loadingStrategy: idle === 0 ? "always" : "demand",
     idleReleaseSec: idle,

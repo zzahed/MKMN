@@ -22,7 +22,7 @@ import { tabLabel } from "./settingsSearch";
 import { executionStatus, observedExecutionTarget } from "../core/settingsUi";
 import { COMPUTE_LABEL } from "../core/adaptiveCompute";
 import { MetersBar } from "./MetersBar";
-import { Projects } from "./Projects";
+import { Projects, newProject } from "./Projects";
 import { Artifacts } from "./Artifacts";
 import { Tasks } from "./Tasks";
 import { Search } from "./Search";
@@ -1068,12 +1068,13 @@ export function App() {
                 active={c.id === active.id && tab === "chat"} busy={busyIds.has(c.id)} leaving={leaving.includes(c.id)} fresh={!seen.current.has(c.id)}
                 actionsOpen={actionsFor === c.id} onOpen={openChatStable} onArchive={archiveChatStable} onRemove={removeChatStable} onPin={togglePinStable} onActions={setActionsFor} />
             );
-            const section = (key: string, label: string, count: number, body: ReactNode, closedByDefault = false) => {
+            const section = (key: string, label: string, count: number, body: ReactNode, closedByDefault = false, action?: ReactNode) => {
               const closed = fold[key] ?? closedByDefault;
               return (
                 <div className="group" key={key}>
                   <div className="group-head">
                     <button className="recents-title" onClick={() => toggleFold(key, closedByDefault)} aria-expanded={!closed}>{label} <span className="count">{count}</span> <span className={`caret ${closed ? "" : "open"}`}>▾</span></button>
+                    {action}
                   </div>
                   {/* A collapsed fold hides its rows visually; `inert` takes them out of
                       the keyboard and the accessibility tree as well, so nothing hidden
@@ -1108,7 +1109,12 @@ export function App() {
                     </div>
                     <div className={`fold ${fold[`p:${p.id}`] ? "" : "open"}`}><div className="fold-inner" inert={!!fold[`p:${p.id}`]}>{list.length ? paged(`p:${p.id}`, list, 5, (c) => row(c, true), 10) : <div className="muted small nested-empty">No chats yet</div>}</div></div>
                   </div>
-                )) : null)}
+                )) : null, false, (
+                  <button type="button" className="group-add" title="New project" aria-label="New project"
+                    onClick={() => { const p = newProject(); saveProject(p); setOpenProject(p.id); setTab("projects"); setFold((f) => ({ ...f, projects: false })); if (narrow) setSideManual(true); }}>
+                    <Icon d={ICONS.plus} size={14} />
+                  </button>
+                ))}
                 {/* The escape hatch sits outside the fold: a persisted-closed Projects
                     section must not hide the way to create the first project. */}
                 {groups.length === 0 && (

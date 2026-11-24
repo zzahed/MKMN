@@ -371,6 +371,29 @@ pub fn apply_pid_tier(pid: u32, tier: QoSTier) -> Result<(), String> {
     }
 }
 
+/// Puts one helper process on the efficiency path (BELOW_NORMAL + EcoQoS + timer
+/// coalescing) WITHOUT touching the app-wide sleep inhibit. `apply_pid_tier(..,
+/// BackgroundEco)` also releases the sleep inhibit, which would cut the one geniex holds
+/// while it is generating; a light helper that runs beside inference must not do that.
+pub fn apply_pid_eco_only(pid: u32) -> Result<(), String> {
+    unsafe {
+        let h_process = OpenProcess(PROCESS_SET_INFORMATION | PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+        if h_process.is_null() || h_process == INVALID_HANDLE_VALUE {
+            let err = GetLastError();
+            return Err(format!("OpenProcess(PID: {}) failed with error {}", pid, err));
+        }
+        let mut errors: Vec<String> = Vec::new();
+        if let Err(e) = set_process_priority(h_process, BELOW_NORMAL_PRIORITY_CLASS) {
+            errors.push(e);
+        }
+        if let Err(e) = set_process_power_throttling(h_process, true, true) {
+            errors.push(e);
+        }
+        CloseHandle(h_process);
+        if errors.is_empty() { Ok(()) } else { Err(errors.join("; ")) }
+    }
+}
+
 /// Apply a QoS Tier policy to the current thread.
 pub fn apply_current_thread_tier(tier: QoSTier) -> Result<(), String> {
     let h_thread = unsafe { GetCurrentThread() };

@@ -141,6 +141,28 @@ export function friendly(raw: string): FriendlyError | null {
   return translateError(raw) ?? (raw.trim() ? genericError(raw) : null);
 }
 
+/** Rules whose advice is about sending a chat message; wrong on a download. */
+const CHAT_ONLY = new Set(["npu-sdk-error", "connection-reset", "no-model", "humain-key", "humain-model", "humain-limit", "humain-offline", "npu-busy"]);
+
+/**
+ * The message for a failed `geniex pull`. A rule written for chat ("Send the message
+ * again") would point the user at the wrong thing on a model card, so those fall back
+ * to download wording; the raw output stays attached for the details.
+ */
+export function pullFailure(raw: string): FriendlyError {
+  const fe = translateError(raw);
+  if (fe && !CHAT_ONLY.has(fe.id)) return fe;
+  const sdk = fe?.id === "npu-sdk-error";
+  return {
+    id: "pull",
+    title: "The download did not finish",
+    fix: sdk
+      ? "GenieX stopped without giving a reason (its generic error, code -100000). Install it again: the download continues where it stopped. If it fails the same way, this model may not have a build for this PC; choose another one."
+      : "Check your connection and disk space, then install it again: the download continues where it stopped.",
+    raw,
+  };
+}
+
 /** True when the line is known to be harmless noise. */
 export function isNoise(line: string): boolean {
   return RULES.some((r) => r.ignore && r.test.test(line));

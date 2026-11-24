@@ -465,6 +465,15 @@ pub(crate) fn settings_patch_of_args(args: &Value) -> Result<Value, String> {
     }
 }
 
+/// Whether `pid` is a child of a child of `host_pid` (the sidecar's own child).
+pub(crate) fn is_grandchild_of(pid: u32, host_pid: u32, procs: &[crate::monitor::RawProcessEntry]) -> bool {
+    let parent_of = |p: u32| procs.iter().find(|e| e.pid == p).map(|e| e.parent_pid);
+    match parent_of(pid) {
+        Some(parent) if parent != 0 && parent != pid => parent_of(parent) == Some(host_pid),
+        _ => false,
+    }
+}
+
 /// The host capabilities the sidecar may ask for. Each maps to a native UI or OS action
 /// the Rust host performs itself; anything unknown is refused.
 async fn host_capability(app: &AppHandle, method: &str, args: &Value) -> Result<Value, String> {
@@ -838,6 +847,24 @@ async fn host_capability(app: &AppHandle, method: &str, args: &Value) -> Result<
                 .map(|_| json!(true))
                 .map_err(|e| e.to_string())
         }
+        // A long background child of the sidecar (a model pull) goes on the efficiency
+        // path. Only the sidecar's OWN children qualify: a pid whose parent is a process
+        // this host started, so the sidecar cannot throttle anything else on the PC.
+        "ecoChild" => {
+            let pid = args
+                .as_array()
+                .and_then(|a| a.first())
+                .and_then(Value::as_u64)
+                .map(|n| n as u32)
+                .ok_or("ecoChild: no process id was given")?;
+            let procs = crate::monitor::snapshot_processes();
+            if !is_grandchild_of(pid, std::process::id(), &procs) {
+                return Err(format!("ecoChild: process {pid} is not one the sidecar started"));
+            }
+            crate::qos::apply_pid_eco_only(pid)?;
+            crate::paths::lifecycle_log("qos", &format!("background child {pid} put on the efficiency path (BELOW_NORMAL + EcoQoS)"));
+            Ok(json!(true))
+        }
         // ---- Computer Use: the ONLY route the sidecar has to the native driver.
         // The AgentDriverHost validates the grant on every call before anything
         // reaches the driver; the sidecar cannot widen its own target.
@@ -909,6 +936,18 @@ fn reveal_target_problem(target: &str) -> Result<(), String> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn eco_child_accepts_only_the_sidecars_own_children() {
+        use crate::monitor::RawProcessEntry;
+        let e = |pid: u32, parent_pid: u32| RawProcessEntry { pid, parent_pid, exe_name: String::new() };
+        // host 10 -> sidecar 20 -> pull 30; an unrelated 40 under explorer 5
+        let procs = vec![e(10, 5), e(20, 10), e(30, 20), e(40, 5)];
+        assert!(is_grandchild_of(30, 10, &procs));
+        assert!(!is_grandchild_of(20, 10, &procs), "the sidecar itself is not its own child");
+        assert!(!is_grandchild_of(40, 10, &procs), "another program's process is refused");
+        assert!(!is_grandchild_of(99, 10, &procs), "a pid that does not exist is refused");
+    }
 
     #[test]
     fn plain_path_drops_the_verbatim_prefix_and_keeps_other_paths() {

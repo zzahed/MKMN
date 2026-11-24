@@ -2,7 +2,7 @@ import { ChildProcess, spawn, execFile } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import { FriendlyError, InstalledModel, InstallProgress } from "../shared/types";
-import { friendly, isNoise } from "./errors";
+import { isNoise, pullFailure } from "./errors";
 
 export const DEFAULT_ENDPOINT = "http://127.0.0.1:18181/v1";
 
@@ -302,6 +302,15 @@ export function pullArgs(ref: string, o: PullOptions | undefined): string[] {
  * taken from any line that has one and the raw line is always passed on. Pull is resumable:
  * calling it again after cancel continues the download.
  */
+/**
+ * Called with the pid of every long background child this module spawns (a model pull:
+ * hours of download, unpack and hashing). The sidecar points it at the host, which puts
+ * the process on the efficiency path (BELOW_NORMAL + EcoQoS) so a download never runs
+ * the fans up. Unset (tests, tools), nothing happens.
+ */
+let backgroundChildHook: ((pid: number) => void) | null = null;
+export function setBackgroundChildHook(fn: ((pid: number) => void) | null): void { backgroundChildHook = fn; }
+
 export function pullModel(
   exe: string,
   ref: string,
@@ -314,6 +323,7 @@ export function pullModel(
   let tail = "";
   const done = new Promise<void>((resolve) => {
     child = spawnFn(exe, pullArgs(ref, options), { windowsHide: true, stdio: ["pipe", "pipe", "pipe"], env: { ...process.env, TERM: "dumb", CI: "1", NO_COLOR: "1" } });
+    if (typeof child.pid === "number") { try { backgroundChildHook?.(child.pid); } catch { /* a download never fails over its priority */ } }
     // A native NPU bundle has no precision in its ref: GenieX lists the precisions and waits for a choice that nobody
     // gives it without a terminal. Enter takes the one it marks as the default; asked at most a few times.
     let answered = 0;
@@ -334,14 +344,14 @@ export function pullModel(
     child.stdout?.on("data", feed);
     child.stderr?.on("data", feed);
     child.on("error", (e) => {
-      onProgress({ ref, phase: "error", percent: null, error: friendly(e.message) ?? undefined });
+      onProgress({ ref, phase: "error", percent: null, error: pullFailure(e.message) });
       resolve();
     });
     child.on("close", (code) => {
       if (pendingAnswer) clearTimeout(pendingAnswer);
       if (cancelled) onProgress({ ref, phase: "cancelled", percent: null });
       else if (code === 0) onProgress({ ref, phase: "done", percent: 100 });
-      else onProgress({ ref, phase: "error", percent: null, error: friendly(tail) ?? { id: "pull", title: "Download failed", fix: "Check your connection and disk space, then try again; the download resumes.", raw: tail } });
+      else onProgress({ ref, phase: "error", percent: null, error: pullFailure(tail) });
       resolve();
     });
   });
