@@ -145,9 +145,21 @@ NPU clock modes before anything they could act on.
 | L2 | Model card line "Q4_0", "GGUF", "native NPU bundle", plus up to three fit-rule reasons (tokens, quant names) on every card. | High | The card shows role and size; the format and the reasons move into a **Details** disclosure on the card. |
 | L3 | Speed chip note "newest measurement for the current compute target". | Low | "The latest speed test on this PC for the chip in use." |
 
+## Phase 3: Skills, About me, Tasks and Files
+
+| # | Finding | Sev | Change |
+| --- | --- | --- | --- |
+| K1 | Personal instructions hide under the "Skills" page in a "Personalisation" tab; the page title stays "Skills". | Medium | Tab and heading read **About me**, matching the settings search entry. |
+| K2 | About me is explained in "context window", "8K tokens", and shows a token count under each box. | High | Explained as which models read which part; the counter shows characters only. |
+| K3 | The Skills list never says what a skill is. | High | One line: a saved recipe, used by typing / and its name, some start by themselves. |
+| K4 | The skill editor shows a regular-expression trigger, JavaScript/CSS libraries and model ids beside name and steps; its labels are not tied to inputs. | High | Those three fold under **Advanced** (open when already filled); every box has an accessible name. |
+| K5 | Skill sizes read "~900 tokens · 8K+ context". | Medium | "short · any model", "medium · mid-size models", "long · larger models". |
+| K6 | Tasks intro: "Prompts … using your NPU. Results and any artifacts land here." | Medium | "Instructions the assistant carries out by itself on a schedule… files it makes appear in Files." |
+| K7 | Task and file deletes do not say what is lost or that they cannot be undone. | Medium | Each names what goes and what stays (checked against the delete handler), and says it cannot be undone. |
+
 ## Phases
 
 1. **Projects** — done in this branch (P1–P13).
 2. **Settings › Speed & memory and the Models library** — S3, S4 (M1–M6, L1–L3), branch `ux/plain-language-settings`.
-3. **Skills, Tasks, Files** — S1, S2, S5.
+3. **Skills, About me, Tasks, Files** — S1, S2, S5 (K1–K7), branch `ux/plain-language-skills-tasks`.
 4. **Errors, status and setup** — S6, S7, S8, and the shared PDF messages above.
