@@ -6,6 +6,8 @@ import { settle } from "../harness/settle";
 import type { SettledStep } from "../harness/run";
 import { parseSheets } from "../sheet";
 import { langOf } from "./kit";
+import { fileQuality, qualityProblems } from "../fileQuality";
+import { QUALITY_BAR, type QualityScore } from "../harness/quality";
 
 /**
  * A spreadsheet or a Word document written freely, when no template fits or the plan of calculations did not hold: the model writes the table (or the Markdown) as text, the app makes the file
@@ -43,31 +45,44 @@ export async function* writeFreely(o: FreeOptions, request: string, kind: "xlsx"
   const g: BuildStage = { id: "write", label: "Write", status: "running", note: kind === "xlsx" ? "writing the table" : "writing the document", agent: "Writer", model: o.modelOf?.(), at: Date.now() };
   stages.push(g);
   let live = "";
-  const run = (status: BuildRun["status"] = "running"): ChatEvent => ({ id: o.id, type: "build", build: { status, steps: steps.map((s) => ({ ...s, stages: s.stages?.map((x) => ({ ...x })) })), phase: status === "running" ? (kind === "xlsx" ? "Writing the sheet…" : "Writing the document…") : "", live: status === "running" && live ? live : undefined } });
+  let quality: QualityScore | undefined;
+  const run = (status: BuildRun["status"] = "running"): ChatEvent => ({ id: o.id, type: "build", build: { status, steps: steps.map((s) => ({ ...s, stages: s.stages?.map((x) => ({ ...x })) })), phase: status === "running" ? (kind === "xlsx" ? "Writing the sheet…" : "Writing the document…") : "", live: status === "running" && live ? live : undefined, ...(quality ? { quality: { rubric: kind, score: quality.score, notes: quality.failed.map((f) => f.note) } } : {}) } });
   const artifactOf = (source: string) => `<artifact type="${kind}" title="${titleOf(source, kind, lang).replace(/"/g, "'")}">\n${source}\n</artifact>`;
   yield run();
-  const msgs: ChatMessage[] = [{ role: "system", content: kind === "xlsx" ? SHEET_RULES : DOC_RULES }, { role: "user", content: request.slice(0, 9000) }];
-  let reply = "", think = "", shownText = "", lastDraw = 0, lastThink = 0;
-  try {
-    // ":x:" in the session id: a short closed job, the model does not think first
-    for await (const ev of o.stream(`${o.id}:x:free:${kind}`, msgs, true, "plan")) {
-      if (ev.type === "done") add(ev.stats);
-      if (ev.type === "thinking") { think += ev.text; if (!reply && Date.now() - lastThink > 400) { lastThink = Date.now(); live = think.slice(-900); yield run(); } continue; }
-      if (ev.type !== "answer" && ev.type !== "retract") continue;
-      reply = withAnswer(reply, ev);
-      live = "";
-      const now = Date.now();
-      if (now - lastDraw < 250) continue;
-      lastDraw = now;
-      const part = fileText(reply, kind);
-      if (part && part !== shownText && (kind === "docx" || parseSheets(part).length)) { shownText = part; yield { id: o.id, type: "replace", text: artifactOf(part) }; }
-    }
-  } catch (e) { if (o.signal?.aborted) throw e; }
-  if (o.signal?.aborted) throw new Error("aborted");
-  live = "";
-  const source = fileText(reply, kind);
-  const ok = kind === "docx" ? source.length > 20 : parseSheets(source).some((s) => s.rows.length >= 1 && s.rows.some((r) => r.length >= 2));
-  if (!ok) {
+  const usable = (src: string) => (kind === "docx" ? src.length > 20 : parseSheets(src).some((x) => x.rows.length >= 1 && x.rows.some((r) => r.length >= 2)));
+  let msgs: ChatMessage[] = [{ role: "system", content: kind === "xlsx" ? SHEET_RULES : DOC_RULES }, { role: "user", content: request.slice(0, 9000) }];
+  let shownText = "", source = "";
+  // one try, and a second one only when the rubric finds the file thin, broken or repetitive: told exactly what to fix, the better scored is kept
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let reply = "", think = "", lastDraw = 0, lastThink = 0;
+    try {
+      // ":x:" in the session id: a short closed job, the model does not think first
+      for await (const ev of o.stream(`${o.id}:x:free:${kind}${attempt ? `:${attempt}` : ""}`, msgs, true, "plan")) {
+        if (ev.type === "done") add(ev.stats);
+        if (ev.type === "thinking") { think += ev.text; if (!reply && Date.now() - lastThink > 400) { lastThink = Date.now(); live = think.slice(-900); yield run(); } continue; }
+        if (ev.type !== "answer" && ev.type !== "retract") continue;
+        reply = withAnswer(reply, ev);
+        live = "";
+        const now = Date.now();
+        if (now - lastDraw < 250 || attempt) continue; // a second try replaces the first only once it is finished and better
+        lastDraw = now;
+        const part = fileText(reply, kind);
+        if (part && part !== shownText && (kind === "docx" || parseSheets(part).length)) { shownText = part; yield { id: o.id, type: "replace", text: artifactOf(part) }; }
+      }
+    } catch (e) { if (o.signal?.aborted) throw e; }
+    if (o.signal?.aborted) throw new Error("aborted");
+    live = "";
+    const text = fileText(reply, kind);
+    if (!usable(text)) { if (attempt) break; continue; }
+    let q: QualityScore | undefined;
+    try { q = fileQuality(kind, text); } catch { /* unscorable: kept as written */ }
+    if (!source || (q && quality && q.score > quality.score)) { source = text; quality = q; }
+    if (!q || q.score >= QUALITY_BAR || attempt) break;
+    g.note = `checking: ${q.failed[0]?.note ?? "weak"}; writing it again`;
+    yield run();
+    msgs = [...msgs, { role: "assistant", content: text }, { role: "user", content: `This file has problems. Write the whole file again, in the same form, without them:\n- ${qualityProblems(q).join("\n- ")}` }];
+  }
+  if (!source) {
     g.status = "skipped"; g.note = "no usable text came back";
     yield { id: o.id, type: "notice", text: "The file could not be written from the request." };
     yield run();

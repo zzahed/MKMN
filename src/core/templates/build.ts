@@ -12,6 +12,12 @@ import { makeCalcSheet } from "./calcsheet";
 import { Q } from "../router";
 import { writeFreely } from "./freefile";
 import { loadIcons } from "../page/iconTable";
+import { fileQuality, qualityProblems, type FileKind } from "../fileQuality";
+import { QUALITY_BAR, type QualityScore } from "../harness/quality";
+
+/** The rubric a kind of template is scored by; a calculator page is judged by its formulas (`problems`), not by how much it says. */
+export const rubricOf = (k: TemplateKind): FileKind | null => (k === "docx" ? "docx" : k === "xlsx" ? "xlsx" : k === "site" ? "html" : null);
+export const qualityField = (rubric: string, q: QualityScore) => ({ rubric, score: q.score, notes: q.failed.map((f) => f.note) });
 
 /**
  * A Word or Excel file made from a template: the app chooses it (the words of the request, then the model with the list when the
@@ -120,7 +126,8 @@ export async function* makeFromTemplate(o: TemplateOptions): AsyncGenerator<Chat
   const stages: BuildStage[] = [];
   const steps: BuildStep[] = [{ file: kind === "xlsx" ? "Spreadsheet" : kind === "docx" ? "Document" : kind === "site" ? "Website" : "Tool", action: "new", job: "from a template", status: "running", stages }];
   let phase = "", live = "";
-  const run = (status: BuildRun["status"] = "running"): ChatEvent => ({ id: o.id, type: "build", build: { status, steps: steps.map((s) => ({ ...s, stages: s.stages?.map((g) => ({ ...g })) })), phase, live: status === "running" && live ? live : undefined } });
+  let quality: { rubric: string; score: number; notes: string[] } | undefined;
+  const run = (status: BuildRun["status"] = "running"): ChatEvent => ({ id: o.id, type: "build", build: { status, steps: steps.map((s) => ({ ...s, stages: s.stages?.map((g) => ({ ...g })) })), phase, live: status === "running" && live ? live : undefined, ...(quality ? { quality } : {}) } });
   const begin = (id: string, label: string, note: string, agent: string, model?: string): BuildStage => { const g: BuildStage = { id, label, status: "running", note, agent, model, at: Date.now() }; stages.push(g); return g; };
   const end = (g: BuildStage, status: BuildStage["status"], note?: string) => { g.status = status; g.sec = Math.round(((Date.now() - (g.at ?? Date.now())) / 1000) * 10) / 10; if (note !== undefined) g.note = note; };
   const lang = langOf(request);
@@ -233,6 +240,7 @@ export async function* makeFromTemplate(o: TemplateOptions): AsyncGenerator<Chat
         if (!first) first = data;
         const done = site.render(sitePage(plan, { language: lang, ...data }, i, first));
         made.push(mk(`${page.file}.html`, done.source));
+        try { const q = fileQuality("html", done.source); if (!quality || q.score < quality.score) quality = { ...qualityField("page", q), notes: q.failed.map((f) => `${page.file}.html: ${f.note}`) }; } catch { /* a score is a report */ }
         g.status = "done"; g.sec = Math.round(((Date.now() - (g.at ?? Date.now())) / 1000) * 10) / 10; g.note = `${done.source.split("\n").length} lines`;
         step.status = "done";
         yield { id: o.id, type: "replace", text: made.join("\n\n") };
@@ -262,6 +270,10 @@ export async function* makeFromTemplate(o: TemplateOptions): AsyncGenerator<Chat
   phase = `Filling in the ${tpl.name.toLowerCase()}…`;
   yield run();
   let data: unknown = null, problems: string[] = [];
+  // the data is judged twice: the template's own rules refuse it (a missing title, a formula that cannot run), and the rubric of the
+  // finished file asks once more when it is thin, filler or repetitive; of the tries that the rules accept, the best scored is kept
+  const rubric = rubricOf(tpl.kind);
+  let best: { got: unknown; q: QualityScore } | null = null;
   const safeTitle = (t: string) => t.replace(/"/g, "'").slice(0, 80);
   const artifactOf = (title: string, source: string) => `<artifact type="${tpl!.kind === "site" || tpl!.kind === "tool" ? "html" : tpl!.kind}" title="${tpl!.kind === "site" || tpl!.kind === "tool" ? "index.html" : safeTitle(title)}">\n${source.trim()}\n</artifact>`;
   let shown = "";
@@ -294,8 +306,16 @@ export async function* makeFromTemplate(o: TemplateOptions): AsyncGenerator<Chat
     if (o.signal?.aborted) throw new Error("aborted");
     const got = firstJson(reply);
     problems = got ? tpl.problems(got) : ["the answer was not a JSON object"];
-    if (got && !problems.length) { data = got; break; }
+    if (got && !problems.length) {
+      let q: QualityScore | null = null;
+      try { q = rubric ? fileQuality(rubric, tpl.render({ language: lang, ...(got as object) }).source) : null; } catch { /* unscorable: the rules accepted it */ }
+      if (!q || q.score >= QUALITY_BAR) { data = got; if (q) best = { got, q }; break; }
+      if (!best || q.score > best.q.score) best = { got, q };
+      problems = qualityProblems(q);
+    }
   }
+  if (!data && best) data = best.got;
+  if (best && rubric) quality = qualityField(rubric === "html" ? "page" : rubric, best.q);
   live = "";
   if (!data) { end(filling, "skipped", `the data did not hold up (${problems[0] ?? "no answer"}); writing it freely`); yield { id: o.id, type: "notice", text: `Template skipped: the filled-in fields were refused twice (${problems[0] ?? "no answer"}).` }; yield run(); if (shown) yield { id: o.id, type: "replace", text: "" }; return yield* freeWay(); }
   const d = data as Record<string, unknown>;

@@ -6,6 +6,7 @@ import { settle } from "../harness/settle";
 import type { SettledStep } from "../harness/run";
 import { firstJson } from "../look";
 import { Workbook, parseSheets, plainLabel } from "../sheet";
+import { xlsxQuality } from "../fileQuality";
 import { langOf, type Lang } from "./kit";
 
 /**
@@ -257,7 +258,8 @@ export async function* makeCalcSheet(o: CalcOptions, request: string, add: (s: C
   const stages: BuildStage[] = [];
   const steps: BuildStep[] = [{ file: "Spreadsheet", action: "new", job: "from the figures of the request", status: "running", stages }];
   let phase = "";
-  const run = (status: BuildRun["status"] = "running"): ChatEvent => ({ id: o.id, type: "build", build: { status, steps: steps.map((s) => ({ ...s, stages: s.stages?.map((g) => ({ ...g })) })), phase } });
+  let quality: { rubric: string; score: number; notes: string[] } | undefined;
+  const run = (status: BuildRun["status"] = "running"): ChatEvent => ({ id: o.id, type: "build", build: { status, steps: steps.map((s) => ({ ...s, stages: s.stages?.map((g) => ({ ...g })) })), phase, ...(quality ? { quality } : {}) } });
   const begin = (id: string, label: string, note: string): BuildStage => { const g: BuildStage = { id, label, status: "running", note, agent: "Writer", model: o.modelOf?.(), at: Date.now() }; stages.push(g); return g; };
   const end = (g: BuildStage, status: BuildStage["status"], note?: string) => { g.status = status; g.sec = Math.round(((Date.now() - (g.at ?? Date.now())) / 1000) * 10) / 10; if (note !== undefined) g.note = note; };
   // a session with ":x:" in its id is one of the short closed questions: it does not think
@@ -332,6 +334,7 @@ export async function* makeCalcSheet(o: CalcOptions, request: string, add: (s: C
   const results = sheetAnswers(source, plan, lang);
   if (results.length < plan.answers.length) return yield* fail(g4, "a formula of the sheet does not calculate");
   end(g4, "done", `${source.split("\n").length} lines`);
+  try { const q = xlsxQuality(source); quality = { rubric: "xlsx", score: q.score, notes: q.failed.map((f) => f.note) }; } catch { /* a score is a report */ }
   steps[0].status = "done";
   phase = "";
   // the verdict is settle()'s over every model call the sheet's making made: the only writer of the final status
