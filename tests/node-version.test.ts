@@ -1,36 +1,40 @@
-// The project requires Node.js 26 (package.json "engines"). The version matters beyond pdf.js:
-// generated code runs under Node's permission model, and only from Node 25 on does that model
-// block network access. CI on Node 24 let a locked-down process open a connection. So CI, the
-// release build and the runtime bundled into the installer must all use the same major version.
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import * as path from "node:path";
 
-const REQUIRED = 26;
 const read = (p: string) => readFileSync(p, "utf8");
+const manifest = JSON.parse(read("package.json"));
 
 describe("one Node.js version everywhere", () => {
-  it("package.json engines names the required major", () => {
-    expect(JSON.parse(read("package.json")).engines?.node).toBe(`>=${REQUIRED}`);
+  it("the version file, package engine and README agree on the security floor", () => {
+    const version = read(".node-version").trim();
+    expect(version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(manifest.engines?.node).toBe(">=" + version);
+    expect(read("README.md")).toContain("Node.js " + version);
   });
 
-  it("every workflow sets up that major", () => {
+  it("all setup-node steps in CI and release use the version file", () => {
     const dir = ".github/workflows";
-    const versions = readdirSync(dir).filter((f) => f.endsWith(".yml"))
-      .flatMap((f) => [...read(path.join(dir, f)).matchAll(/node-version:\s*([^\s,}]+)/g)].map((m) => `${f}: ${m[1]}`));
-    expect(versions.length).toBeGreaterThan(0);
-    for (const v of versions) expect(v).toMatch(new RegExp(`: ${REQUIRED}$`));
+    const workflows = readdirSync(dir).filter((f) => f.endsWith(".yml")).map((f) => read(path.join(dir, f)));
+    const steps = workflows.join("\n");
+    const actions = [...steps.matchAll(/uses:\s*actions\/setup-node@/g)];
+    expect(actions.length).toBeGreaterThan(0);
+    expect([...steps.matchAll(/node-version-file:\s*\.node-version(?=[\s,}])/g)]).toHaveLength(actions.length);
+    expect(steps).not.toMatch(/node-version:\s*/);
   });
 
-  it("the Windows build refuses an older Node", () => {
-    const src = read("scripts/Build-Windows.ps1");
-    expect(src).toMatch(new RegExp(`\\$nodeMajor -lt ${REQUIRED}\\b`));
-    expect(src).not.toMatch(/Node\.js 24/);
+  it.each(["Build-Windows", "Bundle-Sidecar"])("the %s script checks the full Node version", (name) => {
+    const script = read("scripts/" + name + ".ps1");
+    expect(script).toContain(".node-version");
+    expect(script).toMatch(/process\.versions\.node[\x22]/);
+    expect(script).toMatch(/\$nodeVersion -lt \$minimumNodeVersion/);
   });
 
-  it("the runtime bundled into the installer is checked for that major", () => {
-    const src = read("scripts/Bundle-Sidecar.ps1");
-    expect(src).toMatch(/process\.versions\.node/);
-    expect(src).toMatch(new RegExp(`-lt ${REQUIRED}\\b`));
+  it("the Windows build and README follow the exact pnpm pin", () => {
+    expect(manifest.packageManager).toMatch(/^pnpm@\d+\.\d+\.\d+$/);
+    expect(read("README.md")).toContain("pnpm " + manifest.packageManager.slice(5));
+    const script = read("scripts/Build-Windows.ps1");
+    expect(script).toContain(".packageManager");
+    expect(script).toMatch(/\$pnpmVersion -ne \$requiredPnpmVersion/);
   });
 });

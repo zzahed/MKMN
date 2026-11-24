@@ -25,7 +25,7 @@ const worker = path.join(dist, "sidecar", "isolateWorker.js");
 
 beforeAll(() => {
   // the worker runs as compiled JavaScript, the way the app ships it
-  execFileSync(process.execPath, [path.join(root, "node_modules", "typescript", "bin", "tsc"), "-p", path.join(root, "tsconfig.sidecar.json")], { cwd: root, windowsHide: true, stdio: "ignore" });
+  execFileSync(process.execPath, [path.join(root, "node_modules", "typescript-compiler", "bin", "tsc"), "-p", path.join(root, "tsconfig.sidecar.json")], { cwd: root, windowsHide: true, stdio: "ignore" });
   if (!existsSync(worker)) throw new Error("the sidecar did not build");
 }, 180_000);
 

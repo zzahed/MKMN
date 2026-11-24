@@ -909,7 +909,6 @@ describe("a model for each job", () => {
 });
 
 import { siteEntry, siteFileName, siteFiles } from "../src/core/site";
-import { quickErrors } from "../src/core/codecheck";
 import { withNavShim } from "../src/core/artifacts";
 
 describe("launching a site", () => {

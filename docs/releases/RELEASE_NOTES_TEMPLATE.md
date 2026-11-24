@@ -11,7 +11,7 @@
 
 - **Node.js:** <version, from `node --version` on the build PC> (ARM64), copied
   into the installer by `scripts/Bundle-Sidecar.ps1`.
-- MKMN needs Node.js 26 or later. Code a model writes runs in a locked-down Node
+- MKMN needs Node.js 26.13.1 or later. Code a model writes runs in a locked-down Node
   process, and only from Node.js 25 on does that lock block network access. The
   bundling script refuses an older Node.js, and at start the app checks that the
   bundled one really blocks the network; if it does not, generated code is

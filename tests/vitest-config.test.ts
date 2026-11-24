@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import config from "../vitest.config";
+import config from "../vitest.config.mts";
 
 /**
  * An unhandled rejection can hide a failing assertion, so a run with one is a failed run.

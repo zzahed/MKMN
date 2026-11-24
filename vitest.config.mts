@@ -1,7 +1,7 @@
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  esbuild: { jsx: "automatic" },
+  oxc: { jsx: { runtime: "automatic" } },
   // .tsx tests are component interaction tests: each declares `@vitest-environment jsdom`
   // (the node environment stays the default for the pure-logic tests).
   // setup-model-guard fails any test that opens a real connection: model requests
