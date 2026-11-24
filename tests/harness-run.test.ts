@@ -388,6 +388,41 @@ describe("the harness run and its journal", () => {
       expect(readFileSync(corrupt, "utf8")).toBe(before);
     });
 
+    // Codex review of #53: the first resume appended onto the torn fragment, so the fragment became
+    // an inner line and every later resume refused the journal as corrupt.
+    it("seals a torn last line, so the journal can be resumed again and loses no entry", async () => {
+      const jf = file("r-torn-twice.jsonl");
+      const seen: string[] = [];
+      appendEntry(jf, settledRecord("r-torn2", 0, "a", 1));
+      appendFileSync(jf, `{"type":"step_started","runId":"r-torn2","seq":1`); // the process died mid-write
+      const defs = () => [step("a", 1, seen), step("b", 2, seen), step("c", 3, seen)];
+      const once = createRun(defs(), { runId: "r-torn2", pipeline: "test", journalFile: jf });
+      await once.next(); // a, replayed
+      await once.next(); // b, executed and journaled
+      expect(seen).toEqual(["b"]);
+      expect(readJournal(jf).entries.some((e) => e.type === "step" && e.id === "b")).toBe(true); // not glued onto the fragment
+
+      seen.length = 0;
+      const twice = createRun(defs(), { runId: "r-torn2", pipeline: "test", journalFile: jf });
+      for (let r = await twice.next(); !r.done; r = await twice.next()) { /* run it out */ }
+      expect(seen).toEqual(["c"]);
+      expect(twice.state).toBe("done");
+    });
+
+    // Codex review of #53: a step inserted before the interrupted one moved it, and the side-effect
+    // check read the inserted step at the old position.
+    it("refuses when an interrupted step no longer stands at its position in the plan", async () => {
+      const jf = file("r-moved.jsonl");
+      appendEntry(jf, settledRecord("r-moved", 0, "plan", 1));
+      appendEntry(jf, { type: "step_started", runId: "r-moved", seq: 1, id: "send", startedAt: "" });
+      const before = readFileSync(jf, "utf8");
+      const seen: string[] = [];
+      const resumed = createRun([step("plan", 1, seen), step("tidy", 2, seen), step("send", 3, seen, { sideEffects: true })], { runId: "r-moved", pipeline: "test", journalFile: jf });
+      await expect(resumed.next()).rejects.toThrow(/interrupted step 1 \(send\) does not match the current execution plan/);
+      expect(seen).toEqual([]);
+      expect(readFileSync(jf, "utf8")).toBe(before);
+    });
+
     it("refuses a journal that holds another run's entries", async () => {
       const jf = file("r-mixed.jsonl");
       appendEntry(jf, settledRecord("r-mine", 0, "a", 1));

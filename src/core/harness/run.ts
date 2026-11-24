@@ -17,6 +17,7 @@ import {
   journalPath,
   readJournal,
   resumeReplay,
+  sealTornTail,
   type JournalStep,
   type JournalEntry,
   type PromptSectionRef,
@@ -191,7 +192,7 @@ export function createRun(defs: StepDef<unknown, unknown>[], opts: RunOptions): 
     // Resume: replay the settled steps of the journal, mark the dangling ones interrupted.
     let firstIndex = 0;
     if (file !== null && readJournal(file).entries.length > 0) {
-      const { settled: replayed, dangling, corrupt, foreign } = resumeReplay(file, runId);
+      const { settled: replayed, dangling, corrupt, foreign, torn } = resumeReplay(file, runId);
       // Every refusal comes before the first write, so a refused resume leaves the journal as it was.
       const refuse = (why: string): never => { throw new Error(`Cannot resume run ${runId}: ${why}`); };
       if (foreign > 0) refuse(`the journal holds ${foreign} ${foreign === 1 ? "entry" : "entries"} of another run.`);
@@ -210,8 +211,16 @@ export function createRun(defs: StepDef<unknown, unknown>[], opts: RunOptions): 
       }
       // A step that died mid-way may have done its work already: one that changes the world outside
       // the run is never run a second time on its own.
+      // Checked against the step that stands at its position, so a step inserted before it cannot
+      // move it out from under the side-effect check.
       for (const d of dangling) {
-        if (defs[d.seq]?.sideEffects) refuse(`step ${d.seq} (${d.id}) was interrupted before it settled and has side effects, so it is not run again automatically.`);
+        if (defs[d.seq]?.id !== d.id) refuse(`interrupted step ${d.seq} (${d.id}) does not match the current execution plan at position ${d.seq}.`);
+        if (defs[d.seq].sideEffects) refuse(`step ${d.seq} (${d.id}) was interrupted before it settled and has side effects, so it is not run again automatically.`);
+      }
+      // Accepted: from here the resume writes. A torn last line is ended and marked first, so the next
+      // entry does not glue onto it and a later resume does not take it for corruption.
+      if (torn) {
+        try { sealTornTail(file, runId); } catch (e) { console.error(`[harness] could not seal the torn journal of run ${runId}: ${(e as Error).message}`); }
       }
       for (const d of dangling) {
         journalWrite({
