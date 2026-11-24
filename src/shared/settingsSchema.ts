@@ -171,7 +171,7 @@ export const SETTINGS_SCHEMA = [
     legacy: { tab: "models", section: "sec-models-retention" },
   },
   {
-    key: "warmUpWhileTyping", type: "boolean", default: false,
+    key: "warmUpWhileTyping", type: "boolean", default: true,
     scope: "app", level: "everyday", group: "models", applies: "now",
     label: "Warm up while typing",
     description: "Load the chat's local model as you start typing, before Send.",

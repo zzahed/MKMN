@@ -1094,7 +1094,7 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
           <span>Start loading the model while I type <Dot c={changed} k="warmUpWhileTyping" /></span>
         </label>
         <p className="muted small">
-          Answers start sooner, but the model uses memory and power as soon as you start typing, even if you never send the message. Off by default.
+          Answers start sooner, but the model uses memory and power as soon as you start typing, even if you never send the message. On by default.
         </p>
         <p className="muted small">
           {rt.idleReleaseSec === 0

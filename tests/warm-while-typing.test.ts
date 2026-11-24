@@ -46,14 +46,14 @@ beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); });
 
 describe("the setting", () => {
-  it("is off by default, in Speed & memory, and the same default in the host", () => {
-    expect(settingDefault("warmUpWhileTyping")).toBe(false);
+  it("is on by default, in Speed & memory, and the same default in the host", () => {
+    expect(settingDefault("warmUpWhileTyping")).toBe(true);
     const decl = settingDecl("warmUpWhileTyping");
     expect(decl?.group).toBe("models");
     expect(decl?.type).toBe("boolean");
     const rust = readFileSync("src-tauri/src/settings_defaults.rs", "utf8");
     expect(rust).toMatch(/key: "warmUpWhileTyping", kind: "boolean"/);
-    expect(rust).toMatch(/"warmUpWhileTyping": false/);
+    expect(rust).toMatch(/"warmUpWhileTyping": true/);
   });
 
   it("off: typing loads nothing", () => {

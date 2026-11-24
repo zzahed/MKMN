@@ -2,7 +2,7 @@ import { ChildProcess, spawn, execFile } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import { FriendlyError, InstalledModel, InstallProgress } from "../shared/types";
-import { friendly, isNoise } from "./errors";
+import { isNoise, pullFailure } from "./errors";
 
 export const DEFAULT_ENDPOINT = "http://127.0.0.1:18181/v1";
 
@@ -334,14 +334,14 @@ export function pullModel(
     child.stdout?.on("data", feed);
     child.stderr?.on("data", feed);
     child.on("error", (e) => {
-      onProgress({ ref, phase: "error", percent: null, error: friendly(e.message) ?? undefined });
+      onProgress({ ref, phase: "error", percent: null, error: pullFailure(e.message) });
       resolve();
     });
     child.on("close", (code) => {
       if (pendingAnswer) clearTimeout(pendingAnswer);
       if (cancelled) onProgress({ ref, phase: "cancelled", percent: null });
       else if (code === 0) onProgress({ ref, phase: "done", percent: 100 });
-      else onProgress({ ref, phase: "error", percent: null, error: friendly(tail) ?? { id: "pull", title: "Download failed", fix: "Check your connection and disk space, then try again; the download resumes.", raw: tail } });
+      else onProgress({ ref, phase: "error", percent: null, error: pullFailure(tail) });
       resolve();
     });
   });

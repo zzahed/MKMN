@@ -143,7 +143,7 @@ static DEFAULTS_JSON: &str = r#"
         "autoGoal": "balanced",
         "compute": "npu",
         "idleReleaseSec": 300,
-        "warmUpWhileTyping": false,
+        "warmUpWhileTyping": true,
         "keepaliveSec": 300,
         "loadingStrategy": "demand",
         "startupTimeoutSec": 90,
