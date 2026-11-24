@@ -6,7 +6,10 @@
 //!   - **The driver process**: spawned lazily, `CREATE_NO_WINDOW`, job-object
 //!     member, generation-scoped pending calls, bounded kill on shutdown. A
 //!     call that misses its deadline fails; a wedged driver is killed and the
-//!     next call spawns a fresh generation.
+//!     next call spawns a fresh generation. An idle driver (no grant, no call
+//!     for `IDLE_RELEASE`) exits on its own, and a live one runs on the
+//!     efficiency path (BELOW_NORMAL + EcoQoS): it waits on other programs'
+//!     UI, so it never needs a performance core.
 //!   - **The pin**: the driver announces its name/version/protocol on start
 //!     (`agent_wire::check_pin`); a build that is not the pinned one never
 //!     serves a call.
@@ -39,6 +42,24 @@ use crate::agent_wire::{
 const CALL_TIMEOUT: Duration = Duration::from_secs(10);
 /// How long the handshake (`ready` announcement) may take.
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
+/// How long a driver with no grant and no call stays resident. The picker's list and
+/// refresh land well inside it; after that the process is released and the next call
+/// starts a fresh one (a short spawn, against a resident process for the whole session).
+const IDLE_RELEASE: Duration = Duration::from_secs(60);
+/// How often the idle check runs while a driver is alive.
+const IDLE_CHECK: Duration = Duration::from_secs(15);
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// Whether a driver last used at `last_used_ms` has been idle long enough to release.
+fn idle_expired(last_used_ms: u64, now_ms: u64, idle: Duration) -> bool {
+    now_ms.saturating_sub(last_used_ms) >= idle.as_millis() as u64
+}
 
 type PendingMap = Arc<Mutex<HashMap<String, oneshot::Sender<Result<Value, String>>>>>;
 
@@ -70,7 +91,9 @@ pub struct AgentDriverHost {
     pending: PendingMap,
     counter: AtomicU64,
     generation: AtomicU64,
-    grant: Mutex<Option<Grant>>,
+    grant: Arc<Mutex<Option<Grant>>>,
+    /// When the driver was last asked for anything (ms since the epoch): the idle release reads it.
+    last_used: Arc<AtomicU64>,
     app: AppHandle,
 }
 
@@ -81,7 +104,8 @@ impl AgentDriverHost {
             pending: Arc::new(Mutex::new(HashMap::new())),
             counter: AtomicU64::new(0),
             generation: AtomicU64::new(0),
-            grant: Mutex::new(None),
+            grant: Arc::new(Mutex::new(None)),
+            last_used: Arc::new(AtomicU64::new(0)),
             app,
         }
     }
@@ -123,6 +147,9 @@ impl AgentDriverHost {
     /// announcement. The whole transition runs under the process lock.
     async fn ensure_spawned(&self) -> Result<(), String> {
         let mut guard = self.process.lock().await;
+        // Touched under the process lock: the idle release checks it under the same lock,
+        // so a driver someone is about to use is never released under them.
+        self.last_used.store(now_ms(), Ordering::Relaxed);
         if let Some(p) = guard.as_mut() {
             match p.child.try_wait() {
                 Ok(None) => return Ok(()),
@@ -291,8 +318,53 @@ impl AgentDriverHost {
                 path.display()
             ),
         );
+        // The efficiency path: the driver spends its life waiting on other programs' UI
+        // Automation, so BELOW_NORMAL + EcoQoS costs a run nothing and keeps it off the
+        // performance cores. Eco-only: the app-wide sleep inhibit geniex holds is untouched.
+        if let Some(pid) = child.id()
+            && let Err(e) = crate::qos::apply_pid_eco_only(pid) {
+                log::warn!("[agent-desktop] could not apply EcoQoS: {e}");
+            }
         *guard = Some(DriverProcess { child, stdin: tx, generation });
+        drop(guard);
+        self.spawn_idle_release(generation);
         Ok(())
+    }
+
+    /// Releases this generation's driver once it has had no grant and no call for
+    /// `IDLE_RELEASE`. Ends on its own when the generation is replaced or gone.
+    fn spawn_idle_release(&self, generation: u64) {
+        let slot = self.process.clone();
+        let grant = self.grant.clone();
+        let last_used = self.last_used.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(IDLE_CHECK).await;
+                // The grant is read BEFORE the process lock (begin_grant takes them in the
+                // other order); a grant that lands in between finds the driver gone and its
+                // first call respawns one.
+                if grant.lock().await.is_some() {
+                    continue;
+                }
+                let mut guard = slot.lock().await;
+                if guard.as_ref().map(|p| p.generation) != Some(generation) {
+                    return;
+                }
+                if !idle_expired(last_used.load(Ordering::Relaxed), now_ms(), IDLE_RELEASE) {
+                    continue;
+                }
+                let taken = guard.take();
+                drop(guard);
+                if let Some(mut p) = taken {
+                    crate::paths::lifecycle_log(
+                        "agent-driver",
+                        &format!("idle for {} s with no grant: releasing the driver (generation {})", IDLE_RELEASE.as_secs(), p.generation),
+                    );
+                    let _ = tokio::time::timeout(Duration::from_secs(2), p.child.kill()).await;
+                }
+                return;
+            }
+        });
     }
 
     async fn fail_pending(&self) {
@@ -320,23 +392,39 @@ impl AgentDriverHost {
             match guard.as_ref() {
                 Some(p) => {
                     self.pending.lock().await.insert(id.clone(), tx);
-                    p.stdin.try_send(request.to_string()).is_ok()
+                    p.stdin.try_send(request.to_string()).is_ok().then_some(p.generation)
                 }
-                None => false,
+                None => None,
             }
         };
-        if !sent {
+        let Some(generation) = sent else {
+            self.pending.lock().await.remove(&id);
             return Err("The agent-desktop driver is not running.".into());
-        }
-        match tokio::time::timeout(CALL_TIMEOUT, rx).await {
+        };
+        let outcome = tokio::time::timeout(CALL_TIMEOUT, rx).await;
+        self.last_used.store(now_ms(), Ordering::Relaxed);
+        match outcome {
             Ok(Ok(result)) => result,
             Ok(Err(_)) => Err("The agent-desktop driver dropped the call.".into()),
             Err(_) => {
                 self.pending.lock().await.remove(&id);
+                // The driver answers one call at a time: one stuck in a wedged COM call
+                // would make every later call miss its deadline too. Kill THIS generation
+                // (never a newer one) so the next call spawns a fresh driver.
+                let wedged = {
+                    let mut guard = self.process.lock().await;
+                    if guard.as_ref().map(|p| p.generation) == Some(generation) { guard.take() } else { None }
+                };
                 crate::paths::lifecycle_log(
                     "agent-driver",
-                    &format!("call \"{method}\" missed its {} s deadline; the generation discipline recovers it", CALL_TIMEOUT.as_secs()),
+                    &format!(
+                        "call \"{method}\" missed its {} s deadline; killing generation {generation} so the next call starts a fresh driver",
+                        CALL_TIMEOUT.as_secs()
+                    ),
                 );
+                if let Some(mut p) = wedged {
+                    let _ = tokio::time::timeout(Duration::from_secs(2), p.child.kill()).await;
+                }
                 Err(format!("The agent-desktop driver did not answer \"{}\" in time.", method))
             }
         }
@@ -512,6 +600,16 @@ fn grant_log_line(grant: &Grant) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_idle_driver_is_released_only_after_the_idle_window() {
+        let idle = Duration::from_secs(60);
+        assert!(!idle_expired(1_000, 1_000, idle));
+        assert!(!idle_expired(1_000, 60_999, idle));
+        assert!(idle_expired(1_000, 61_000, idle));
+        // a clock that stepped backwards never releases a driver early
+        assert!(!idle_expired(10_000, 5_000, idle));
+    }
 
     #[test]
     fn grant_log_line_names_no_window_contents() {

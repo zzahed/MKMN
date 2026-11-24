@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { useDocumentVisible } from "./useDocumentVisible";
 import { DEFAULT_METRICS, formatAccelerator, formatPercent, formatProcessCpu, formatProcessRam, lastUpdatedText, livePills, metricsAreLive, statusBadgeKind, type SystemMetricsPayload } from "./metricsModel";
 
 export const TitlebarMetrics: React.FC = () => {
@@ -15,10 +16,15 @@ export const TitlebarMetrics: React.FC = () => {
   const flyoutOpenRef = useRef(false);
   flyoutOpenRef.current = flyoutOpen;
 
+  // A hidden window shows no verdict, so it needs no re-render either; becoming visible
+  // re-renders at once (the visibility change itself), then the beat resumes.
+  const docVisible = useDocumentVisible();
   useEffect(() => {
+    if (!docVisible) return;
+    setTick((t) => t + 1);
     const id = window.setInterval(() => setTick((t) => t + 1), 5_000);
     return () => window.clearInterval(id);
-  }, []);
+  }, [docVisible]);
 
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {

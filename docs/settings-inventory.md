@@ -63,7 +63,7 @@ still declares its default, so nothing restates one.
 | `speculativeDecoding.specType` | enum | `"ngram-simple"` | `ngram-simple` · `ngram-cache` · `ngram-mod` · `ngram-map-k` · `ngram-map-k4v` · `draft-simple` · `draft-mtp` · `draft-eagle3` | app | advanced | models | Draft strategy | model-reload | yes — models (sec-models-speculative) |
 | `startupTimeoutSec` | number | `90` | 30 – 300 | app | advanced | models | Startup timeout | model-reload | yes — models (sec-models-retention) |
 | `vitCompute` | string | `""` |  | app | advanced | models | Vision encoder | model-reload | yes — models (sec-models-offload) |
-| `warmUpWhileTyping` | boolean | `true` |  | app | everyday | models | Warm up while typing | now | yes — models (sec-models-retention) |
+| `warmUpWhileTyping` | boolean | `false` |  | app | everyday | models | Warm up while typing | now | yes — models (sec-models-retention) |
 | `autoCompact` | boolean | `true` |  | chat | everyday | chats | Keep long chats going | now | yes — build (sec-chats-long) |
 | `effort` | enum | `"auto"` | `auto` · `off` · `low` · `medium` · `high` | message | everyday | chats | Thinking | now | yes — build (sec-chats-thinking) |
 | `humainMode` | enum | `"local"` | `local` · `fuse` · `node` | app | everyday | chats | Chat location | now | yes — chats (sec-chats-location) |
