@@ -286,8 +286,11 @@ describe("generated code runs only on a runtime that is proven to block the netw
     expect(run([...locked, "--allow-fs-write=*"])).toBe("FS_WRITE_OPEN");
     expect(run([...locked, "--allow-child-process"])).toBe("CHILD_PROCESS_OPEN");
     expect(run([...locked, "--allow-worker"])).toBe("WORKER_OPEN");
+    // the reply-integrity fix (#55) relies on the worker's builtins being frozen: a runtime that
+    // ignores --frozen-intrinsics, or a runner started without it, is not proven safe
+    expect(run(locked.filter((f) => f !== "--frozen-intrinsics"))).toBe("INTRINSICS_OPEN");
     expect(run([...locked, "--allow-net"])).toMatch(/^E(?!RR_)[A-Z0-9]+$/); // the network is open: a socket error, ECONNREFUSED
-    for (const out of ["FS_WRITE_OPEN", "CHILD_PROCESS_OPEN", "WORKER_OPEN"]) expect(probeVerdict(out)).toBe(false);
+    for (const out of ["FS_WRITE_OPEN", "CHILD_PROCESS_OPEN", "WORKER_OPEN", "INTRINSICS_OPEN"]) expect(probeVerdict(out)).toBe(false);
     for (const out of ["FS_WRITE_UNKNOWN", "CHILD_PROCESS_UNKNOWN", "WORKER_UNKNOWN"]) expect(probeVerdict(out)).toBeNull();
   }, 120_000);
 

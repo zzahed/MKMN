@@ -43,6 +43,8 @@ export function codeDirs(sidecarDir: string): string[] {
  * - SQLITE_AVAILABLE: node:sqlite is still there (it writes files past the permission model);
  * - FS_WRITE_OPEN, CHILD_PROCESS_OPEN, WORKER_OPEN: that call worked (a written file is removed);
  * - FS_WRITE_UNKNOWN (and so on): it failed for another reason than the permission model;
+ * - INTRINSICS_OPEN: the process's builtins are not frozen (--frozen-intrinsics), which the
+ *   worker's reply relies on: an escape could bend the verdict and the reply it is sent in;
  * - and then, all of them denied, how one TCP connection ended. Nothing needs to listen: a
  *   runtime that enforces the ban answers ERR_ACCESS_DENIED before any packet is sent, and one
  *   that does not answers ECONNREFUSED (or CONNECTED).
@@ -57,20 +59,21 @@ export const ISOLATION_PROBE = [
   `];`,
   `let out = p.getBuiltinModule("node:sqlite") ? "SQLITE_AVAILABLE" : "";`,
   `for (const [name, f] of checks) { if (out) break; const r = tryIt(f); if (r) out = name + "_" + r; }`,
+  `if (!out && ![Object.prototype, Array.prototype, Function.prototype, JSON].every(Object.isFrozen)) out = "INTRINSICS_OPEN";`,
   `if (out) { try { fs.rmSync(file, { force: true }); } catch {} console.log(out); }`,
   `else { const s = require("net").connect(9, "127.0.0.1"); s.on("connect", () => { console.log("CONNECTED"); s.destroy(); }); s.on("error", (e) => console.log(e.code)); }`,
 ].join("\n");
 const PROBE_MS = 10_000;
 /**
  * What the probe printed. Only ERR_ACCESS_DENIED proves every restriction (true). CONNECTED, a
- * socket error code (ECONNREFUSED, EACCES...), SQLITE_AVAILABLE or a ..._OPEN proves the runtime
+ * socket error code (ECONNREFUSED, EACCES...), SQLITE_AVAILABLE or an ..._OPEN proves the runtime
  * unsafe (false). No output, a ..._UNKNOWN, a timeout, a crash or anything else cannot tell
  * (null): never taken as proof, and asked again next run.
  */
 export function probeVerdict(stdout: unknown): boolean | null {
   const out = String(stdout ?? "").trim();
   if (out === "ERR_ACCESS_DENIED") return true;
-  if (/^(?:CONNECTED|SQLITE_AVAILABLE|(?:FS_WRITE|CHILD_PROCESS|WORKER)_OPEN|E(?!RR_)[A-Z0-9]+)$/.test(out)) return false;
+  if (/^(?:CONNECTED|SQLITE_AVAILABLE|INTRINSICS_OPEN|(?:FS_WRITE|CHILD_PROCESS|WORKER)_OPEN|E(?!RR_)[A-Z0-9]+)$/.test(out)) return false;
   return null;
 }
 
