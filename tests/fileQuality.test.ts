@@ -1,7 +1,7 @@
 // The quality of generated Word documents, spreadsheets and web pages: the rubrics (src/core/fileQuality.ts), calibrated against the
 // app's own templates, the pipelines that report a score and ask once more when a file is weak, and the eval personas.
 import { describe, expect, it } from "vitest";
-import { docxQuality, pageQuality, xlsxQuality } from "../src/core/fileQuality";
+import { docxQuality, pageQuality, strip, xlsxQuality } from "../src/core/fileQuality";
 import { EXCEL_TEMPLATES } from "../src/core/templates/excel";
 import { WORD_TEMPLATES } from "../src/core/templates/word";
 import { makeFromTemplate } from "../src/core/templates/build";
@@ -49,6 +49,9 @@ describe("the spreadsheet rubric", () => {
 describe("the page rubric", () => {
   const page = (body: string, extra = "") => `<!doctype html><html><head><title>Green Bean Café</title></head><body><nav><a href="#about">About us</a><a href="#menu">Menu</a></nav>${extra}${body}</body></html>`;
   const GOOD = `<h1>Green Bean Café</h1><section id="about"><h2>About us</h2><p>Beans are roasted every morning in the back room, in small batches for a sweeter cup.</p><p>Long tables and soft light make it easy to stay and work for hours.</p></section><section id="menu"><h2>Menu</h2><ul><li>Espresso drinks made with our house blend and oat or almond milk at no extra cost.</li><li>Pastries delivered at seven from the bakery two streets away, until they run out.</li></ul></section><section id="visit"><h2>Visit</h2><p>Open every day from seven in the morning until six in the evening, near the station.</p><img src="x.jpg" alt="The front counter"></section>`;
+  it("decodes a page's entities once: the text \"&amp;lt;\" stays \"&lt;\"", () => {
+    expect(strip("<p>a &amp;lt;b&amp;gt; &lt;i&gt; Tom &amp; Jerry&nbsp;&quot;x&quot; it&#39;s</p>")).toBe("a &lt;b&gt; <i> Tom & Jerry \"x\" it's");
+  });
   it("a real page passes; the menu repeating the section titles is not a repeat", () => {
     expect(pageQuality(page(GOOD))).toEqual({ score: 1, failed: [] });
   });

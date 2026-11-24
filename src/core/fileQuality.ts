@@ -109,7 +109,9 @@ export const xlsxQuality = (src: string): QualityScore => scoreRubric(XLSX_RUBRI
 // ---------------------------------------------------------------- web pages (one HTML file)
 
 interface Page { title: string; h1: number; sections: number; headings: string[]; texts: string[]; words: number; anchors: string[]; ids: Set<string>; imgsNoAlt: number }
-const strip = (h: string) => h.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
+/** The entities a page's text decodes, in ONE pass: decoding &amp; first and the others after would turn the text "&amp;lt;" into "<" instead of "&lt;". */
+const ENTITIES: Record<string, string> = { "&nbsp;": " ", "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": "\"", "&#39;": "'" };
+export const strip = (h: string) => h.replace(/<[^>]+>/g, " ").replace(/&(?:nbsp|amp|lt|gt|quot|#39);/g, (e) => ENTITIES[e]).replace(/\s+/g, " ").trim();
 export function readPage(html: string): Page {
   // what the reader sees: never the script, the style, the menu (it repeats the section titles on purpose) or data blocks
   const seen = html.replace(/<(script|style|nav|template|noscript)\b[\s\S]*?<\/\1>/gi, " ").replace(/<!--[\s\S]*?-->/g, " ");
