@@ -12,7 +12,7 @@ export default defineConfig({
     exclude: ["tests/e2e/**", "node_modules/**"],
     dangerouslyIgnoreUnhandledErrors: false,
     testTimeout: 20000,
-    setupFiles: ["tests/setup-model-guard.ts"],
+    setupFiles: ["tests/setup-model-guard.ts", "tests/setup-journal-key.ts"],
     coverage: {
       provider: "v8",
       include: ["src/**/*.{ts,tsx}"],

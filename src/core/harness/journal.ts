@@ -12,7 +12,8 @@
  * file, and the tests pin that. "Copy full log" and the build progress views read
  * these lines.
  */
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import * as path from "node:path";
 import { mkmnPaths } from "../../shared/paths";
 
@@ -124,10 +125,122 @@ export function journalPath(runId: string, env: NodeJS.ProcessEnv = process.env)
   return path.join(journalDir(env), `${runId}.jsonl`);
 }
 
-/** Append one line. Creates the folder on first write; never touches existing bytes. */
+// ---------------------------------------------------------------------------------------------
+// Integrity (security pre-review 2026-11-24, F5 item 5). A resume replays the outputs a journal
+// records, so whatever could write the file could make a run "complete" steps it never ran. Every
+// line therefore ends with `"mac":"<hex>"`: an HMAC-SHA256, under this install's key, of the MAC
+// of the line before it and of the exact bytes of this line without that field. A changed, removed,
+// inserted, reordered or unsigned line, or a journal from another install, fails the chain and the
+// resume refuses it. Lines cut off at the END are not detected (that is what a crash leaves; a
+// resume re-runs those steps, and an interrupted side-effecting step is never re-run on its own).
+// The key is readable by the same Windows user, so this does not stop a program already running as
+// them; it stops forged and copied journals, stray edits, and generated code (which cannot write
+// files at all). The key never sits beside a journal, so a copied-in workspace cannot bring one
+// that vouches for its own forged journal. Offloaded reply files (offload.ts) are not covered: a resume does not read them.
+// ---------------------------------------------------------------------------------------------
+
+const CHAIN_START = "mkmn-journal-v1";
+const MAC_FIELD = /,"mac":"([0-9a-f]{64})"\}$/;
+const keys = new Map<string, Buffer | null>();
+/** The MAC of the last line written to a file, and the size the file had then. */
+const tails = new Map<string, { size: number; mac: string }>();
+
+let keyFileOverride: string | null = null;
+
+/** Where the key that signs and checks every journal lives: the install's Config folder, outside
+ *  any workspace, whatever folder the journal itself is in (a headless run's `--workspace` too).
+ *  A key that travelled with a journal is never trusted. Tests point it elsewhere explicitly. */
+export function journalKeyFile(env: NodeJS.ProcessEnv = process.env): string {
+  return keyFileOverride ?? path.join(mkmnPaths(env).configDir, "journal.key");
+}
+
+/** Tests only (tests/setup-journal-key.ts): sign and check with the key at `file`, or with the
+ *  install's again for null. The app never calls it. */
+export function useJournalKeyFile(file: string | null): void {
+  keyFileOverride = file;
+  forgetJournalKeys();
+}
+
+/** The install's 32-byte journal key, made on first use (readable by this user only, where the OS
+ *  honours the mode); null when it cannot be read or made, and then nothing written is trusted. */
+function journalKey(): Buffer | null {
+  const at = journalKeyFile();
+  if (keys.has(at)) return keys.get(at)!;
+  let key: Buffer | null = null;
+  try {
+    mkdirSync(path.dirname(at), { recursive: true });
+    try { writeFileSync(at, randomBytes(32), { flag: "wx", mode: 0o600 }); }
+    catch (e) { if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e; }
+    const read = readFileSync(at);
+    if (read.length === 32) key = read;
+  } catch { key = null; }
+  keys.set(at, key);
+  return key;
+}
+
+/** Drop the keys and chain ends held in memory, as a fresh start of the app does (tests). */
+export function forgetJournalKeys(): void { keys.clear(); tails.clear(); }
+
+const macOf = (key: Buffer, prev: string, body: string) => createHmac("sha256", key).update(prev).update("\n").update(body).digest("hex");
+
+/** A journal line as text: its JSON, then its MAC (none when there is no key). */
+function signedLine(file: string, entry: JournalEntry, prev: string): { line: string; mac: string | null } {
+  const { mac: _drop, ...plain } = entry as JournalEntry & { mac?: unknown };
+  const body = JSON.stringify(plain);
+  const key = journalKey();
+  if (!key) return { line: body, mac: null };
+  const mac = macOf(key, prev, body);
+  return { line: `${body.slice(0, -1)},"mac":"${mac}"}`, mac };
+}
+
+/** The MAC the next line of `file` chains from: that of its last signed, readable line. Read from
+ *  the file only when it changed since this process last wrote it. */
+function chainEnd(file: string): string {
+  const size = existsSync(file) ? statSync(file).size : 0;
+  const known = tails.get(file);
+  if (known && known.size === size) return known.mac;
+  let mac = CHAIN_START;
+  if (size > 0) {
+    for (const line of readFileSync(file, "utf8").split("\n")) {
+      const m = MAC_FIELD.exec(line.trim());
+      if (m) mac = m[1];
+    }
+  }
+  return mac;
+}
+
+function appendSigned(file: string, entry: JournalEntry, lead = ""): void {
+  const { line, mac } = signedLine(file, entry, chainEnd(file));
+  appendFileSync(file, `${lead}${line}\n`, "utf8");
+  if (mac) tails.set(file, { size: statSync(file).size, mac });
+  else tails.delete(file);
+}
+
+/** How many lines of `file` fail the chain under this install's key: unsigned, changed, signed
+ *  with another key, or out of their place. 0 for a journal this install wrote and nobody touched.
+ *  Unreadable lines are not counted here (readJournal does), and are not links of the chain. */
+export function untrustedLines(file: string): number {
+  if (!existsSync(file)) return 0;
+  const key = journalKey();
+  let prev = CHAIN_START;
+  let bad = 0;
+  for (const line of readFileSync(file, "utf8").split("\n")) {
+    const text = line.trim();
+    if (!text) continue;
+    try { JSON.parse(text); } catch { continue; }
+    const m = MAC_FIELD.exec(text);
+    if (!m || !key) { bad++; prev = m ? m[1] : "unsigned"; continue; }
+    const want = Buffer.from(macOf(key, prev, `${text.slice(0, text.length - m[0].length)}}`), "hex");
+    if (!timingSafeEqual(want, Buffer.from(m[1], "hex"))) bad++;
+    prev = m[1];
+  }
+  return bad;
+}
+
+/** Append one line, signed. Creates the folder on first write; never touches existing bytes. */
 export function appendEntry(file: string, entry: JournalEntry): void {
   mkdirSync(path.dirname(file), { recursive: true });
-  appendFileSync(file, `${JSON.stringify(entry)}\n`, "utf8");
+  appendSigned(file, entry);
 }
 
 /** Read every well-formed line. A malformed line is skipped and counted, never rewritten.
@@ -162,7 +275,7 @@ export function readJournal(file: string): { entries: JournalEntry[]; malformed:
 /** End a torn last line and mark it sealed, in one append, so what is journaled next starts on a
  *  line of its own and later reads do not take the fragment for corruption. */
 export function sealTornTail(file: string, runId: string): void {
-  appendFileSync(file, `\n${JSON.stringify({ type: "torn", runId, at: new Date().toISOString() } satisfies JournalTorn)}\n`, "utf8");
+  appendSigned(file, { type: "torn", runId, at: new Date().toISOString() } satisfies JournalTorn, "\n");
 }
 
 /** The settled step records of a journal, in order. */
@@ -177,9 +290,9 @@ export function settledSteps(file: string): JournalStep[] {
  * unreadable lines before the journal's end (a torn last line, or one an earlier resume sealed, is
  * not one), and `foreign`, the entries that belong to another run than `runId` (left out of
  * settled and dangling). `torn` says the last line is a fragment the resume must seal before it
- * writes (sealTornTail).
+ * writes (sealTornTail). And `untrusted`, the lines whose signature fails (untrustedLines).
  */
-export function resumeReplay(file: string, runId?: string): { settled: JournalStep[]; dangling: { seq: number; id: string }[]; corrupt: number; foreign: number; torn: boolean } {
+export function resumeReplay(file: string, runId?: string): { settled: JournalStep[]; dangling: { seq: number; id: string }[]; corrupt: number; foreign: number; torn: boolean; untrusted: number } {
   const { entries: all, corrupt, torn } = readJournal(file);
   const entries = runId === undefined ? all : all.filter((e) => e.runId === runId);
   const settled = new Map<number, JournalStep>();
@@ -200,5 +313,6 @@ export function resumeReplay(file: string, runId?: string): { settled: JournalSt
     corrupt,
     foreign: all.length - entries.length,
     torn,
+    untrusted: untrustedLines(file),
   };
 }
