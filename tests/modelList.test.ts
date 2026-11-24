@@ -25,7 +25,7 @@ describe("the list of models", () => {
     expect(r.tested.map((i) => i.entry.id)).toEqual(["foundry:qwen2.5-coder-3b", "foundry:qwen3.5-2b"]); // Foundry is faster on both, so it is the one shown
     expect(r.slower.map((i) => i.entry.id).sort()).toEqual(["g1", "g2"]);
     expect(r.alt["foundry:qwen3.5-2b"].entry.id).toBe("g1");
-    expect(altNote(r.tested[1], r.alt["foundry:qwen3.5-2b"])).toBe("Runs faster than on GenieX (34.7 against 27.9 tokens/s)");
+    expect(altNote(r.tested[1], r.alt["foundry:qwen3.5-2b"])).toBe("Faster here than with Qualcomm's NPU engine (about 26 against 21 words/s)");
     expect(r.unscored.map((i) => i.entry.id).sort()).toEqual(["foundry:other", "g3"]);
   });
 

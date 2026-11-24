@@ -112,8 +112,10 @@ export function recommendedModels(items: CatalogItem[], max = 9): CatalogItem[] 
 /** What a line says of the other engine, when the same model was tested on it too and was slower: "Faster than on GenieX (34.7 against 27.9 tokens/s)". */
 export function altNote(shown: CatalogItem, other: CatalogItem): string {
   const a = scoreOf(shown.entry)?.tokPerSec, b = scoreOf(other.entry)?.tokPerSec;
-  const name = isFoundryItem(other) ? "Foundry Local" : "GenieX";
-  return a && b ? `Runs faster than on ${name} (${a} against ${b} tokens/s)` : `Also tested on ${name}`;
+  const name = isFoundryItem(other) ? "Foundry Local" : "Qualcomm's NPU engine";
+  // words a second (about ¾ of a word per token), the unit of the speed column beside it
+  const words = (t: number) => Math.max(1, Math.round(t * 0.75));
+  return a && b ? `Faster here than with ${name} (about ${words(a)} against ${words(b)} words/s)` : `Also tested with ${name}`;
 }
 
 /**

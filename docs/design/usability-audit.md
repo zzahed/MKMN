@@ -125,9 +125,29 @@ Still open, moved to phase 4 (#62) because the helpers are shared with chat
 attachments: `noPdfText` ("no selectable text (a scan?)… vision model") and
 the `describePdfError` fallback ("error category: …").
 
+## Phase 2: Settings › Speed & memory, and the Models library
+
+The schema (`src/shared/settingsSchema.ts`) already marks the memory cap,
+context window, cache precision, cache in RAM, power mode and startup timeout
+as `advanced`, yet the Speed & memory page showed them all in the open, so a
+first-time user met "KV cache", "Q8_0", "context window (tokens)" and nine
+NPU clock modes before anything they could act on.
+
+| # | Finding | Sev | Change |
+| --- | --- | --- | --- |
+| M1 | Advanced keys shown as everyday controls. | High | Memory use, NPU memory plan, conversation length, power mode and the startup time limit move under the page's **Advanced** fold. Search and deep links still open them (the fold opens itself). |
+| M2 | NPU card: "Prioritizes Qualcomm-optimized W4A16 weights and ARM64 vector-aligned Q4_0_4_4 quants for direct HTP residency…" | High | "Runs on the NPU: the part of this PC's chip made for AI. It answers quickly and uses little power." |
+| M3 | Auto goals explained with "measured whole-task energy", "end-to-end time". | Medium | One plain line each. |
+| M4 | Summary tiles "Execution mode", "Model retention", "Memory fit". | Medium | "Runs on", "When not in use", "Fits in memory". |
+| M5 | Conversation length offered in tokens (2048/4096/8192). | Medium | Shown with rough words ("about 1,500 words"); values unchanged. |
+| M6 | Power mode: nine runtime clock modes in one list. | Low | Auto and the three common modes first; the rest in a "More modes" group. |
+| L1 | Model card badges "Fits NPU / Caution / Not recommended" with "fit rules", "quant", "context" in tooltips. | High | "Should fit / Might not fit / Too large", plain tooltips. |
+| L2 | Model card line "Q4_0", "GGUF", "native NPU bundle", plus up to three fit-rule reasons (tokens, quant names) on every card. | High | The card shows role and size; the format and the reasons move into a **Details** disclosure on the card. |
+| L3 | Speed chip note "newest measurement for the current compute target". | Low | "The latest speed test on this PC for the chip in use." |
+
 ## Phases
 
 1. **Projects** — done in this branch (P1–P13).
-2. **Settings and Local Models** — S3, S4.
+2. **Settings › Speed & memory and the Models library** — S3, S4 (M1–M6, L1–L3), branch `ux/plain-language-settings`.
 3. **Skills, Tasks, Files** — S1, S2, S5.
 4. **Errors, status and setup** — S6, S7, S8, and the shared PDF messages above.

@@ -38,8 +38,8 @@ describe("options are checked", () => {
     expect(suggestGpuLayers(0, 32, 4)).toBe(-1);
   });
   it("describes spill to RAM", () => {
-    expect(backendNote("gpu", { gpuLayers: 12 })).toMatch(/12 layers.*RAM/);
-    expect(backendNote("cpu")).toMatch(/mapped from disk/);
+    expect(backendNote("gpu", { gpuLayers: 12 })).toMatch(/12 layers.*processor/);
+    expect(backendNote("cpu")).toMatch(/larger than the free memory still starts/);
   });
 });
 

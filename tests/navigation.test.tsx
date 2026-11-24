@@ -333,6 +333,38 @@ describe("Models and the settings journey", () => {
   const group = (name: string) => within(setNav()).getByRole("button", { name: new RegExp(`^${name}`) });
   const railModels = () => document.querySelector<HTMLElement>('.rail-btn[aria-label="Local Models"]')!;
 
+  it("Speed & memory leads with everyday choices; memory, conversation length and power start folded under Advanced", async () => {
+    boot(makeApi(), CONVS);
+    await settle();
+    await screen.findByRole("button", { name: "Standalone chat" });
+    fireEvent.click(railBtn("Settings"));
+    await waitFor(() => expect(setNav()).toBeTruthy());
+    fireEvent.click(group("Speed & memory"));
+    await screen.findByRole("heading", { name: "Keep the model ready" });
+    const adv = document.querySelector("details.set-adv") as HTMLDetailsElement;
+    expect(adv.open).toBe(false);
+    for (const id of ["sec-models-memory", "sec-models-context", "sec-models-power"]) {
+      const sec = document.getElementById(id);
+      expect(sec, id).toBeTruthy();
+      expect(adv.contains(sec), id).toBe(true);
+    }
+    expect(adv.contains(document.getElementById("sec-models-retention"))).toBe(false);
+    expect(adv.contains(document.getElementById("sec-models-compute"))).toBe(false);
+  });
+
+  it("a search hit inside the Advanced fold opens the fold", async () => {
+    boot(makeApi(), CONVS);
+    await settle();
+    await screen.findByRole("button", { name: "Standalone chat" });
+    fireEvent.click(railBtn("Settings"));
+    await waitFor(() => expect(setNav()).toBeTruthy());
+    fireEvent.change(screen.getByPlaceholderText("Search settings"), { target: { value: "power mode" } });
+    const hit = await screen.findByRole("button", { name: /Power mode/ });
+    fireEvent.click(hit);
+    await waitFor(() => expect((document.querySelector("details.set-adv") as HTMLDetailsElement).open).toBe(true));
+    expect(document.getElementById("sec-models-power")).toBeTruthy();
+  });
+
   it("the rail's Models button opens Settings on its Models group, the library inside it", async () => {
     boot(makeApi(), CONVS);
     await settle();

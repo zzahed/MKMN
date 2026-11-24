@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "./api";
 import { ICONS, IconButton } from "./Icon";
 import type { CatalogItem } from "../shared/api";
+import { COMPUTE_LABEL } from "../core/adaptiveCompute";
 import { CapBadges } from "./Capabilities";
 import { RunsBadge } from "./RunsBadge";
 import { EvidenceBadges } from "./EvidenceBadges";
@@ -22,22 +23,25 @@ const isFoundry = (e: CatalogEntry) => e.id.startsWith("foundry:");
 /** Which engine runs the model: the one thing the two kinds of cards must not be mistaken for. */
 function EngineBadge({ foundry, installed }: { foundry: boolean; installed?: boolean }) {
   return foundry
-    ? <span className="badge engine foundry" title={installed === false ? "Offered by Microsoft Foundry Local: install it to run it on this PC" : "Run by Microsoft Foundry Local, installed on this PC"}>Foundry Local</span>
-    : <span className="badge engine geniex" title="Run by GenieX, Qualcomm's engine for the NPU">GenieX</span>;
+    ? <span className="badge engine foundry" title={installed === false ? "Runs with Microsoft Foundry Local, which needs to be installed first" : "Runs with Microsoft Foundry Local"}>Foundry Local</span>
+    : <span className="badge engine geniex" title="Runs with Qualcomm's NPU engine (GenieX)">GenieX</span>;
 }
+
+/** A speed people can picture: words a second, from the engine's tokens a second (about ¾ of a word each). */
+export const wordsPerSec = (tokPerSec: number): number => Math.max(1, Math.round(tokPerSec * 0.75));
 
 function Badge({ level, foundry }: { level: "green" | "amber" | "red"; foundry?: boolean }) {
   // a Foundry Local model is not judged by the NPU fit rules: where it runs is the badge next to this one.
   // "Fits NPU" is a size/compatibility ESTIMATE from the fit rules — where the model was
   // actually seen to run is the RunsBadge next to it, and an unmeasured model says so.
-  const label = foundry ? (level === "green" ? "Fits" : "Large") : level === "green" ? "Fits NPU" : level === "amber" ? "Caution" : "Not recommended";
+  const label = foundry ? (level === "green" ? "Should fit" : "Large") : level === "green" ? "Should fit" : level === "amber" ? "Might not fit" : "Too large";
   const hint = foundry
-    ? (level === "green" ? "Estimated to fit by the Foundry Local fit rules." : "Larger than the fit rules like; it may still work.")
+    ? (level === "green" ? "Expected to fit on this PC, judged from its size." : "Larger than usual for this PC. It may still work, but slowly.")
     : level === "green"
-      ? "Estimated to fit on the NPU from its size and quantization. It has not necessarily been run on this PC — the badge next to it reports measured placements."
+      ? "Expected to fit on this PC's NPU, judged from its size. It has not necessarily been tried here: the badge beside it shows where it actually ran."
       : level === "amber"
-        ? "May fit with care: a smaller context or a lighter quant may be needed."
-        : "Larger than the NPU can hold under the fit rules.";
+        ? "Might fit. MKMN may shorten the conversation length so that it does."
+        : "Too large for this PC's NPU.";
   return <span className={`badge ${level}`} title={hint}>{label}</span>;
 }
 
@@ -101,12 +105,12 @@ function BenchChip({ sel, preferredCompute }: { sel: BenchSelection | null; pref
   const reasons = benchOutdatedReasons(sel.run, { preferredCompute });
   return (
     <details className="bench-chip">
-      <summary>{benchHeadline(sel.run)}</summary>
+      <summary title={benchHeadline(sel.run)}>On this PC: about {wordsPerSec(sel.run.decodeTokPerSec)} words/s on {COMPUTE_LABEL[sel.run.compute as keyof typeof COMPUTE_LABEL] ?? sel.run.compute}</summary>
       <div className="muted small">{benchDetailLines(sel.run).join(" · ")}</div>
       <div className="muted small">
         {sel.basis === "current-compute"
-          ? "Shown: the newest measurement for the current compute target (never the fastest historical run)."
-          : "Shown: the newest measurement on this PC (no run for the current compute target; never the fastest historical run)."}
+          ? "The latest speed test on this PC for the chip in use (not the best one ever)."
+          : "The latest speed test on this PC (none yet for the chip in use; not the best one ever)."}
       </div>
       {reasons.length > 0 && <div className="warn small">May be outdated: {reasons.join("; ")}.</div>}
     </details>
@@ -118,7 +122,7 @@ function RelatedChip({ item, bench, own }: { item: CatalogItem; bench?: BenchPro
   if (own || !bench?.rows) return null;
   const rel = relatedVariantRun(item, bench.rows, bench.profiles);
   if (!rel) return null;
-  return <span className="bench-chip related muted small" title={`Measured on this PC with the Foundry Local build of this model, not with this build. ${benchDetailLines(rel.run).join(" · ")}`}>{rel.label}</span>;
+  return <span className="bench-chip related muted small" title={`Measured on this PC with the Foundry Local build of this model, not with this build. ${rel.label}. ${benchDetailLines(rel.run).join(" · ")}`}>Foundry Local version on this PC: about {wordsPerSec(rel.run.decodeTokPerSec)} words/s on {COMPUTE_LABEL[rel.run.compute as keyof typeof COMPUTE_LABEL] ?? rel.run.compute}</span>;
 }
 
 /** The evidence context the model cards render: the cache manifest, the per-device records and what "here" means. */
@@ -133,7 +137,7 @@ function Card({ item, progress, selected, check, ev, bench, ...rest }: { item: C
       <div className="card-top">
         <div>
           <div className="card-title">{entry.name} {entry.default && <span className="tag">default</span>} <BenchChip sel={benchSel} preferredCompute={bench?.preferredCompute} /> <RelatedChip item={item} bench={bench} own={benchSel} /></div>
-          <div className="muted small">{entry.role} · {entry.sizeApprox ? "~" : ""}{entry.sizeGB} GB · {isFoundry(entry) ? "Foundry Local (ONNX)" : entry.engine === "qairt" ? "native NPU bundle" : entry.quant ?? "GGUF"}</div>
+          <div className="muted small">{entry.role} · {entry.sizeApprox ? "about " : ""}{entry.sizeGB} GB download</div>
         </div>
         <div className="row"><EngineBadge foundry={isFoundry(entry)} installed={item.installed} /><ScoreChip score={scoreOf(entry)} /><RunsBadge on={bp.on} native={isNativeNpu(item)} here={bp.here} /><Badge level={verdict.level} foundry={isFoundry(entry)} /></div>
       </div>
@@ -142,17 +146,22 @@ function Card({ item, progress, selected, check, ev, bench, ...rest }: { item: C
       {check?.phase === "failed" && <div className="warn small">This model did not load on this PC under any setting. The log is in Settings → Developer → NPU load test.</div>}
       <CapBadges entry={entry} />
       {/* A placement nobody measured must point at the things that measure it. */}
-      {!bp.on && <div className="muted small">{measureHint()}</div>}
-      <ul className="reasons">{verdict.reasons.filter((r) => !r.startsWith("NPU memory limit is an estimate")).slice(0, 3).map((r, i) => <li key={i}>{r}</li>)}</ul>
+      {!bp.on && <details className="muted small"><summary>Not tried on this PC yet</summary>{measureHint()}</details>}
+      {/* The fit rules' reasons and the file format are technical: one click away, not on every card. */}
+      <details className="small model-details">
+        <summary className="muted">Details</summary>
+        <div className="muted small">Format: {isFoundry(entry) ? "Foundry Local (ONNX)" : entry.engine === "qairt" ? "native NPU bundle" : entry.quant ?? "GGUF"}</div>
+        {entry.measured && <div className="muted small">On MKMN's test PC: about {wordsPerSec(entry.measured.tokPerSec)} words/s ({entry.measured.tokPerSec} tokens a second)</div>}
+        {verdict.contextTokens > 0 && <div className="muted small">Conversation length: about {(Math.round(verdict.contextTokens * 0.75 / 100) * 100).toLocaleString()} words ({verdict.contextTokens} tokens)</div>}
+        <ul className="reasons">{verdict.reasons.filter((r) => !r.startsWith("NPU memory limit is an estimate")).slice(0, 3).map((r, i) => <li key={i}>{r}</li>)}</ul>
+      </details>
       <div className="card-foot">
         <div className="muted small">
           {/* Local measurement vs bundled reference: the chip beside the name is THIS PC's
               own benchmark; these numbers are the app's shipped reference and an estimate. */}
           {!benchSel && <span>not measured on this PC · </span>}
-          {verdict.estTokPerSec !== null && <span>~{verdict.estTokPerSec} tok/s estimated · </span>}
-          {entry.measured && <span>reference {entry.measured.tokPerSec} tok/s (bundled) · </span>}
-          {verdict.contextTokens > 0 && <span>{Math.round(verdict.contextTokens / 1024)}K context · </span>}
-          <span>~{verdict.estNpuGB} GB NPU</span>
+          {verdict.estTokPerSec !== null && <span title={`${verdict.estTokPerSec} tokens a second, estimated`}>about {wordsPerSec(verdict.estTokPerSec)} words/s (estimate) · </span>}
+          <span>needs about {verdict.estNpuGB} GB of NPU memory</span>
         </div>
         {progress?.error && <div className="error-box"><strong>{progress.error.title}</strong><div>{progress.error.fix}</div></div>}
         <InstallButton item={item} progress={progress} selected={selected} onInstall={rest.onInstall} onCancel={rest.onCancel} onUninstall={rest.onUninstall} onUse={rest.onUse} />
@@ -183,10 +192,10 @@ function ModelRow({ item, progress, selected, check, quiet, alt, bench, ...rest 
       </div>
       {/* The speed column is the BUNDLED reference (a test PC's numbers, shipped with the
           app): labeled as such, so it can never be mistaken for a measurement of this PC. */}
-      <span className="mrow-speed muted small" title={sc?.tokPerSec ? "Bundled reference speed, measured on MKMN AI's own test PC - not on this PC. A local measurement appears beside the name when one exists." : undefined}>
-        {sc?.tokPerSec ? `ref · ${sc.tokPerSec} tok/s` : ""}
+      <span className="mrow-speed muted small" title={sc?.tokPerSec ? `Typical speed on MKMN's own test PC, not measured on this PC (${sc.tokPerSec} tokens a second). This PC's own speed test appears beside the name once one has run.` : undefined}>
+        {sc?.tokPerSec ? `test PC · about ${wordsPerSec(sc.tokPerSec)} words/s` : ""}
       </span>
-      <span className="mrow-size muted small">{entry.sizeApprox ? "~" : ""}{entry.sizeGB} GB</span>
+      <span className="mrow-size muted small">{entry.sizeApprox ? "about " : ""}{entry.sizeGB} GB</span>
       <div className="mrow-act"><InstallButton item={item} progress={progress} selected={selected} onInstall={rest.onInstall} onCancel={rest.onCancel} onUninstall={rest.onUninstall} onUse={rest.onUse} /></div>
       {check?.phase === "testing" && <div className="mrow-note muted small" role="status">Testing this model on your NPU{check.step ? `: ${check.step}` : ""}…</div>}
       {check?.phase === "failed" && <div className="mrow-note warn small">This model did not load on this PC under any setting.</div>}

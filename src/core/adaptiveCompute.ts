@@ -24,9 +24,9 @@ export type ManualCompute = "npu" | "hybrid" | "gpu" | "cpu";
 export type EngineId = "geniex" | "foundry" | "llama_cpp";
 
 export const AUTO_GOALS: { id: AutoGoal; label: string; why: string }[] = [
-  { id: "balanced", label: "Balanced", why: "A measured compromise between response time, memory and energy, within explicit limits." },
-  { id: "battery_saver", label: "Battery Saver", why: "The lowest measured whole-task energy that still meets an acceptable response time." },
-  { id: "fastest", label: "Fastest", why: "The lowest predicted end-to-end time from this device's measured timings, within memory and responsiveness limits." },
+  { id: "balanced", label: "Balanced", why: "A good mix of speed, memory and battery, as measured on this PC." },
+  { id: "battery_saver", label: "Battery Saver", why: "The least battery use measured on this PC that still answers in reasonable time." },
+  { id: "fastest", label: "Fastest", why: "The fastest answers measured on this PC, within safe memory limits." },
 ];
 
 /** "hybrid" is CPU + NPU, everywhere the user can read it. */
