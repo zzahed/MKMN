@@ -192,11 +192,14 @@ export function createRun(defs: StepDef<unknown, unknown>[], opts: RunOptions): 
     // Resume: replay the settled steps of the journal, mark the dangling ones interrupted.
     let firstIndex = 0;
     if (file !== null && readJournal(file).entries.length > 0) {
-      const { settled: replayed, dangling, corrupt, foreign, torn } = resumeReplay(file, runId);
+      const { settled: replayed, dangling, corrupt, foreign, torn, untrusted } = resumeReplay(file, runId);
       // Every refusal comes before the first write, so a refused resume leaves the journal as it was.
       const refuse = (why: string): never => { throw new Error(`Cannot resume run ${runId}: ${why}`); };
       if (foreign > 0) refuse(`the journal holds ${foreign} ${foreign === 1 ? "entry" : "entries"} of another run.`);
       if (corrupt > 0) refuse(`the journal has ${corrupt} unreadable line${corrupt === 1 ? "" : "s"} before its end, so its checkpoint cannot be trusted.`);
+      // Signed by this install, line by line, each chained to the one before (journal.ts): a forged,
+      // edited, cut or copied-in journal could otherwise replay outputs no step ever produced.
+      if (untrusted > 0) refuse(`${untrusted} journal line${untrusted === 1 ? "" : "s"} cannot be verified as written by this install, so its checkpoint cannot be trusted.`);
       // A resumed run must match the original plan's contiguous settled prefix, step by step and
       // input by input. Otherwise a changed graph or corrupted journal could silently skip a step,
       // or replay an output made for another input, then claim an incompatible checkpoint completed.

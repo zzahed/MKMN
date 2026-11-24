@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { appendFileSync, mkdtempSync, readFileSync, rmSync, existsSync } from "node:fs";
+import { appendFileSync, mkdtempSync, readFileSync, rmSync, existsSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { createRun, type StepDef, type SettledStep } from "../src/core/harness/run";
-import { appendEntry, journalPath, readJournal, resumeReplay, settledSteps } from "../src/core/harness/journal";
+import { appendEntry, forgetJournalKeys, journalKeyFile, journalPath, readJournal, resumeReplay, settledSteps } from "../src/core/harness/journal";
+import { mkmnPaths } from "../src/shared/paths";
 import { sArray, sNumber, sObject, sString } from "../src/core/harness/schema";
 
 let dir: string;
@@ -443,6 +444,80 @@ describe("the harness run and its journal", () => {
       await expect(resumed.next()).rejects.toThrow(/step 1 \(send\) was interrupted.*side effects/);
       expect(seen).toEqual([]);
       expect(readFileSync(jf, "utf8")).toBe(before); // not even marked interrupted: nothing was decided
+    });
+
+    // F5 item 5: anything that could write the journal could forge the outputs a resume replays.
+    // Every line is now signed with the install's key, chained to the line before it.
+    describe("the journal is signed, and a resume replays only what this install wrote", () => {
+      const finished = async (jf: string, runId: string, seen: string[]) => {
+        const first = createRun([step("a", 1, seen), step("b", 2, seen)], { runId, pipeline: "test", journalFile: jf });
+        await first.next(); // a settles; b never starts, as if the process died here
+        seen.length = 0;
+      };
+      const resume = (jf: string, runId: string, seen: string[]) => createRun([step("a", 1, seen), step("b", 2, seen)], { runId, pipeline: "test", journalFile: jf });
+      const UNTRUSTED = /cannot be verified as written by this install/;
+
+      it("signs every line, and resumes a journal nobody touched", async () => {
+        const jf = file("r-signed.jsonl");
+        const seen: string[] = [];
+        await finished(jf, "r-signed", seen);
+        const lines = readFileSync(jf, "utf8").trim().split("\n");
+        expect(lines.length).toBeGreaterThan(0);
+        for (const l of lines) expect(l).toMatch(/,"mac":"[0-9a-f]{64}"\}$/);
+        const r = resume(jf, "r-signed", seen);
+        for (let x = await r.next(); !x.done; x = await r.next()) { /* run it out */ }
+        expect(seen).toEqual(["b"]);
+        expect(r.state).toBe("done");
+      });
+
+      it("refuses a journal whose recorded step was changed, even when it is still valid JSON", async () => {
+        const jf = file("r-edited.jsonl");
+        const seen: string[] = [];
+        await finished(jf, "r-edited", seen);
+        writeFileSync(jf, readFileSync(jf, "utf8").replace('"attempts":1', '"attempts":2'));
+        const before = readFileSync(jf, "utf8");
+        await expect(resume(jf, "r-edited", seen).next()).rejects.toThrow(UNTRUSTED);
+        expect(seen).toEqual([]);
+        expect(readFileSync(jf, "utf8")).toBe(before);
+      });
+
+      it("refuses a journal a line was taken out of", async () => {
+        const jf = file("r-cut.jsonl");
+        const seen: string[] = [];
+        await finished(jf, "r-cut", seen);
+        const lines = readFileSync(jf, "utf8").trim().split("\n");
+        expect(lines.length).toBeGreaterThanOrEqual(3); // run, step_started, step
+        writeFileSync(jf, `${[lines[0], ...lines.slice(2)].join("\n")}\n`);
+        await expect(resume(jf, "r-cut", seen).next()).rejects.toThrow(UNTRUSTED);
+        expect(seen).toEqual([]);
+      });
+
+      it("refuses a line written without a signature, as an older or a foreign writer leaves", async () => {
+        const jf = file("r-unsigned.jsonl");
+        const seen: string[] = [];
+        await finished(jf, "r-unsigned", seen);
+        appendFileSync(jf, `${JSON.stringify(settledRecord("r-unsigned", 1, "b", 2))}\n`);
+        await expect(resume(jf, "r-unsigned", seen).next()).rejects.toThrow(UNTRUSTED);
+        expect(seen).toEqual([]);
+      });
+
+      it("refuses a journal signed with another key, as one copied from another install is", async () => {
+        const jf = file("r-other-key.jsonl");
+        const seen: string[] = [];
+        await finished(jf, "r-other-key", seen);
+        const keyFile = journalKeyFile(jf);
+        expect(readFileSync(keyFile).length).toBe(32);
+        writeFileSync(keyFile, Buffer.alloc(32, 7));
+        forgetJournalKeys(); // as a fresh start of the app reads it
+        await expect(resume(jf, "r-other-key", seen).next()).rejects.toThrow(UNTRUSTED);
+        expect(seen).toEqual([]);
+      });
+
+      it("keeps the key of the app's own journals in its Config folder, not beside them in the workspace", () => {
+        const env = { LOCALAPPDATA: dir } as NodeJS.ProcessEnv;
+        expect(journalKeyFile(journalPath("r-1", env), env)).toBe(path.join(mkmnPaths(env).configDir, "journal.key"));
+        expect(journalKeyFile(file("elsewhere.jsonl"), env)).toBe(file("journal.key"));
+      });
     });
   });
 
