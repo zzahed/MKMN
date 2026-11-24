@@ -21,6 +21,19 @@ const OPS: Record<IsolatedOp, (...args: never[]) => unknown> = {
   runCases: runCasesHere,
 };
 
+// The permission model does not cover other processes: process.kill (and the raw process._kill
+// under it) would let an escape stop the sidecar or any other program of the person, and
+// os.setPriority would let it slow them to a crawl. This process does neither, so all three are
+// replaced, for good, before any generated code runs. The bindings they come from are closed by
+// the permission model, so the originals cannot be fetched again; os is the one shared module
+// object (getBuiltinModule, not an import wrapper), so every way of reaching it sees the refusal.
+function refuseOtherProcesses(): never {
+  throw Object.assign(new Error("Access to this API has been restricted: generated code may not act on other processes."), { code: "ERR_ACCESS_DENIED" });
+}
+const sealed = { value: refuseOtherProcesses, writable: false, configurable: false, enumerable: false };
+for (const name of ["kill", "_kill"]) Object.defineProperty(process, name, sealed);
+Object.defineProperty(process.getBuiltinModule("os"), "setPriority", sealed);
+
 function reply(r: IsolatedReply): void {
   process.stdout.write(`${JSON.stringify(r)}\n`, () => process.exit(0));
 }

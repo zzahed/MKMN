@@ -1,13 +1,14 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { execFile, execFileSync } from "node:child_process";
+import { execFile, execFileSync, spawn, spawnSync } from "node:child_process";
 import { createServer, type AddressInfo } from "node:net";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
+import { getPriority, tmpdir } from "node:os";
 import * as path from "node:path";
 import { runExamples, smokeRun } from "../src/core/construct/sandbox";
 import { runCases } from "../src/core/benchChecks";
 import { codeChecks } from "../src/core/labCode";
 import { IsolationUnsafeError, lockedNodeArgs, setIsolation } from "../src/core/isolate";
-import { codeDirs, lockedNodeRunner, probeVerdict, proveNetworkDenied, proveNetworkDeniedSync } from "../src/sidecar/isolation";
+import { codeDirs, ISOLATION_PROBE, lockedEnv, lockedNodeRunner, probeVerdict, proveNetworkDenied, proveNetworkDeniedSync } from "../src/sidecar/isolation";
 
 /**
  * Code a model wrote was run with node:vm INSIDE the sidecar: Node says vm is not a
@@ -76,6 +77,50 @@ describe("generated code runs in a locked-down process", () => {
     expect([...ran.keys()][0]).toBe(checks[0]); // keyed by the caller's own check
   }, 60_000);
 
+  // Security pre-review 2026-11-24, F1 and F2: node:sqlite opened, attached and wrote files outside
+  // the permission model's file-system rules, and process.kill reached every process of the user.
+  it("in the locked-down process an escape can neither write a file through SQLite nor signal or reprioritise another process", async () => {
+    const target = path.join(tmpdir(), `mkmn-isolation-${process.pid}.db`);
+    rmSync(target, { force: true });
+    const victim = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], { stdio: "ignore", windowsHide: true });
+    try {
+      const sqlTarget = target.replace(/\\/g, "/").replace(/'/g, "''");
+      const escape = `(function () { var p = this.constructor.constructor("return process")(); var r = []; ` +
+        `try { var s = p.getBuiltinModule("node:sqlite"); if (!s) r.push("sqlite:none"); else { new s.DatabaseSync(":memory:").exec("vacuum into '${sqlTarget}'"); r.push("sqlite:wrote"); } } catch (e) { r.push("sqlite:" + (e.code || "error")); } ` +
+        `try { p.kill(${victim.pid}, 0); r.push("kill:signalled"); } catch (e) { r.push("kill:" + (e.code || "error")); } ` +
+        `try { p._kill(${victim.pid}, 0); r.push("rawkill:signalled"); } catch (e) { r.push("rawkill:" + (e.code || "error")); } ` +
+        // found reviewing #52: the permission model does not cover another process's priority either
+        `try { p.getBuiltinModule("os").setPriority(${victim.pid}, 19); r.push("priority:changed"); } catch (e) { r.push("priority:" + (e.code || "error")); } ` +
+        `return r.join(","); })()`;
+      const priorityBefore = getPriority(victim.pid!);
+      setIsolation(lockedNodeRunner(process.execPath, worker, codeDirs(path.join(dist, "sidecar"))));
+      const r = await runExamples([], "function f() { return 1; }", [{ call: escape, expect: '"x"' }]);
+      expect(gave(r.failures)).toBe("sqlite:none,kill:ERR_ACCESS_DENIED,rawkill:ERR_ACCESS_DENIED,priority:ERR_ACCESS_DENIED");
+      expect(existsSync(target)).toBe(false);
+      expect(victim.exitCode).toBeNull();
+      expect(getPriority(victim.pid!)).toBe(priorityBefore);
+    } finally {
+      victim.kill();
+      rmSync(target, { force: true });
+    }
+  }, 60_000);
+
+  // F3: Windows (libuv) copies its own list of variables into a child whose environment lacks
+  // them (USERNAME, USERPROFILE, PATH, TEMP...), so an empty-looking environment still named the
+  // person and their profile folder. They are now passed blank, which libuv leaves as they are.
+  it("in the locked-down process an escape finds no user name, profile folder, temp folder or PATH", async () => {
+    const escape = `(function () { var e = this.constructor.constructor("return process")().env; ` +
+      `return ["USERNAME", "USERPROFILE", "HOMEPATH", "USERDOMAIN", "LOGONSERVER", "TEMP", "TMP", "PATH"].map(function (k) { return k + "=" + (e[k] || ""); }).join(","); })()`;
+    setIsolation(lockedNodeRunner(process.execPath, worker, codeDirs(path.join(dist, "sidecar"))));
+    const r = await runExamples([], "function f() { return 1; }", [{ call: escape, expect: '"x"' }]);
+    expect(gave(r.failures)).toBe("USERNAME=,USERPROFILE=,HOMEPATH=,USERDOMAIN=,LOGONSERVER=,TEMP=,TMP=,PATH=");
+  }, 60_000);
+
+  it("a process with the same locked flags has no node:sqlite at all", () => {
+    const out = execFileSync(process.execPath, [...lockedNodeArgs(codeDirs(path.join(dist, "sidecar")), "-e"), `console.log(typeof process.getBuiltinModule("node:sqlite"))`], { windowsHide: true, encoding: "utf8" });
+    expect(out.trim()).toBe("undefined");
+  }, 60_000);
+
   it("a loop that never ends is stopped and reported, not left running", async () => {
     setIsolation(lockedNodeRunner(process.execPath, worker, codeDirs(path.join(dist, "sidecar"))));
     const r = await runExamples([], "function spin() { while (true) {} }", [{ call: "spin()", expect: "1" }]);
@@ -98,7 +143,7 @@ describe("generated code runs only on a runtime that is proven to block the netw
     const first = await runner.run("runExamples", []).catch((e: Error) => e);
     expect(first).toBeInstanceOf(IsolationUnsafeError);
     expect((first as Error).name).toBe("IsolationUnsafeError");
-    expect((first as Error).message).toBe("Generated code is turned off: this Node.js runtime cannot block network access.");
+    expect((first as Error).message).toBe("Generated code is turned off: this Node.js runtime cannot keep it away from the network and your files.");
     expect(() => runner.runSync("runExamples", [])).toThrow(IsolationUnsafeError);
     await expect(runner.run("runExamples", [])).rejects.toThrow(IsolationUnsafeError);
     expect(probes).toBe(1); // asked once, then remembered
@@ -137,6 +182,8 @@ describe("generated code runs only on a runtime that is proven to block the netw
     expect(probeVerdict("ECONNREFUSED")).toBe(false);
     expect(probeVerdict("CONNECTED")).toBe(false);
     expect(probeVerdict("EACCES")).toBe(false);
+    expect(probeVerdict("SQLITE_AVAILABLE")).toBe(false); // the file-system bypass of F1 is open
+    expect(probeVerdict("SQLITE_AVAILABLE\nERR_ACCESS_DENIED")).toBeNull();
     expect(probeVerdict("")).toBeNull();
     expect(probeVerdict(undefined)).toBeNull();
     expect(probeVerdict("node:internal/modules/cjs/loader:1\nError: boom")).toBeNull();
@@ -163,6 +210,25 @@ describe("generated code runs only on a runtime that is proven to block the netw
     expect(() => runner.runSync("runExamples", [])).toThrow(/could not confirm/);
     expect(probes).toBe(2);
   });
+
+  // F4: the probe used to try only one TCP connection, so a runtime that blocked the network but
+  // let generated code write files, start programs or start workers passed as safe.
+  it("the probe proves every restriction the runner relies on, and names the first one a runtime lacks", () => {
+    const run = (flags: string[]) => {
+      const r = spawnSync(process.execPath, [...flags, "-e", ISOLATION_PROBE], { windowsHide: true, encoding: "utf8", timeout: 30_000, env: lockedEnv() });
+      return String(r.stdout).trim();
+    };
+    const locked = lockedNodeArgs(dirs(), "-e").slice(0, -1);
+    expect(run(locked)).toBe("ERR_ACCESS_DENIED");
+    expect(run([])).toBe("SQLITE_AVAILABLE");
+    expect(run(["--no-experimental-sqlite"])).toBe("FS_WRITE_OPEN");
+    expect(run([...locked, "--allow-fs-write=*"])).toBe("FS_WRITE_OPEN");
+    expect(run([...locked, "--allow-child-process"])).toBe("CHILD_PROCESS_OPEN");
+    expect(run([...locked, "--allow-worker"])).toBe("WORKER_OPEN");
+    expect(run([...locked, "--allow-net"])).toMatch(/^E(?!RR_)[A-Z0-9]+$/); // the network is open: a socket error, ECONNREFUSED
+    for (const out of ["FS_WRITE_OPEN", "CHILD_PROCESS_OPEN", "WORKER_OPEN"]) expect(probeVerdict(out)).toBe(false);
+    for (const out of ["FS_WRITE_UNKNOWN", "CHILD_PROCESS_UNKNOWN", "WORKER_UNKNOWN"]) expect(probeVerdict(out)).toBeNull();
+  }, 120_000);
 
   it("a locked process cannot resolve a name, send UDP or fetch either", async () => {
     const run = (code: string) => new Promise<string>((resolve) => {

@@ -44,11 +44,11 @@ describe("readReply", () => {
 });
 
 describe("lockedNodeArgs", () => {
-  it("turns the permission model on and grants read access to the given folders only", () => {
+  it("turns the permission model on, switches node:sqlite off and grants read access to the given folders only", () => {
     expect(lockedNodeArgs(["C:\\app\\dist", "C:\\app\\node_modules"], "w.js"))
-      .toEqual(["--permission", "--allow-fs-read=C:\\app\\dist", "--allow-fs-read=C:\\app\\node_modules", "w.js"]);
+      .toEqual(["--permission", "--no-experimental-sqlite", "--allow-fs-read=C:\\app\\dist", "--allow-fs-read=C:\\app\\node_modules", "w.js"]);
     const args = lockedNodeArgs([], "w.js");
-    expect(args).toEqual(["--permission", "w.js"]);
+    expect(args).toEqual(["--permission", "--no-experimental-sqlite", "w.js"]);
     expect(args.join(" ")).not.toMatch(/allow-(fs-write|child-process|worker|addons|net|wasi)/);
   });
 });

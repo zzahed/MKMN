@@ -23,9 +23,12 @@ export function setIsolation(r: IsolationRunner | null): void { current = r; }
 export function isolation(): IsolationRunner | null { return current; }
 
 /** The arguments of a locked-down Node process that may only read `readDirs` (the app's
- *  own code and the packages it loads): no write, child process, worker, addon or network flag. */
+ *  own code and the packages it loads): no write, child process, worker, addon or network flag.
+ *  node:sqlite is switched off: it opens, attaches and writes database files past the permission
+ *  model's file-system rules (Node 26), so any SQLite file the person owns could be read and a
+ *  file written anywhere they can write. */
 export function lockedNodeArgs(readDirs: string[], script: string): string[] {
-  return ["--permission", ...readDirs.map((d) => `--allow-fs-read=${d}`), script];
+  return ["--permission", "--no-experimental-sqlite", ...readDirs.map((d) => `--allow-fs-read=${d}`), script];
 }
 
 /** Raised instead of running generated code on a Node.js that does not enforce the network ban,
@@ -34,7 +37,7 @@ export class IsolationUnsafeError extends Error {
   constructor(unconfirmed = false) {
     super(unconfirmed
       ? "Generated code is paused: MKMN could not confirm that this Node.js runtime blocks network access. It checks again on the next run."
-      : "Generated code is turned off: this Node.js runtime cannot block network access.");
+      : "Generated code is turned off: this Node.js runtime cannot keep it away from the network and your files.");
     this.name = "IsolationUnsafeError";
   }
 }
