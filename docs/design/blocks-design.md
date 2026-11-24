@@ -1,6 +1,7 @@
-# Blocks: the complete logic (design document, before any code)
+# Blocks design
 
-Status: proposal for review. Nothing described here as "to do" is coded. The already pushed base (`src/core/gameBlocks.ts`, version 0) is described in section 12: it serves as a draft, not a reference.
+This document describes the block architecture and its design decisions.
+Implementation modules are listed in section 12.
 
 ## 1. Goal
 
@@ -134,7 +135,7 @@ A simple application is expressed with the same language:
 <p data-when="tasks.length == 0">Nothing to do.</p>
 <x-calc name="open" value="count(tasks, done == false)"></x-calc>
 ```
-The prefix must be neutral (`x-`, not `game-`), since the same tags serve applications. The already pushed `game-*` tags remain accepted as aliases.
+The prefix must be neutral (`x-`, not `game-`), since the same tags serve applications. The legacy `game-*` tags remain accepted as aliases.
 
 ## 6. Does generalizing lose game quality?
 
@@ -189,29 +190,7 @@ Target budget per step: about 2 000 tokens read and less than 1 000 written. A c
 4. **Layout report**: ASCII plan, boxes, overlaps, overflows.
 5. **Bench**: ten typical requests per package, with first-try rate, duration, tokens. This is the measurement to look at before expanding the core.
 
-## 10. Writing the blocks themselves: small agents
-
-Distinction to keep: **at runtime**, it is the 4-billion-parameter model that writes the games. **When building the library**, small fast writing agents can write the blocks in parallel, which avoids sending the whole engine to each one.
-
-Each agent only receives: the core API (one page: read/write state, emit, listen), the sheet of **its** block, an example, and the instruction to deliver the implementation plus its test. It sees no other block.
-
-Safeguards: each delivery passes an automatic test in Chromium before being accepted; a single API style (the core); the sheet remains the source of truth. I review the final assembly. This is only useful once the sheets are validated: writing blocks before freezing the core would make them be rewritten.
-
-## 11. Construction plan (after review)
-
-1. Core: state, effect and condition evaluator (tolerant), bridge to CSS, `data-when`, `data-click`, `data-key`, cross-validator. Chromium to verify the engine.
-2. World in DOM: map, roles, classes, camera, BFS traversal.
-3. Events, list templates, scenes, persistence.
-4. Minimal app package (bind, form, calc) to validate the hypothesis "same engine for an app".
-5. Steps per session, wiring the layout report to the execution test.
-6. Imported resources and style sheet.
-7. Bench of ten requests; the only result that decides what comes next.
-
-## 12. Current state of the code (version 0)
-
-Already pushed: a canvas engine with map, legend, state, `when`, `game-value`, `game-bar`, `game-inventory`, `game-log`, `win/lose/restart` rules, text verification, layout report (not wired), automatic choice for world requests. To rework according to this document: effect syntax (`gold+=1`), DOM rendering, neutral prefix, CSS bridges, cross-validator, BFS.
-
-## 13. Decisions made
+## 10. Design decisions
 
 1. `x-` prefix; `game-*` tags remain aliases.
 2. The attributes `data-click`, `data-when`... and their short forms are accepted; `data-*` is documented.
@@ -219,7 +198,7 @@ Already pushed: a canvas engine with map, legend, state, `when`, `game-value`, `
 4. **A block that does not exist can be created, but not lightly.** Before letting the model write a block, the app asks it the question firmly, several times, with a definition of "exist": a block exists if there is a known tag that produces this behaviour with attributes (even with other settings), or if two existing blocks combined (states, events, rules) produce it. It answers with the name of an existing block, or with "none" and the reason. Two matching "none" answers out of three tries are needed to create; otherwise, we rewrite with the closest block. A created block is a declaration (states, events, effects), never free code, except as a last resort in a sandbox.
 5. No visual block editor: the goal is that a single message produces a complex and complete game (a Mario-style level, a Pokémon-style RPG), by splitting the tasks well.
 
-## 14. Breakdown for a complex game (Mario-like, RPG-like)
+## 11. Breakdown for a complex game (Mario-like, RPG-like)
 
 The block packages deliver the mechanics; the model composes:
 - **Mario-like**: `platformer` (physics, stompable enemies, blocks, flag, camera) + `x-state` (score, lives, coins, `big`) + rules (`lives<=0` → lose) + `x-timer` (time) + scenes (menu, level 1, level 2) + CSS (HUD, title).
@@ -227,7 +206,7 @@ The block packages deliver the mechanics; the model composes:
 - A level or a map fits in 30 to 60 lines of text; a complete request is written in short steps (section 8), each step only seeing the names from the previous ones.
 - Exact copies of the original games are not aimed at: the mechanics, yes, with visuals and names specific to the produced game.
 
-## 15. What is built (after the first wave)
+## 12. Implementation
 
 - Core and seven blocks written and tested in Chromium (`src/core/xblocks/`, scripts `scripts/xblocks-smoke/`), generated runtime (`xblocks.generated.ts`).
 - `xcheck.ts`: text verification, map traversal, automatic repairs (`xMend`). `xplan.ts`: plan reading, default plan, names, replacement of approximate names (`mendNames`). `xbuild.ts`: construction in steps. `xdocs.ts`: what the small model reads from each block.

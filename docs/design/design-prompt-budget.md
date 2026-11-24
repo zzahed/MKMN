@@ -203,18 +203,3 @@ conversation grows; it only moves the cliff.
   line assumes the block rules). Answer: the registry records dependencies; a block
   is never included without the blocks it depends on, and never dropped while a
   dependent block is kept.
-
-## Migration steps (after approval, in order)
-
-1. **Registry + budgeted builder** in `src/core/prompts.ts`; `buildSystemPrompt`
-   keeps its signature (callers unchanged) and gains the budget behavior; the
-   sidecar appends (search/images/sub-agents/folder) go through the registry too.
-2. **Fallback honesty**: the notice + logged closed-question replies in `stepwise` →
-   chat fallback paths (`chatOrchestrator.ts`); calc-sheet → free-file → chat keeps
-   its behavior but through the budgeted builder.
-3. **One window**: served-window plumbing (renderer meter, helper-route fallbacks)
-   + host log line with reason.
-4. **Error rewrite** in `fitMessages` / `streamComplete`.
-5. **Tests first for each step** (each lands with the
-   step that makes it pass), then the prompt-change rule in CONTRIBUTING.md.
-

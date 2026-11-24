@@ -175,6 +175,11 @@ v0.0.2 installer SHA-256:
 MKMN does not update itself; install a new release to update. Uninstalling
 keeps your chats and settings (`%APPDATA%\MKMN`, `%LOCALAPPDATA%\MKMN`).
 
+The initial release remains available as the
+[v0.0.1 Windows ARM64 installer](https://github.com/zzahed/MKMN/releases/download/v0.0.1/MKMN-0.0.1-arm64-Setup.exe).
+
+<a id="build-and-run-from-source"></a>
+
 <details>
 <summary><b>Build from source (developers)</b></summary>
 
