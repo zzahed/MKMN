@@ -17,12 +17,14 @@ const MAX_FILE = 1_000_000;
 /** One line beside the two starting actions: how many files, and whether they are
  *  ready to be read with the next question (sent whole, or searched once indexed). */
 export function filesReadiness(count: number, indexState: string | null, overBudget: boolean): string {
-  if (count === 0) return "No files yet: the chat starts with the instructions only";
-  const n = `${count} file${count === 1 ? "" : "s"}`;
-  if (!overBudget) return `${n} · ready, sent whole with every message`;
-  if (indexState === "ready") return `${n} · ready, searched for each question`;
-  if (indexState === "failed") return `${n} · the search index failed: retry under Files`;
-  return `${n} · getting ready: the search index is being built`;
+  if (count === 0) return "No files added: chats will use your instructions only";
+  const n = `${count} reference file${count === 1 ? "" : "s"}`;
+  if (!overBudget) return `${n} · ready, read in full in every chat`;
+  if (indexState === "ready") return `${n} · ready, the matching parts are read for each question`;
+  if (indexState === "failed") return `${n} · could not be prepared: try again under Reference files`;
+  // no status to read (not reported yet, or the store is out of reach): say what will happen, claim nothing
+  if (indexState === null) return `${n} · the matching parts are read for each question`;
+  return `${n} · preparing your files…`;
 }
 
 export function newProject(): Project {
@@ -31,6 +33,20 @@ export function newProject(): Project {
 }
 
 const PAGE = 12;
+
+/** About how many words a text holds: a size people can picture, unlike characters or tokens. */
+export function wordCount(text: string): number {
+  return text.match(/\S+/g)?.length ?? 0;
+}
+
+/** A file's size in plain words: its pages when the file has pages, and its words. */
+export function describeFileSize(words: number, pages: number, scannedPages: number): string {
+  const parts: string[] = [];
+  if (pages > 0) parts.push(`${pages.toLocaleString()} page${pages === 1 ? "" : "s"}`);
+  if (scannedPages > 0) parts.push(`${scannedPages.toLocaleString()} scanned`);
+  parts.push(`about ${words.toLocaleString()} word${words === 1 ? "" : "s"}`);
+  return parts.join(" · ");
+}
 
 function ProjectEditor({ project, convs, tasks, artifacts, contextTokens, onChange, onBack, onDelete, onPin, onArchive, onNewChat, onOpenChat, onPinChat, onArchiveChat, onOpenTasks, onOpenArtifact }: {
   project: Project; convs: Conversation[]; tasks: ScheduledTask[]; artifacts: Artifact[]; contextTokens: number;
@@ -100,9 +116,9 @@ function ProjectEditor({ project, convs, tasks, artifacts, contextTokens, onChan
         try { added.push({ id: crypto.randomUUID(), name: f.name, content: await (await import("./docs")).readDocument(f) }); } catch (e) { setErr((e as Error).message); }
         continue;
       }
-      if (f.size > MAX_FILE) { setErr(`${f.name} is larger than 1 MB. Split it or paste the relevant part as a note.`); continue; }
+      if (f.size > MAX_FILE) { setErr(`“${f.name}” is larger than 1 MB. Split it into smaller files, or paste only the part you need under “Paste text instead”.`); continue; }
       const text = await f.text();
-      if (text.includes("\u0000")) { setErr(`${f.name} is not a text file. Only text, markdown, code, CSV or JSON files can be added.`); continue; }
+      if (text.includes("\u0000")) { setErr(`“${f.name}” cannot be read. You can add PDFs, Word documents, and plain-text files such as .txt, .md, .csv, .json or code.`); continue; }
       added.push({ id: crypto.randomUUID(), name: f.name, content: text });
     }
     if (pdfReadAbort.current === pdfAbort) pdfReadAbort.current = null;
@@ -130,7 +146,7 @@ function ProjectEditor({ project, convs, tasks, artifacts, contextTokens, onChan
   // from scans — cut the same way the index cuts them) and what the store says
   // of the whole (ready, stale, failed...). A missing or unreachable store
   // says nothing; the screen never guesses.
-  const fileStats = useMemo(() => new Map(draft.files.map((f) => [f.id, fileKnowledgeStats(f)])), [draft.files]);
+  const fileStats = useMemo(() => new Map(draft.files.map((f) => [f.id, { ...fileKnowledgeStats(f), words: wordCount(f.content) }])), [draft.files]);
   // C4: pairs of files whose sections say the same thing — decided by the code from
   // the sections' words, never from the names
   const overlaps = useMemo(() => overlappingFilePairs(draft.files), [draft.files]);
@@ -186,15 +202,15 @@ function ProjectEditor({ project, convs, tasks, artifacts, contextTokens, onChan
         <button className="linkbtn" onClick={onBack}>Projects</button><span className="muted">/</span><span>{draft.name || "Untitled project"}</span>
         <span className="grow" />
         {project.archived && <span className="muted small">Archived</span>}
-        <button className={`linkbtn ${project.pinned ? "on" : ""}`} onClick={onPin} disabled={project.archived}>{project.pinned ? "Unpin" : "Pin"}</button>
-        <button className="linkbtn" onClick={onArchive}>{project.archived ? "Restore" : "Archive"}</button>
+        <button className={`linkbtn ${project.pinned ? "on" : ""}`} onClick={onPin} disabled={project.archived} title={project.pinned ? "Stop keeping this project at the top of your list" : "Keep this project at the top of your list"}>{project.pinned ? "Unpin" : "Pin"}</button>
+        <button className="linkbtn" onClick={onArchive} title={project.archived ? "Put this project back in your list" : "Hide this project from your list. Nothing is deleted, and you can restore it later."}>{project.archived ? "Restore" : "Archive"}</button>
       </div>
       <div className="proj-cols">
         <div className="proj-main">
           <input className="title-input" value={draft.name} onChange={(e) => patch({ name: e.target.value })} aria-label="Project name" />
-          <input className="wide" value={draft.description} onChange={(e) => patch({ description: e.target.value })} placeholder="What is this project about? (one line)" />
+          <input className="wide" value={draft.description} onChange={(e) => patch({ description: e.target.value })} placeholder="Short description (optional)" aria-label="Project description" />
           <div className="proj-ask">
-            <textarea rows={3} value={ask} placeholder={`New chat in ${draft.name || "this project"}`} aria-label="Start a chat in this project"
+            <textarea rows={3} value={ask} placeholder={`Ask anything to start a chat in ${draft.name || "this project"}`} aria-label="Start a chat in this project"
               onChange={(e) => setAsk(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); start(); } }} />
             <div className="proj-ask-foot">
@@ -205,7 +221,7 @@ function ProjectEditor({ project, convs, tasks, artifacts, contextTokens, onChan
               </span>
             </div>
           </div>
-          <h2 className="proj-sub">Recents</h2>
+          <h2 className="proj-sub">Chats in this project</h2>
           <div className="list proj-chats">
             {mine.slice(0, shown).map((c) => (
               <div key={c.id} className="row-item clickable" {...rowAction(() => onOpenChat(c.id))}>
@@ -215,95 +231,88 @@ function ProjectEditor({ project, convs, tasks, artifacts, contextTokens, onChan
                 <button className="linkbtn" title="Archive chat" aria-label="Archive chat" onClick={(e) => { e.stopPropagation(); onArchiveChat(c.id, true); }}><Icon d={ICONS.archive} size={14} /></button>
               </div>
             ))}
-            {mine.length === 0 && <div className="muted small">No chats yet.</div>}
+            {mine.length === 0 && <div className="muted small">No chats yet. Type a question above and press Start chat.</div>}
           </div>
           {mine.length > shown && <button className="show-more wide-more" onClick={() => setShown((n) => n + PAGE)}>Show more <span className="count">{Math.min(PAGE, mine.length - shown)}</span></button>}
         </div>
 
         <aside className="proj-side">
           <div className="side-card">
-            <div className="side-card-head"><h2>Instructions</h2><button className="linkbtn" onClick={() => setEditInstr((v) => !v)}>{editInstr ? "Done" : "Edit"}</button></div>
+            <div className="side-card-head"><h2>Instructions</h2><button className="linkbtn" onClick={() => setEditInstr((v) => !v)} aria-label={editInstr ? "Done editing instructions" : "Edit instructions"}>{editInstr ? "Done" : "Edit"}</button></div>
             {editInstr
-              ? <textarea rows={7} autoFocus value={draft.instructions} onChange={(e) => patch({ instructions: e.target.value })} placeholder="e.g. You are my Arabic tutor. Answer in Arabic first, then give the English translation." />
-              : <p className="muted small clip3">{draft.instructions.trim() || "Tell the assistant how to work in this project: tone, role, format, rules. It is sent with every message."}</p>}
+              ? <textarea rows={7} autoFocus value={draft.instructions} onChange={(e) => patch({ instructions: e.target.value })} aria-label="Project instructions" placeholder="e.g. You are my Arabic tutor. Answer in Arabic first, then give the English translation." />
+              : <p className="muted small clip3">{draft.instructions.trim() || "Optional. Tell the assistant how to help in this project, for example its role, tone or answer format. It follows these in every chat here."}</p>}
           </div>
 
           <div className="side-card">
-            <div className="side-card-head"><h2>Files</h2>
+            <div className="side-card-head"><h2>Reference files</h2>
               <input ref={fileRef} type="file" multiple hidden onChange={(e) => void addFiles(e.target.files)} />
-              <button className="linkbtn" onClick={() => fileRef.current?.click()}>Add</button></div>
-            {/* The truth about what rides with a question, read from the app's
-                own budget: under it, the files go whole; over it, the question is searched
-                and only the matching parts ride. Search covers the over-budget case, so
-                nothing here is a warning colour. */}
-            <div className="meter-line">
-              <div className="track"><div className="fill" style={{ width: `${pct}%` }} /></div>
-              <span className="small muted">{Math.round(used / 1000)}k / {Math.round(budget / 1000)}k</span>
-            </div>
-            <p className="muted small">
-              {used > budget
-                ? <>Too big to send whole: for each question, MKMN searches these files and sends the matching parts (about {Math.round(budget / 1000)}k characters at a time).</>
-                : <>All of it rides with every message in this project.</>}
-            </p>
-            {indexState && (
-              <p className="muted small">
-                {indexState === "ready" ? "Search index: ready — the question-by-question search reads from it."
-                  : indexState === "indexing" ? <>Building the search index{indexProgress ? `: ${indexProgress.done} of ${indexProgress.of} files` : ""}…</>
-                  : indexState === "stale" ? "Search index: out of date with the files — rebuilding."
-                  : indexState === "queued" ? "Search index: waiting to be built."
-                  : <>Could not build the search index{indexError ? `: ${indexError}` : "."}</>}
+              <button className="linkbtn" onClick={() => fileRef.current?.click()}>Add files</button></div>
+            {/* What the assistant reads with a question, from the app's own limit
+                (knowledgeBudget(contextTokens)): under it, the files are read whole; over it,
+                each question is searched and only the matching parts are read. Search covers
+                the over-limit case, so nothing here uses a warning colour. */}
+            {draft.files.length > 0 && (used > budget
+              ? <p className="muted small">Too long to read all at once. For each question, the assistant looks up the parts of these files that match it.</p>
+              : <>
+                  <div className="meter-line">
+                    <div className="track" role="progressbar" aria-label="Space used by reference files" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}><div className="fill" style={{ width: `${pct}%` }} /></div>
+                    <span className="small muted">{pct}% used</span>
+                  </div>
+                  <p className="muted small">Short enough to read in full: the assistant reads all of it in every chat in this project.</p>
+                </>)}
+            {/* Preparing (the search index) matters only when the files are too long to
+                read whole; under the limit it would be noise. */}
+            {indexState && used > budget && (
+              <p className="muted small" role="status">
+                {indexState === "ready" ? "Your files are ready."
+                  : indexState === "indexing" ? <>Preparing your files{indexProgress ? `: ${indexProgress.done} of ${indexProgress.of} done` : ""}…</>
+                  : indexState === "stale" ? "Your files changed. Preparing them again…"
+                  : indexState === "queued" ? "Waiting to prepare your files…"
+                  : <>Your files could not be prepared{indexError ? ` (${indexError})` : ""}. Try again, or remove the file that causes the problem.</>}
               </p>
             )}
-            {indexState === "failed" && <button className="linkbtn" onClick={retryIndex}>Retry building the search index</button>}
+            {indexState === "failed" && used > budget && <button className="linkbtn" onClick={retryIndex}>Try again</button>}
             {overlaps.length > 0 && overlaps.map(([a, b]) => (
-              <p key={`${a}\u0000${b}`} className="muted small">“{a}” and “{b}” overlap: they say much the same thing, so an answer may quote either.</p>
+              <p key={`${a}\u0000${b}`} className="muted small">“{a}” and “{b}” cover much of the same content, so an answer may quote either one.</p>
             ))}
             <div className="side-files">
               {draft.files.map((f) => {
                 const s = fileStats.get(f.id);
-                const inIndex = indexState === "ready" || indexState === "stale";
-                // the file's own size in the app's measure (~3.5 characters to a token)
-                const tokens = Math.max(1, Math.round(f.content.length / 3.5));
+                const preparing = used > budget && indexState !== null && indexState !== "ready" && indexState !== "stale";
                 return (
                   <div key={f.id} className="side-file knowledge-file">
                     <div className="grow clip-col">
                       <span className="clip" title={f.name}>{f.name}</span>
                       <span className="muted small">
-                        ~{tokens} tokens
-                        {s && s.sections > 0 && (
-                          <>
-                            {" · "}{s.sections} section{s.sections === 1 ? "" : "s"}
-                            {s.pages > 0 ? ` · ${s.pages} page${s.pages === 1 ? "" : "s"}` : ""}
-                            {s.scannedPages > 0 ? ` · ${s.scannedPages} read from scans` : ""}
-                          </>
-                        )}
-                        {indexState && !inIndex ? " · not indexed yet" : ""}
+                        {s ? describeFileSize(s.words, s.pages, s.scannedPages) : ""}
+                        {preparing ? " · being prepared" : ""}
                       </span>
                     </div>
-                    <button className="linkbtn" onClick={() => patch({ files: draft.files.filter((x) => x.id !== f.id) })}>Remove</button>
+                    <button className="linkbtn" aria-label={`Remove ${f.name}`} onClick={() => patch({ files: draft.files.filter((x) => x.id !== f.id) })}>Remove</button>
                   </div>
                 );
               })}
-              {draft.files.length === 0 && <div className="muted small">Text the assistant can draw on in every chat. It stays on this computer.</div>}
+              {draft.files.length === 0 && <div className="muted small">Add notes, reports or PDFs the assistant should know about. It can use them in every chat in this project. They stay on this computer.</div>}
             </div>
             {err && <div className="error-box">{err}</div>}
-            <details className="sysprompt"><summary className="small muted">Or paste a note</summary>
-              <input className="wide" value={noteName} onChange={(e) => setNoteName(e.target.value)} placeholder="Title" style={{ margin: "6px 0" }} />
-              <textarea rows={4} value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder="Paste text here" />
+            <details className="sysprompt"><summary className="small muted">Paste text instead</summary>
+              <input className="wide" value={noteName} onChange={(e) => setNoteName(e.target.value)} placeholder="Title (optional)" aria-label="Note title" style={{ margin: "6px 0" }} />
+              <textarea rows={4} value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder="Paste text here" aria-label="Note text" />
               <div className="row"><button className="ghost" onClick={addNote} disabled={!noteText.trim()}>Add note</button></div>
             </details>
           </div>
 
           <div className="side-card">
-            <div className="side-card-head"><h2>Folder</h2><button className="linkbtn" onClick={() => void pickFolder()}>{draft.folder ? "Change" : "Choose"}</button></div>
+            <div className="side-card-head"><h2>Linked folder</h2><button className="linkbtn" onClick={() => void pickFolder()}>{draft.folder ? "Change folder" : "Choose folder"}</button></div>
             {draft.folder
-              ? <div className="side-file"><span className="clip grow" title={draft.folder}>{draft.folder}</span><button className="linkbtn" onClick={() => patch({ folder: undefined })}>Remove</button></div>
-              : <p className="muted small">A folder the assistant can read in every chat of this project. It never changes anything.</p>}
+              ? <div className="side-file"><span className="clip grow" title={draft.folder}>{draft.folder}</span><button className="linkbtn" title="Unlink this folder. Nothing in it is deleted." onClick={() => patch({ folder: undefined })}>Unlink</button></div>
+              : <p className="muted small">Optional. Let the assistant read a folder on this computer in this project's chats. It can open and read the files there, but never changes or deletes them.</p>}
           </div>
 
           {(myArts.length > 0 || myTasks.length > 0) && (
             <div className="side-card">
-              <div className="side-card-head"><h2>Made here</h2></div>
+              <div className="side-card-head"><h2>Made in this project</h2></div>
               <div className="side-files">
                 {myArts.map((a) => <div key={a.id} className="side-file clickable" {...rowAction(() => onOpenArtifact(a.id))}><span className="clip grow">{a.title}</span><span className="muted small">{a.kind}</span></div>)}
                 {myTasks.map((t) => <div key={t.id} className="side-file clickable" {...rowAction(onOpenTasks)}><span className="clip grow">{t.name}</span><span className="muted small">{describeSchedule(t.schedule)}</span></div>)}
@@ -311,7 +320,7 @@ function ProjectEditor({ project, convs, tasks, artifacts, contextTokens, onChan
             </div>
           )}
 
-          <button className="danger" onClick={() => { if (confirm(`Delete the project "${draft.name}"? Its chats are kept, without the project's context.`)) { gone.current = true; onDelete(); } }}>Delete project</button>
+          <button className="danger" onClick={() => { if (confirm(`Delete the project "${draft.name}"?\n\nIts instructions, reference files and linked folder are removed. Its chats stay in your chat list, without this project's instructions and files.\n\nThis cannot be undone. To hide the project instead, use Archive.`)) { gone.current = true; onDelete(); } }}>Delete project</button>
         </aside>
       </div>
     </div>
@@ -345,14 +354,14 @@ export function Projects(props: {
   return (
     <div className="page">
       <div className="page-head">
-        <div><h1>Projects</h1><p className="muted">A project keeps instructions and reference files together, and every chat inside it starts with that context.</p></div>
+        <div><h1>Projects</h1><p className="muted">Keep instructions and reference files together for one topic. Every chat in a project can use them.</p></div>
         <button className="primary" onClick={() => { const p = newProject(); props.onSave(p); onOpen(p.id); }}>＋ New project</button>
       </div>
       {(archivedCount > 0 || showArchived) && (
         <div className="row"><button className="ghost" onClick={() => { setShowArchived((v) => !v); setShown(PAGE); }}>{showArchived ? "Back to projects" : `Archived (${archivedCount})`}</button></div>
       )}
       {sorted.length === 0 ? (
-        <div className="empty-box"><p>{showArchived ? "No archived projects." : "No projects yet. Create one for a course, a codebase, a client or a recurring job, add what the assistant should know, and start chatting."}</p></div>
+        <div className="empty-box"><p>{showArchived ? "No archived projects." : "No projects yet. Make one for a course, a client, a piece of work or a recurring job. Add what the assistant should know, then start a chat."}</p></div>
       ) : (
         <>
           <div className="grid">
@@ -368,7 +377,7 @@ export function Projects(props: {
                     </div>
                   </div>
                   <div className="muted small clip2">{p.description || p.instructions || "No description"}</div>
-                  <div className="muted small">{p.files.length} file{p.files.length === 1 ? "" : "s"}{p.folder ? " + folder" : ""} · {n} chat{n === 1 ? "" : "s"} · updated {new Date(p.updated).toLocaleDateString()}</div>
+                  <div className="muted small">{p.files.length} reference file{p.files.length === 1 ? "" : "s"}{p.folder ? " + linked folder" : ""} · {n} chat{n === 1 ? "" : "s"} · updated {new Date(p.updated).toLocaleDateString()}</div>
                 </div>
               );
             })}

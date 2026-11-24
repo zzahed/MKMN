@@ -112,8 +112,8 @@ describe("which files overlap (C4): decided from the sections, never the names",
 describe("the panel speaks the truth (source pins on Projects.tsx and the api)", () => {
   it("the orange lie is gone; both truths are here, derived from the app's own budget", () => {
     expect(proj).not.toContain("The rest will be cut");
-    expect(proj).toContain("Too big to send whole");
-    expect(proj).toMatch(/rides with every (?:message|question)/); // under budget: the files go whole
+    expect(proj).toContain("Too long to read all at once");
+    expect(proj).toContain("reads all of it in every chat"); // under budget: the files go whole
     expect(proj).toContain("knowledgeBudget(contextTokens)"); // the threshold is the app's own, never a private number
   });
 
@@ -127,13 +127,19 @@ describe("the panel speaks the truth (source pins on Projects.tsx and the api)",
     expect(api).toContain("knowledgeBuild");
     expect(proj).toContain("knowledgeBuild(");
     expect(proj).toContain("indexProgress"); // the n-of-m progress the status poll brings
-    expect(proj).toMatch(/Building the search index/);
-    expect(proj).toMatch(/[Rr]etry/); // a failed build offers the retry
+    expect(proj).toMatch(/Preparing your files/);
+    expect(proj).toMatch(/retryIndex}>Try again</); // a failed build offers the retry
   });
 
-  it("each file's line carries its token size (C3)", () => {
-    expect(proj).toMatch(/tokens/);
-    expect(proj).toMatch(/3\.5/); // the app's own chars-per-token measure, not a second one
+  it("each file's line carries its size in pages and words, never tokens (C3)", () => {
+    expect(proj).toContain("describeFileSize(s.words, s.pages, s.scannedPages)");
+    expect(proj).not.toMatch(/~\{tokens\} tokens/);
+  });
+
+  it("the meter shows a percentage only while everything fits, never a raw count over the limit", () => {
+    expect(proj).not.toMatch(/Math\.round\(used \/ 1000\)\}k \//);
+    expect(proj).toContain("{pct}% used");
+    expect(proj).toContain('role="progressbar"');
   });
 
   it("the overlap note is drawn from the code's pair list (C4)", () => {

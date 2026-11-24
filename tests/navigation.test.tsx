@@ -549,7 +549,7 @@ describe("Models and the settings journey", () => {
 describe("the Files panel follows an index build to its end", () => {
   it("keeps polling while the index stays \"indexing\", until it is ready", async () => {
     let polls = 0;
-    const withFile = { ...PROJECT, files: [{ id: "f1", name: "notes.txt", content: "The annex opens at nine. ".repeat(40) }] };
+    const withFile = { ...PROJECT, files: [{ id: "f1", name: "notes.txt", content: "The annex opens at nine. ".repeat(400) }] }; // longer than the read-at-once limit, so the preparing status shows
     boot(makeApi({
       projects: async () => [{ ...withFile }],
       knowledgeStatus: async () => { polls++; return polls <= 3 ? { state: "indexing", progress: { done: 0, of: 1 } } : { state: "ready" }; },
@@ -560,7 +560,7 @@ describe("the Files panel follows an index build to its end", () => {
     fireEvent.click(railBtn("Projects"));
     await waitFor(() => expect(document.querySelector(".card.clickable")).toBeTruthy());
     fireEvent.click([...document.querySelectorAll(".card.clickable")].find((c) => c.textContent!.includes("Alpha project")) as HTMLElement);
-    await waitFor(() => expect(screen.getByText(/Search index: ready/)).toBeTruthy(), { timeout: 9000 });
+    await waitFor(() => expect(screen.getByText(/Your files are ready/)).toBeTruthy(), { timeout: 9000 });
     expect(polls).toBeGreaterThanOrEqual(4);
   }, 12000);
 });
