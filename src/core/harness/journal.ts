@@ -135,7 +135,8 @@ export function journalPath(runId: string, env: NodeJS.ProcessEnv = process.env)
 // resume re-runs those steps, and an interrupted side-effecting step is never re-run on its own).
 // The key is readable by the same Windows user, so this does not stop a program already running as
 // them; it stops forged and copied journals, stray edits, and generated code (which cannot write
-// files at all). Offloaded reply files (offload.ts) are not covered: a resume does not read them.
+// files at all). The key never sits beside a journal, so a copied-in workspace cannot bring one
+// that vouches for its own forged journal. Offloaded reply files (offload.ts) are not covered: a resume does not read them.
 // ---------------------------------------------------------------------------------------------
 
 const CHAIN_START = "mkmn-journal-v1";
@@ -144,22 +145,26 @@ const keys = new Map<string, Buffer | null>();
 /** The MAC of the last line written to a file, and the size the file had then. */
 const tails = new Map<string, { size: number; mac: string }>();
 
-const sameDir = (a: string, b: string) =>
-  process.platform === "win32" ? path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase() : path.resolve(a) === path.resolve(b);
+let keyFileOverride: string | null = null;
 
-/** Where the key that signs `file` lives: the app's own journals (in the workspace's harness
- *  folder) use the install's key in its Config folder, outside the workspace, so a workspace
- *  copied in from elsewhere does not carry its key along. A journal anywhere else (a test's
- *  temporary folder) uses a key beside it. */
-export function journalKeyFile(file: string, env: NodeJS.ProcessEnv = process.env): string {
-  const dir = path.dirname(file);
-  return sameDir(dir, journalDir(env)) ? path.join(mkmnPaths(env).configDir, "journal.key") : path.join(dir, "journal.key");
+/** Where the key that signs and checks every journal lives: the install's Config folder, outside
+ *  any workspace, whatever folder the journal itself is in (a headless run's `--workspace` too).
+ *  A key that travelled with a journal is never trusted. Tests point it elsewhere explicitly. */
+export function journalKeyFile(env: NodeJS.ProcessEnv = process.env): string {
+  return keyFileOverride ?? path.join(mkmnPaths(env).configDir, "journal.key");
 }
 
-/** The 32-byte key for `file`, made on first use (readable by this user only, where the OS
+/** Tests only (tests/setup-journal-key.ts): sign and check with the key at `file`, or with the
+ *  install's again for null. The app never calls it. */
+export function useJournalKeyFile(file: string | null): void {
+  keyFileOverride = file;
+  forgetJournalKeys();
+}
+
+/** The install's 32-byte journal key, made on first use (readable by this user only, where the OS
  *  honours the mode); null when it cannot be read or made, and then nothing written is trusted. */
-function journalKey(file: string): Buffer | null {
-  const at = journalKeyFile(file);
+function journalKey(): Buffer | null {
+  const at = journalKeyFile();
   if (keys.has(at)) return keys.get(at)!;
   let key: Buffer | null = null;
   try {
@@ -182,7 +187,7 @@ const macOf = (key: Buffer, prev: string, body: string) => createHmac("sha256", 
 function signedLine(file: string, entry: JournalEntry, prev: string): { line: string; mac: string | null } {
   const { mac: _drop, ...plain } = entry as JournalEntry & { mac?: unknown };
   const body = JSON.stringify(plain);
-  const key = journalKey(file);
+  const key = journalKey();
   if (!key) return { line: body, mac: null };
   const mac = macOf(key, prev, body);
   return { line: `${body.slice(0, -1)},"mac":"${mac}"}`, mac };
@@ -216,7 +221,7 @@ function appendSigned(file: string, entry: JournalEntry, lead = ""): void {
  *  Unreadable lines are not counted here (readJournal does), and are not links of the chain. */
 export function untrustedLines(file: string): number {
   if (!existsSync(file)) return 0;
-  const key = journalKey(file);
+  const key = journalKey();
   let prev = CHAIN_START;
   let bad = 0;
   for (const line of readFileSync(file, "utf8").split("\n")) {

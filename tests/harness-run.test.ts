@@ -3,7 +3,7 @@ import { appendFileSync, mkdtempSync, readFileSync, rmSync, existsSync, writeFil
 import * as os from "node:os";
 import * as path from "node:path";
 import { createRun, type StepDef, type SettledStep } from "../src/core/harness/run";
-import { appendEntry, forgetJournalKeys, journalKeyFile, journalPath, readJournal, resumeReplay, settledSteps } from "../src/core/harness/journal";
+import { appendEntry, journalKeyFile, journalPath, readJournal, resumeReplay, settledSteps, useJournalKeyFile } from "../src/core/harness/journal";
 import { mkmnPaths } from "../src/shared/paths";
 import { sArray, sNumber, sObject, sString } from "../src/core/harness/schema";
 
@@ -505,18 +505,39 @@ describe("the harness run and its journal", () => {
         const jf = file("r-other-key.jsonl");
         const seen: string[] = [];
         await finished(jf, "r-other-key", seen);
-        const keyFile = journalKeyFile(jf);
-        expect(readFileSync(keyFile).length).toBe(32);
-        writeFileSync(keyFile, Buffer.alloc(32, 7));
-        forgetJournalKeys(); // as a fresh start of the app reads it
-        await expect(resume(jf, "r-other-key", seen).next()).rejects.toThrow(UNTRUSTED);
+        const installKey = journalKeyFile();
+        expect(readFileSync(installKey).length).toBe(32);
+        const other = file("other-install.key");
+        writeFileSync(other, Buffer.alloc(32, 7));
+        useJournalKeyFile(other); // as the app on another install reads it
+        try {
+          await expect(resume(jf, "r-other-key", seen).next()).rejects.toThrow(UNTRUSTED);
+          expect(seen).toEqual([]);
+        } finally { useJournalKeyFile(installKey); }
+      });
+
+      // Codex review of #56: a headless run journals to `<workspace>/harness.jsonl`, and a key beside
+      // the journal was trusted, so a copied-in workspace could bring a key that vouched for its own
+      // forged journal. The key is now the install's, wherever the journal is.
+      it("does not trust a key that came with the journal, as a copied-in workspace brings one", async () => {
+        const installKey = journalKeyFile();
+        const workspace = file("copied-workspace");
+        const jf = path.join(workspace, "harness.jsonl");
+        const seen: string[] = [];
+        useJournalKeyFile(path.join(workspace, "journal.key")); // whoever forged it signed with a key of their own, kept beside it
+        try { await finished(jf, "r-copied", seen); } finally { useJournalKeyFile(installKey); }
+        expect(existsSync(path.join(workspace, "journal.key"))).toBe(true);
+        await expect(resume(jf, "r-copied", seen).next()).rejects.toThrow(UNTRUSTED);
         expect(seen).toEqual([]);
       });
 
-      it("keeps the key of the app's own journals in its Config folder, not beside them in the workspace", () => {
-        const env = { LOCALAPPDATA: dir } as NodeJS.ProcessEnv;
-        expect(journalKeyFile(journalPath("r-1", env), env)).toBe(path.join(mkmnPaths(env).configDir, "journal.key"));
-        expect(journalKeyFile(file("elsewhere.jsonl"), env)).toBe(file("journal.key"));
+      it("keeps the install's key in its Config folder, whatever folder a journal is in", () => {
+        const testKey = journalKeyFile();
+        useJournalKeyFile(null);
+        try {
+          const env = { LOCALAPPDATA: dir } as NodeJS.ProcessEnv;
+          expect(journalKeyFile(env)).toBe(path.join(mkmnPaths(env).configDir, "journal.key"));
+        } finally { useJournalKeyFile(testKey); }
       });
     });
   });
