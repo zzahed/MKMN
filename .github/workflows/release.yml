@@ -106,6 +106,7 @@ jobs:
 
   verify-candidate:
     name: Verify the attested pilot candidate
+    if: github.repository == 'zzahed/MKMN' && github.ref == 'refs/heads/main'
     needs: windows-arm64
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -123,14 +124,13 @@ jobs:
           import json, os, subprocess, sys, time
           repo, sha = os.environ["GITHUB_REPOSITORY"], os.environ["GITHUB_SHA"]
           for attempt in range(60):
-              data = json.loads(subprocess.check_output(
-                  ["gh", "api", f"repos/{repo}/actions/runs?head_sha={sha}&per_page=100"], text=True))
               matches = {}
-              for run in data.get("workflow_runs", []):
-                  if run.get("head_sha") == sha and run.get("name") in ("ci", "codeql"):
-                      name = run["name"]
-                      if name not in matches or run["id"] > matches[name]["id"]:
-                          matches[name] = run
+              for name in ("ci", "codeql"):
+                  endpoint = f"repos/{repo}/actions/workflows/{name}.yml/runs?head_sha={sha}&branch=main&event=push&per_page=100"
+                  data = json.loads(subprocess.check_output(["gh", "api", endpoint], text=True))
+                  runs = [r for r in data.get("workflow_runs", []) if r.get("head_sha") == sha]
+                  if runs:
+                      matches[name] = max(runs, key=lambda r: r["id"])
               print(f"Gate {attempt + 1}: " + ", ".join(
                   f"{name}={matches.get(name, {}).get('conclusion') or matches.get(name, {}).get('status', 'missing')}"
                   for name in ("ci", "codeql")), flush=True)
@@ -166,4 +166,5 @@ jobs:
           sed 's/\r$//' "MKMN-$version-build.txt" | grep -Fx "installer_sha256=$sha"
           gh attestation verify "$installer" --repo "$GITHUB_REPOSITORY" \
             --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" \
-            --source-digest "$GITHUB_SHA"
+            --source-digest "$GITHUB_SHA" \
+            --source-ref refs/heads/main
