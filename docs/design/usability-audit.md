@@ -157,6 +157,16 @@ NPU clock modes before anything they could act on.
 | K6 | Tasks intro: "Prompts … using your NPU. Results and any artifacts land here." | Medium | "Instructions the assistant carries out by itself on a schedule… files it makes appear in Files." |
 | K7 | Task and file deletes do not say what is lost or that they cannot be undone. | Medium | Each names what goes and what stays (checked against the delete handler), and says it cannot be undone. |
 
+## Open security item found during review
+
+A skill's "start by itself" pattern written by hand, or carried in an
+imported `.md` skill's `when:` line, is compiled and run against every
+message in the renderer. A catastrophic pattern such as `(a+)+$` could
+freeze the window; the 300-character limit does not prevent it. This
+predates the plain-language work; the new words form (escaped literals in
+one alternation) adds no risk. To do: refuse nested quantifiers on save and
+import, or match with a length or time guard. Tracked in #62.
+
 ## Phases
 
 1. **Projects** — done in this branch (P1–P13).

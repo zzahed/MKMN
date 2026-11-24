@@ -13,7 +13,7 @@ const TITLES = [
 const HINTS = [
   "Always read, whatever the model and setting. Put what matters most: your name, your language, how you like answers.",
   "Read when the conversation length is Long (about 6,000 words) or more. Preferences that help but are not vital.",
-  "Read only when the model is set up for very long conversations (about 12,000 words or more). Background, habits, and examples of answers you liked."
+  "Read only by a model set up for very long conversations (about 12,000 words or more), which most setups are not. Background, habits, and examples of answers you liked."
 ];
 const PLACEHOLDERS = [
   "I'm Fabien, a developer on Windows. Reply in Arabic unless I write in English. Be concise.",
