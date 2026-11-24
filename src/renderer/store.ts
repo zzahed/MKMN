@@ -54,6 +54,12 @@ const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object
 /** The objects of a saved list (anything else in it is dropped), as the type the field holds. */
 const list = <T extends object = Record<string, unknown>>(v: unknown): T[] => (Array.isArray(v) ? v.filter((x): x is T => isObj(x)) : []);
 
+/** A build's saved quality score, read back only when it has the shape the card draws (a score in [0, 1], a rubric name, notes as text). */
+function cleanQuality(q: unknown): NonNullable<Turn["build"]>["quality"] {
+  if (!isObj(q) || typeof q.rubric !== "string" || typeof q.score !== "number" || !Number.isFinite(q.score) || q.score < 0 || q.score > 1) return undefined;
+  return { rubric: q.rubric, score: q.score, notes: Array.isArray(q.notes) ? q.notes.filter((n): n is string => typeof n === "string") : [] };
+}
+
 /** Saved chats are read back as found: anything malformed is repaired or dropped so one bad value can never stop the app from drawing. */
 function cleanTurn(t: Record<string, unknown>): Turn {
   const turn: Turn = { ...t, role: t.role === "user" ? "user" : "assistant", content: typeof t.content === "string" ? t.content : "", pending: false } as Turn;
@@ -61,7 +67,7 @@ function cleanTurn(t: Record<string, unknown>): Turn {
   if (t.attachments !== undefined) turn.attachments = list(t.attachments);
   if (t.agents !== undefined) turn.agents = list(t.agents);
   if (t.notices !== undefined) turn.notices = Array.isArray(t.notices) ? t.notices.filter((n: unknown) => typeof n === "string") : undefined;
-  if (t.build !== undefined) turn.build = isObj(t.build) && Array.isArray(t.build.steps) ? { status: t.build.status === "unresolved" ? "unresolved" : "done", steps: list(t.build.steps), spec: typeof t.build.spec === "string" ? t.build.spec : undefined, start: Array.isArray(t.build.start) ? list(t.build.start) : undefined, verify: Array.isArray(t.build.verify) ? list(t.build.verify) : undefined } : undefined;
+  if (t.build !== undefined) turn.build = isObj(t.build) && Array.isArray(t.build.steps) ? { status: t.build.status === "unresolved" ? "unresolved" : "done", steps: list(t.build.steps), spec: typeof t.build.spec === "string" ? t.build.spec : undefined, start: Array.isArray(t.build.start) ? list(t.build.start) : undefined, verify: Array.isArray(t.build.verify) ? list(t.build.verify) : undefined, quality: cleanQuality(t.build.quality) } : undefined;
   for (const k of ["review", "loop"] as const) {
     if (t[k] !== undefined && !(isObj(t[k]) && Array.isArray(t[k].steps))) delete turn[k];
   }
@@ -88,7 +94,7 @@ function cleanAttachments(items: Attachment[] | undefined): Attachment[] | undef
 
 /** What is written down: no live run state, and picture bytes left to the media store. */
 export function persistableConversations(c: Conversation[]): Conversation[] {
-  return c.map((x) => ({ ...x, turns: x.turns.map((t) => ({ ...t, pending: false, run: undefined, attachments: cleanAttachments(t.attachments), agents: t.agents?.map((a) => ({ ...a, status: a.status === "running" ? "error" as const : a.status })), review: t.review ? { ...t.review, status: "done" as const, shots: undefined } : undefined, loop: t.loop ? { ...t.loop, status: "done" as const } : undefined, build: t.build ? { status: t.build.status === "running" ? "done" as const : t.build.status, spec: t.build.spec, start: t.build.start?.map(({ shot, ...v }) => ({ ...v, status: v.status === "running" ? "error" as const : v.status })), verify: t.build.verify?.map(({ shot, ...v }) => ({ ...v, status: v.status === "running" ? "error" as const : v.status })), steps: t.build.steps.map((s) => ({ ...s, status: s.status === "running" || s.status === "waiting" ? "error" as const : s.status, stages: s.stages?.map(({ shot, ...v }) => ({ ...v, status: v.status === "running" ? "error" as const : v.status })) })) } : undefined })) }));
+  return c.map((x) => ({ ...x, turns: x.turns.map((t) => ({ ...t, pending: false, run: undefined, attachments: cleanAttachments(t.attachments), agents: t.agents?.map((a) => ({ ...a, status: a.status === "running" ? "error" as const : a.status })), review: t.review ? { ...t.review, status: "done" as const, shots: undefined } : undefined, loop: t.loop ? { ...t.loop, status: "done" as const } : undefined, build: t.build ? { status: t.build.status === "running" ? "done" as const : t.build.status, spec: t.build.spec, quality: t.build.quality, start: t.build.start?.map(({ shot, ...v }) => ({ ...v, status: v.status === "running" ? "error" as const : v.status })), verify: t.build.verify?.map(({ shot, ...v }) => ({ ...v, status: v.status === "running" ? "error" as const : v.status })), steps: t.build.steps.map((s) => ({ ...s, status: s.status === "running" || s.status === "waiting" ? "error" as const : s.status, stages: s.stages?.map(({ shot, ...v }) => ({ ...v, status: v.status === "running" ? "error" as const : v.status })) })) } : undefined })) }));
 }
 
 /** Last resort when the quota is full: drop picture bytes that were never written to the media store, and say so. */
