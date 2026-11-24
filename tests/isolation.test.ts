@@ -129,6 +129,67 @@ describe("generated code runs in a locked-down process", () => {
 });
 
 /**
+ * Security pre-review 2026-11-24, F6 and F7. An escape reaches the worker's own `process`, so it
+ * could print a reply of its own (and exit before the real one), rewrite the real one on its way
+ * out, or bend the builtins the reply is made with: every check it was judged by then "passed".
+ * And it could print without end into the sidecar's memory.
+ */
+describe("the locked-down process's reply is the worker's, and its output is bounded", () => {
+  const locked = () => setIsolation(lockedNodeRunner(process.execPath, worker, codeDirs(path.join(dist, "sidecar"))));
+  const failing = (call: string) => runExamples([], "function f() { return 1; }", [{ call, expect: '"never"' }]).then((r) => r, (e: Error) => e);
+  const PASSED = '{"ok":true,"value":{"ok":true,"failures":[]}}';
+  const esc = (body: string) => `(function () { var p = this.constructor.constructor("return process")(); ${body} return "x"; })()`;
+
+  it("a reply the code printed itself, before exiting, is not taken for the worker's", async () => {
+    locked();
+    const r = await failing(esc(`p.stdout.write('${PASSED}\\n'); p.exit(0);`));
+    expect(r).not.toEqual({ ok: true, failures: [] });
+    expect(r).toBeInstanceOf(Error);
+  }, 60_000);
+
+  it("a reply the code printed itself, with the real one still to come, is not taken either", async () => {
+    locked();
+    const r = await failing(esc(`p.on("exit", function () { p.stdout.write('${PASSED}\\n'); });`));
+    expect(r).toMatchObject({ ok: false });
+  }, 60_000);
+
+  it("the code cannot rewrite the real reply on its way out", async () => {
+    locked();
+    const r = await failing(esc(`var w = p.stdout.write.bind(p.stdout); p.stdout.write = function (s, cb) { return w('${PASSED}\\n', cb); }; ` +
+      `var fs = p.getBuiltinModule("fs"), ws = fs.writeSync; fs.writeSync = function (fd) { return ws(fd, '${PASSED}\\n'); };`));
+    expect(r).toMatchObject({ ok: false });
+  }, 60_000);
+
+  it("the code cannot bend the builtins the reply and the verdict are made with", async () => {
+    locked();
+    const r = await failing(esc(`var O = p.constructor.constructor("return Object")(), J = p.constructor.constructor("return JSON")(); ` +
+      `try { O.defineProperty(O.prototype, "toJSON", { value: function () { return this && this.failures ? { ok: true, failures: [] } : this; }, configurable: true }); } catch (e) {} ` +
+      `try { J.stringify = function () { return '${PASSED}'; }; } catch (e) {} ` +
+      `try { p.constructor.constructor("return Array")().prototype.push = function () { return 0; }; } catch (e) {}`));
+    expect(r).toMatchObject({ ok: false });
+  }, 60_000);
+
+  // CI on Linux: there stdout to a pipe is asynchronous, so the code's last unterminated output
+  // could still be on the line the reply was written to
+  it("output that does not end its line does not hide the real reply", async () => {
+    locked();
+    const r = await failing(esc(`p.getBuiltinModule("fs").writeSync(1, "no newline"); p.stdout.write("nor this");`));
+    expect(r).toMatchObject({ ok: false });
+  }, 60_000);
+
+  it("output past the limit stops the check and is reported, on the async and the sync path", async () => {
+    locked();
+    // written synchronously (an asynchronous write may be dropped when the worker exits, as on Linux)
+    const flood = esc(`var fs = p.getBuiltinModule("fs"), b = p.getBuiltinModule("buffer").Buffer.alloc(1 << 20, 120); ` +
+      `for (var i = 0; i < 40; i++) for (var at = 0; at < b.length;) { try { at += fs.writeSync(1, b, at, b.length - at); } catch (e) { if (e.code !== "EAGAIN") throw e; } }`);
+    const r = await failing(flood);
+    expect(r).toBeInstanceOf(Error);
+    expect((r as Error).message).toMatch(/printed more than 16 MiB and was stopped/);
+    expect(() => runCases(`function f() { return ${flood}; }`, [["f()", 1]])).toThrow(/printed more than 16 MiB and was stopped/);
+  }, 60_000);
+});
+
+/**
  * QE-1.4: the locked flags only protect when THIS Node binary enforces them. Node 24's
  * permission model let a locked process open a connection, so the sidecar now proves the
  * runtime denies the network before it runs any generated code, and refuses when it cannot.

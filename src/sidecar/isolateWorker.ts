@@ -8,7 +8,8 @@ import { runExamplesHere, smokeRunHere, playPageRunHere } from "../core/construc
 import { judgeScenesHere } from "../core/construct/scene";
 import { codeChecksHere } from "../core/labCode";
 import { runCasesHere } from "../core/benchChecks";
-import type { IsolatedOp, IsolatedReply } from "../core/isolate";
+import { replyPrefix, type IsolatedOp, type IsolatedReply } from "../core/isolate";
+import * as fs from "fs";
 import type { Check } from "../core/promptLab";
 
 const OPS: Record<IsolatedOp, (...args: never[]) => unknown> = {
@@ -34,8 +35,24 @@ const sealed = { value: refuseOtherProcesses, writable: false, configurable: fal
 for (const name of ["kill", "_kill"]) Object.defineProperty(process, name, sealed);
 Object.defineProperty(process.getBuiltinModule("os"), "setPriority", sealed);
 
+// An escape could print a reply of its own and exit, or rewrite the real one on its way out
+// through process.stdout or the fs module. So the reply is written with functions taken here,
+// before any generated code runs, straight to fd 1, and it starts with the request's nonce, which
+// only this closure holds. The builtins it is made with are frozen (--frozen-intrinsics).
+const writeSync = fs.writeSync;
+const prefix = replyPrefix; // the compiled import is read at each call: a patched module would see the nonce
+const toBytes = Buffer.from.bind(Buffer);
+const exit = process.exit.bind(process);
+let nonce = "";
+
 function reply(r: IsolatedReply): void {
-  process.stdout.write(`${JSON.stringify(r)}\n`, () => process.exit(0));
+  // on a line of its own: what the code printed last may not end with one
+  const bytes = toBytes(`\n${prefix(nonce)}${JSON.stringify(r).slice(1)}\n`, "utf8");
+  for (let at = 0; at < bytes.length;) {
+    try { at += writeSync(1, bytes, at, bytes.length - at); }
+    catch (e) { if ((e as NodeJS.ErrnoException).code !== "EAGAIN") throw e; }
+  }
+  exit(0);
 }
 
 let input = "";
@@ -44,7 +61,9 @@ process.stdin.on("data", (d) => { input += d; });
 process.stdin.on("end", () => {
   void (async () => {
     try {
-      const { op, args } = JSON.parse(input) as { op: IsolatedOp; args: unknown[] };
+      const request = JSON.parse(input) as { op: IsolatedOp; args: unknown[]; nonce?: unknown };
+      nonce = typeof request.nonce === "string" ? request.nonce : "";
+      const { op, args } = request;
       const fn = OPS[op];
       if (!fn) return reply({ ok: false, error: `unknown isolated operation ${op}` });
       // the arguments are what the parent sent as JSON for this operation
