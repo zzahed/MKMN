@@ -27,6 +27,7 @@ import { FOCUS_FROM, Range, diffText, errorLines, excerpts, outline, outlineText
 import { applyEdits, blame, latestArtifacts, parseReply, plainScript, rawFile, REPAIR_INSTRUCTIONS, repairPrompt, stripEdits, withoutPointers } from "./review";
 import { ProbePlan, inlineScripts, lostEffects, quickErrors } from "./codecheck";
 import { artifactsIn, replaceArtifact } from "./artifacts";
+import { pageQuality } from "./fileQuality";
 import { stripSubagents } from "./agents";
 import { withSystem } from "./effort";
 import { parseYesNo, yesNoPrompt, Q } from "./router";
@@ -966,8 +967,10 @@ export async function* stepwise(o: StepwiseOptions): AsyncGenerator<ChatEvent, S
     const streamChars = doneChars + curChars;
     const verifiedOnly = estimatedCalls === 0 && verifiedCalls > 0;
     const tokens = verifiedOnly ? total.tokens : Math.max(total.tokens, Math.round(streamChars / 3.6));
-    return { id: o.id, type: "build", build: { status, request: clip(request, 3000), calls: pendingCalls.length ? pendingCalls.splice(0) : undefined, steps: steps.map((s) => ({ ...s, stages: copy(s.stages) })), phase: status === "running" ? phaseOf() : undefined, spec: spec || undefined, live: status === "running" && live ? live : undefined, tokens: tokens || undefined, tokensEstimated: verifiedOnly ? undefined : true, lines: doneLines + curLines || undefined, art: status === "running" && artDraft ? artDraft.slice(0, 9000) : undefined, unit: status === "running" && activeUnit ? { ...activeUnit } : undefined, start: startStages.length ? copy(startStages) : undefined, verify: verify.length ? copy(verify) : undefined } };
+    return { id: o.id, type: "build", build: { status, request: clip(request, 3000), calls: pendingCalls.length ? pendingCalls.splice(0) : undefined, steps: steps.map((s) => ({ ...s, stages: copy(s.stages) })), phase: status === "running" ? phaseOf() : undefined, spec: spec || undefined, live: status === "running" && live ? live : undefined, tokens: tokens || undefined, tokensEstimated: verifiedOnly ? undefined : true, lines: doneLines + curLines || undefined, art: status === "running" && artDraft ? artDraft.slice(0, 9000) : undefined, unit: status === "running" && activeUnit ? { ...activeUnit } : undefined, start: startStages.length ? copy(startStages) : undefined, verify: verify.length ? copy(verify) : undefined, ...(pageScore ? { quality: pageScore } : {}) } };
   };
+  // the finished page's content, scored by the page rubric (src/core/fileQuality.ts) beside the test run: the run says it WORKS, the score says what it SAYS
+  let pageScore: { rubric: string; score: number; notes: string[] } | undefined;
   const ordered = steps.map((s) => plan.files.find((f) => f.name === s.file)!);
   let text = "";
   const say = (s: string): ChatEvent => { text += s; return { id: o.id, type: "answer", text: s }; };
@@ -1757,6 +1760,10 @@ export async function* stepwise(o: StepwiseOptions): AsyncGenerator<ChatEvent, S
   // The verdict is settle()'s, over the build run's steps (every model call, this summary included —
   // a summary call that failed is a failed step) and the gates: the only writer of the final status.
   // The gates also go to the run, so finish() settles the run to the same verdict.
+  try {
+    const html = artifactsIn(text).filter((a) => a.kind === "html").pop();
+    if (html) { const q = pageQuality(html.content); pageScore = { rubric: "page", score: q.score, notes: q.failed.map((f) => f.note) }; }
+  } catch { /* a score is a report, never a failure */ }
   const gates = buildGates(unresolved, failed.length, failedCalls, !checkCouldNotRun);
   o.runGates?.(gates);
   const verdict = settle({ steps: o.runSteps?.() ?? [], gates });

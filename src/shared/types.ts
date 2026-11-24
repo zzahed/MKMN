@@ -451,7 +451,9 @@ export interface BuildRun {
   /** The rules written before the code of a program (what the writer is told to follow). */
   spec?: string;
   /** Work counts of a deck build (and what power mode it ran in): model calls with their retries, preview updates, elapsed seconds, tokens of the finished calls. GPU/NPU vs WebView2 activity is NOT attributed here — that needs a runtime measurement. */
-  deckMetrics?: { calls: number; retries: number; renders: number; reviews: number; previews: number; elapsedSec: number; tokens: number; mode: "full" | "low" };
+  deckMetrics?: { calls: number; retries: number; renders: number; reviews: number; previews: number; elapsedSec: number; tokens: number; mode: "full" | "low"; /** The deck rubric's score in [0, 1] once the slides are final (src/core/deckQuality.ts). */ quality?: number; /** What the rubric found short, as notes. */ qualityNotes?: string[] };
+  /** The finished file's quality, scored by its feature's rubric (src/core/harness/quality.ts): which rubric, the score in [0, 1] and what fell short. A report, never a reason to fail the build. */
+  quality?: { rubric: string; score: number; notes: string[] };
   /** The planner, before there are files: shown as soon as it starts. */
   start?: BuildStage[];
   /** The test run of the finished page: run it, press its keys and buttons, fix what it shows, run it again. */
