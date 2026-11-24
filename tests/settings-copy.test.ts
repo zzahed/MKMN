@@ -110,12 +110,12 @@ describe("phase 2, round 2: what a first-time user meets by default", () => {
     expect(runtime).toMatch(/<summary className="muted">Technical details<\/summary>\s*<div className="muted small">\{adaptive\.last\.label\}/);
   });
 
-  it("the Auto power mode says what power.rs does: balanced on battery, saving below 25% or in Energy Saver", () => {
+  it("the Auto power mode says what power.rs does: quiet, balanced when plugged in, saving below 25% or in Energy Saver", () => {
     const rust = readFileSync("src-tauri/src/power.rs", "utf8");
+    expect(rust).toMatch(/if on_ac \{\s*return "balanced";/);
     expect(rust).toMatch(/Some\(b\) if b <= 25 => "power_saver"/);
-    expect(rust).toMatch(/_ => "balanced"/);
     expect(rust).toMatch(/if energy_saver_on \{\s*return "power_saver";/);
-    expect(speedAdvanced).toContain("balanced on battery, saves power below 25% or in Energy Saver");
+    expect(speedAdvanced).toContain("quiet, balanced when plugged in, saves more on battery, below 25% or in Energy Saver");
   });
 
   it("no tokens-per-second on the model rows, cards or speed chip outside Details and tooltips", () => {

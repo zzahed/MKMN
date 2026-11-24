@@ -1283,7 +1283,7 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
               value={readSetting(settings, "powerProfile")}
               onChange={(e) => void save({ powerProfile: e.target.value as Settings["powerProfile"] })}
             >
-              <option value="auto">Automatic: fastest when plugged in, balanced on battery, saves power below 25% or in Energy Saver (recommended)</option>
+              <option value="auto">Automatic: quiet, balanced when plugged in, saves more on battery, below 25% or in Energy Saver (recommended)</option>
               <option value="burst">Fastest</option>
               <option value="balanced">Balanced</option>
               <option value="power_saver">Battery saver: less heat, slower</option>
@@ -1302,8 +1302,8 @@ export function SettingsView({ settings, hw, info, server, voice, items, onSave,
           {powerInfo === null ? "Checking the power supply…" :
             (readSetting(settings, "powerProfile")) === "auto"
               ? (powerInfo?.energySaverOn ? "Windows Energy Saver is on: the NPU saves power. Applies the next time the model loads."
-                : powerInfo?.onAcPower ? "Plugged in: full speed. Applies the next time the model loads."
-                : "On battery: balanced speed, quieter below 50% battery, and power saving below 25%. Applies the next time the model loads.")
+                : powerInfo?.onAcPower ? "Plugged in: balanced speed, so the fans stay quiet. Choose Burst for full speed. Applies the next time the model loads."
+                : "On battery: quieter still below 50% battery, and power saving below 25%. Applies the next time the model loads.")
               : (readSetting(settings, "powerProfile") === "burst" ? "Always runs the NPU at full speed. Answers are fastest; the PC may get warmer." : "The NPU runs in the mode chosen above.")}
         </p>
       </section>

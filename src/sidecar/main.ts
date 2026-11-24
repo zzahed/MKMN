@@ -63,7 +63,7 @@ import { Gateway } from "../core/harness/gateway";
 import { createLiveRun, type LiveRun } from "../core/harness/run";
 import { sString } from "../core/harness/schema";
 import { applyEffort, effectiveEffort, thinkingSupport } from "../core/effort";
-import { DEFAULT_ENDPOINT, geniexVersion } from "../core/geniex";
+import { DEFAULT_ENDPOINT, geniexVersion, setBackgroundChildHook } from "../core/geniex";
 import { GeniexGate, parseGeniexCliVersion } from "../core/geniexGate";
 import { NPU_UTIL_SCRIPT, WINDOWS_BUILD_SCRIPT, npuReadingFromHost, parseNpuCounters, type NpuReading } from "../core/perf";
 import { BATTERY_SCRIPT, batteryFromHost, batteryPercent, createCachedPowerReader, createHostFirstBatteryReader, parseBattery } from "../core/battery";
@@ -2372,6 +2372,12 @@ dispatcher.register("stopRun", (runId: string) => { runs.get(String(runId))?.kil
 
 /** The runs being driven, so the panel's Stop and the app shutdown abort them. */
 const agentRuns = new Map<string, AbortController>();
+
+// Model pulls run for minutes to hours: the host puts each one on the efficiency path
+// (BELOW_NORMAL + EcoQoS) so a download stays quiet. Best effort: a refusal only logs.
+setBackgroundChildHook((pid) => {
+  void dispatcher.callHost((m) => { void write(m); }, "ecoChild", [pid], 5_000).catch(() => undefined);
+});
 
 /** One host capability call: the ONLY route the loop's driver has anywhere. */
 function agentCallHost<T>(method: string, args: unknown[], timeoutMs = 10_000): Promise<T> {

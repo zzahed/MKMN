@@ -302,6 +302,15 @@ export function pullArgs(ref: string, o: PullOptions | undefined): string[] {
  * taken from any line that has one and the raw line is always passed on. Pull is resumable:
  * calling it again after cancel continues the download.
  */
+/**
+ * Called with the pid of every long background child this module spawns (a model pull:
+ * hours of download, unpack and hashing). The sidecar points it at the host, which puts
+ * the process on the efficiency path (BELOW_NORMAL + EcoQoS) so a download never runs
+ * the fans up. Unset (tests, tools), nothing happens.
+ */
+let backgroundChildHook: ((pid: number) => void) | null = null;
+export function setBackgroundChildHook(fn: ((pid: number) => void) | null): void { backgroundChildHook = fn; }
+
 export function pullModel(
   exe: string,
   ref: string,
@@ -314,6 +323,7 @@ export function pullModel(
   let tail = "";
   const done = new Promise<void>((resolve) => {
     child = spawnFn(exe, pullArgs(ref, options), { windowsHide: true, stdio: ["pipe", "pipe", "pipe"], env: { ...process.env, TERM: "dumb", CI: "1", NO_COLOR: "1" } });
+    if (typeof child.pid === "number") { try { backgroundChildHook?.(child.pid); } catch { /* a download never fails over its priority */ } }
     // A native NPU bundle has no precision in its ref: GenieX lists the precisions and waits for a choice that nobody
     // gives it without a terminal. Enter takes the one it marks as the default; asked at most a few times.
     let answered = 0;

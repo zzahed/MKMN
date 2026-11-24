@@ -117,20 +117,22 @@ pub fn resolve_effective_power_mode(requested: &str) -> &'static str {
     }
 }
 
-/// "By power source": peak speed on mains (a short burst finishes sooner and lets the
-/// NPU idle again), and on battery the quieter clocks, stepping down as the charge falls.
-/// Windows Energy Saver wins over everything: the person asked the whole PC to save power.
+/// "Automatic" is quiet-first: the NPU never runs at its peak clocks unless the person
+/// picks "burst" themselves, because peak clocks over a long answer are what heat the PC
+/// and spin the fans up. Plugged in it runs balanced; on battery it steps further down as
+/// the charge falls. Windows Energy Saver wins over everything: the person asked the
+/// whole PC to save power.
 pub fn auto_power_mode(on_ac: bool, battery_percent: Option<u8>, energy_saver_on: bool) -> &'static str {
     if energy_saver_on {
         return "power_saver";
     }
     if on_ac {
-        return "burst";
+        return "balanced";
     }
     match battery_percent {
         Some(b) if b <= 25 => "power_saver",
-        Some(b) if b <= 50 => "low_balanced",
-        _ => "balanced",
+        Some(b) if b <= 50 => "high_power_saver",
+        _ => "low_balanced",
     }
 }
 
@@ -140,11 +142,12 @@ mod tests {
 
     #[test]
     fn auto_saves_power_on_battery_and_under_energy_saver() {
-        assert_eq!(auto_power_mode(true, Some(100), false), "burst");
-        assert_eq!(auto_power_mode(true, None, false), "burst");
-        assert_eq!(auto_power_mode(false, Some(90), false), "balanced");
-        assert_eq!(auto_power_mode(false, None, false), "balanced");
-        assert_eq!(auto_power_mode(false, Some(50), false), "low_balanced");
+        // never the peak clocks on its own: those are what spin the fans up
+        assert_eq!(auto_power_mode(true, Some(100), false), "balanced");
+        assert_eq!(auto_power_mode(true, None, false), "balanced");
+        assert_eq!(auto_power_mode(false, Some(90), false), "low_balanced");
+        assert_eq!(auto_power_mode(false, None, false), "low_balanced");
+        assert_eq!(auto_power_mode(false, Some(50), false), "high_power_saver");
         assert_eq!(auto_power_mode(false, Some(25), false), "power_saver");
         // Energy Saver is the person's own request: it wins on mains power too
         assert_eq!(auto_power_mode(true, Some(100), true), "power_saver");
