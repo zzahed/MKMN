@@ -44,8 +44,9 @@ export type SkillSize = { tokens: number; level: 1 | 2 | 3; label: string; short
 export function skillSize(s: Pick<Skill, "instructions" | "steps" | "libraries">): SkillSize {
   const tokens = skillTokens(s);
   const level = tokens <= 500 ? 1 : tokens <= 1200 ? 2 : 3;
-  const label = `about ${tokens} tokens, ${level === 1 ? "suits every model, even small ones" : level === 2 ? "suits models with a context of 8K or more" : "needs a model with a context of 16K or more"}`;
-  return { tokens, level, label, short: `~${tokens} tokens · ${level === 1 ? "any model" : level === 2 ? "8K+ context" : "16K+ context"}` };
+  // plain words for people; the token count stays in the object for whoever needs it
+  const label = level === 1 ? "Short: every model can use it, even small ones." : level === 2 ? "Medium: needs a mid-size model or larger." : "Long: needs one of the larger models.";
+  return { tokens, level, label, short: level === 1 ? "short · any model" : level === 2 ? "medium · mid-size models" : "long · larger models" };
 }
 
 export function cleanTags(tags: string[]): string[] {

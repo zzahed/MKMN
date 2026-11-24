@@ -116,8 +116,8 @@ export function Skills({ settings, onSave, onOpenDocs, tabs }: { tabs?: ReactNod
         <div className="skill-head">
           <button type="button" className="skill-icon big" onClick={() => setPickIcon(!pickIcon)} aria-expanded={pickIcon} title="Choose an icon"><Glyph id={shown} size={28} /></button>
           <div style={{ flex: 1 }}>
-            <input value={editing.name} maxLength={60} placeholder="Name" onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
-            <input value={editing.description} maxLength={160} placeholder="What it does, in one sentence" onChange={(e) => setEditing({ ...editing, description: e.target.value })} />
+            <input value={editing.name} maxLength={60} placeholder="Name" aria-label="Skill name" onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
+            <input value={editing.description} maxLength={160} placeholder="What it does, in one sentence" aria-label="What the skill does" onChange={(e) => setEditing({ ...editing, description: e.target.value })} />
           </div>
         </div>
         {pickIcon && (
@@ -133,24 +133,26 @@ export function Skills({ settings, onSave, onOpenDocs, tabs }: { tabs?: ReactNod
           </div>
         )}
         <label className="small muted">Tags (up to {MAX_TAGS}, separated by commas). They also decide its category.</label>
-        <input value={tagText} onChange={(e) => setTagText(e.target.value)} placeholder="writing, study, code" />
-        <label className="small muted">Load by itself when the request contains… (a regular expression, optional, e.g. \b(invoice|bill)\b). Leave empty to use the skill only with /.</label>
-        <input value={editing.when ?? ""} onChange={(e) => setEditing({ ...editing, when: e.target.value || undefined })} placeholder="\b(word one|word two)\b" />
-        <label className="small muted">Shared rules, kept for every step</label>
-        <textarea rows={3} value={editing.instructions} onChange={(e) => setEditing({ ...editing, instructions: e.target.value })} />
+        <input value={tagText} onChange={(e) => setTagText(e.target.value)} placeholder="writing, study, code" aria-label="Tags" />
+        <label className="small muted">Rules for every step (optional)</label>
+        <textarea rows={3} value={editing.instructions} aria-label="Rules for every step" onChange={(e) => setEditing({ ...editing, instructions: e.target.value })} />
         <label className="small muted">Steps ({editing.steps.length} / {MAX_STEPS})</label>
         {editing.steps.map((st, i) => (
           <div key={i} className="skill-step">
             <div style={{ display: "flex", gap: 6 }}>
-              <input style={{ flex: 1 }} value={st.title} placeholder={`Step ${i + 1} title`} onChange={(e) => setStep(i, { title: e.target.value })} />
-              <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">↑</button>
-              <button type="button" onClick={() => move(i, 1)} disabled={i === editing.steps.length - 1} aria-label="Move down">↓</button>
-              <button type="button" onClick={() => setEditing({ ...editing, steps: editing.steps.filter((_, k) => k !== i) })} disabled={editing.steps.length === 1} aria-label="Remove the step"><Glyph id="x" size={14} /></button>
+              <input style={{ flex: 1 }} value={st.title} placeholder={`Step ${i + 1} title`} aria-label={`Step ${i + 1} title`} onChange={(e) => setStep(i, { title: e.target.value })} />
+              <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label={`Move step ${i + 1} up`}>↑</button>
+              <button type="button" onClick={() => move(i, 1)} disabled={i === editing.steps.length - 1} aria-label={`Move step ${i + 1} down`}>↓</button>
+              <button type="button" onClick={() => setEditing({ ...editing, steps: editing.steps.filter((_, k) => k !== i) })} disabled={editing.steps.length === 1} aria-label={`Remove step ${i + 1}`}><Glyph id="x" size={14} /></button>
             </div>
-            <textarea rows={3} value={st.prompt} placeholder="What the model does in this step" onChange={(e) => setStep(i, { prompt: e.target.value })} />
+            <textarea rows={3} value={st.prompt} placeholder="What the assistant does in this step" aria-label={`Step ${i + 1}: what the assistant does`} onChange={(e) => setStep(i, { prompt: e.target.value })} />
           </div>
         ))}
         <button type="button" disabled={editing.steps.length >= MAX_STEPS} onClick={() => setEditing({ ...editing, steps: [...editing.steps, { title: "", prompt: "" }] })}>+ Add a step</button>
+        <details className="skill-adv" open={!!editing.when || (editing.libraries ?? []).length > 0 || !!modelText.trim()}>
+        <summary className="small"><strong>Advanced</strong> <span className="muted">· start by itself, code libraries, recommended models</span></summary>
+        <label className="small muted">Start by itself when a message matches this pattern (optional; a regular expression such as \b(invoice|bill)\b). Leave empty to start the skill only by typing / and its name.</label>
+        <input value={editing.when ?? ""} onChange={(e) => setEditing({ ...editing, when: e.target.value || undefined })} placeholder="\b(word one|word two)\b" aria-label="Pattern that starts the skill by itself" />
         <label className="small muted" style={{ display: "block", marginTop: 10 }}>Libraries ({(editing.libraries ?? []).length} / {MAX_LIBS}): public ones are downloaded once when you save, custom ones are pasted here. Pages that use them get the code inside the file.</label>
         {(editing.libraries ?? []).map((l, i) => (
           <div key={i} className="skill-step">
@@ -187,7 +189,8 @@ export function Skills({ settings, onSave, onOpenDocs, tabs }: { tabs?: ReactNod
           <button type="button" disabled={(editing.libraries ?? []).length >= MAX_LIBS} onClick={() => libFileRef.current?.click()}><Glyph id="upload" size={14} /> From a file or a zip on this PC</button>
         </div>
         <label className="small muted" style={{ display: "block", marginTop: 10 }}>Recommended models (ids, best first, optional)</label>
-        <input value={modelText} onChange={(e) => setModelText(e.target.value)} placeholder="qwen3-4b-thinking-2507" />
+        <input value={modelText} onChange={(e) => setModelText(e.target.value)} placeholder="qwen3-4b-thinking-2507" aria-label="Recommended models" />
+        </details>
         <p className="muted small">{size.label}</p>
         {error && <p className="error small">{error}</p>}
         <div style={{ display: "flex", gap: 8 }}>
@@ -232,7 +235,7 @@ export function Skills({ settings, onSave, onOpenDocs, tabs }: { tabs?: ReactNod
     <div className="skills-wrap">
       <div className="skills-bar">
         {tabs}
-        <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search skills or #tags" />
+        <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search skills or #tags" aria-label="Search skills" />
         <div className="menu-anchor">
           <button type="button" className="primary add-skill" onClick={() => setAddMenu(!addMenu)} aria-haspopup="menu" aria-expanded={addMenu} title="Add a skill"><Glyph id="plus" size={16} /> Add skill</button>
           {addMenu && (
@@ -244,6 +247,7 @@ export function Skills({ settings, onSave, onOpenDocs, tabs }: { tabs?: ReactNod
         </div>
         <input ref={fileRef} type="file" accept=".md,.txt,text/markdown,text/plain" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void imported(f); e.target.value = ""; }} />
       </div>
+      <p className="muted small">A skill is a saved recipe the assistant follows step by step, such as writing a cover letter or planning a trip. Use one by typing / and its name in a chat; some also start by themselves when a message matches.</p>
       <div className="skill-cats">
         {SKILL_CATEGORIES.map((c) => {
           const n = list.filter((s) => categoryOf(s) === c.id).length;
