@@ -298,7 +298,7 @@ v2 folds Computer Use into the composer the chat already has.
   grant (`agentBeginRun`) at the start of EACH run — a grant from a finished
   run is never reused — and the grant dies with the run as before.
 
-### What the live pass taught (baked into the v2 contract)
+### Verification and stop behavior
 
 - The driver's observe must carry the field's FULL value on the wire (bounded,
   prefix-cut at 8192 characters, no ellipsis marker inside the value), or a
@@ -310,7 +310,7 @@ v2 folds Computer Use into the composer the chat already has.
 - Stop failures are surfaced in the run strip, never swallowed: a Stop that
   errors says so beside the target.
 
-### What the Word pass taught (baked into the loop)
+### Word interaction and logging
 
 - Some windows hold text the action union cannot write. Word's document canvas
   ("Page 1 content", role Edit) exposes no UIA Value pattern — Notepad's edit
@@ -339,11 +339,7 @@ v2 folds Computer Use into the composer the chat already has.
   for a Word write is the named read-only refusal — zero actions, the
   document preserved, the limitation on the record.
 
-### What the composer-UX pass taught (baked into the contract)
-
-Recorded against the installed ARM64 app (build 8, commits `fbe28b3` + the
-wrap fix), driven over CDP with per-character typing, real mouse events for
-hover, and the installed driver for readback; 44/44 checks passed.
+### Composer behavior
 
 - The run control's label is a CONSTANT ("Run task") and the target row above
   the composer carries the window's name — this is what makes clipping

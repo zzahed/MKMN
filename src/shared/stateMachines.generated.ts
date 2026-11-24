@@ -1375,7 +1375,7 @@ export const STATE_MACHINES = {
   "npuOwner": {
     "id": "npuOwner",
     "title": "NPU owner",
-    "description": "Which engine holds the NPU: nobody, GenieX or Foundry Local. One engine at a time: on 2026-11-15 a GenieX model was started while a Foundry Local model held the NPU, its DSP crashed, and every model failed until the PC restarted. An engine takes the NPU only from nobody, so the other one is always released first.",
+    "description": "Which engine holds the NPU: nobody, GenieX or Foundry Local. Concurrent engine ownership can crash the DSP. An engine takes the NPU only from nobody, so the other one is always released first.",
     "initial": "free",
     "states": [
       {
@@ -1434,7 +1434,7 @@ export const STATE_MACHINES = {
   "modelVerdict": {
     "id": "modelVerdict",
     "title": "Model verdict on this PC",
-    "description": "Whether an installed model loads here, the record the Models list reads (placements, loadFailures). A model is judged only on a load GenieX really attempted: on 2026-11-15 models were recorded as failing that were never tried, and a 30 s warm-up called large models failed.",
+    "description": "Whether an installed model loads here, the record the Models list reads (placements, loadFailures). A model is judged only on a load GenieX really attempted. Warm-up time alone does not establish a load failure.",
     "initial": "unknown",
     "states": [
       {
@@ -1510,7 +1510,7 @@ export const STATE_MACHINES = {
   "agentGrant": {
     "id": "agentGrant",
     "title": "Computer Use window grant",
-    "description": "The host's ONE grant of a window to a Computer Use run. On 2026-11-15 a grant taken for a run that then failed to start was never released, and every later run was refused with nothing to stop.",
+    "description": "The host's single grant of a window to a Computer Use run. A failed start must release the grant so later runs can acquire it.",
     "initial": "free",
     "states": [
       {
@@ -1543,7 +1543,7 @@ export const STATE_MACHINES = {
   "geniexProbe": {
     "id": "geniexProbe",
     "title": "GenieX options probe",
-    "description": "What the host knows of the installed GenieX's serve options, read from its own help. On 2026-11-15 a fresh GenieX answered its help in part (2 of 19 options) and that answer was kept, so every start dropped the app's options.",
+    "description": "What the host knows of the installed GenieX's serve options, read from its own help. Partial help output must not be cached as a complete set of supported options.",
     "initial": "not_probed",
     "states": [
       {

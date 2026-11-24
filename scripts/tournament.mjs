@@ -18,8 +18,7 @@
 //
 // NOT measured here, on purpose: energy (no reliable per-process method on this
 // Windows build), per-process GPU attribution (no per-process GPU counter), and
-// the Qwen3.5-2B / Qwen3.5-4B Q4_0 candidates (not cached — downloads deferred,
-// reported as unvalidated in the handoff).
+// candidates missing from the local model cache.
 //
 // Usage: node scripts/tournament.mjs [--only <name>,<name>]
 // Scratch state: scripts/.tournament/ (PID file, samples, custom entries).
@@ -32,6 +31,7 @@ const os = await import("node:os");
 const { fileURLToPath, pathToFileURL } = await import("node:url");
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const APP_VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version;
 const DIST = path.join(ROOT, "dist");
 const SCRATCH = path.join(ROOT, "scripts", ".tournament");
 const OUT_DIR = path.join(ROOT, "docs", "evidence");
@@ -295,7 +295,7 @@ function startSidecar() {
       ...process.env,
       LOCALAPPDATA: SCRATCH,
       GENIEX_PATH: process.env.GENIEX_PATH ?? REAL_GENIEX,
-      MKMN_APP_VERSION: "0.0.1-tournament",
+      MKMN_APP_VERSION: `${APP_VERSION}-tournament`,
     },
   });
   child.stdout.on("data", (d) => {
