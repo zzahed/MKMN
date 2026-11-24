@@ -164,7 +164,8 @@ internet connection the first time to download a model.
    [latest release](https://github.com/zzahed/MKMN/releases/latest).
 2. Run it. The installer is not signed, so Windows may say "Windows protected
    your PC". If you trust the file, click **More info**, then **Run anyway**.
-   On a work PC, ask your IT team first.
+   On a work PC, ask your IT team first. To confirm the download is genuine
+   first, see [verifying a release](docs/TRUST.md#verifying-a-release-share-this-with-users).
 3. Open MKMN and follow the setup. It asks before it downloads Qualcomm GenieX
    (0.11.0 or newer) and any model.
 4. Go to **Settings → Models**, install a model and click **Use**.

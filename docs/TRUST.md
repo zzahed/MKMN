@@ -75,7 +75,7 @@ carries reputation with it.
 
 ---
 
-## How anyone can verify an MKMN release (share this with users)
+## Verifying a release (share this with users)
 
 **Checksum:**
 ```powershell
