@@ -132,6 +132,26 @@ const settle = () => new Promise((r) => setTimeout(r, 40));
 
 const railBtn = (name: string) => screen.getByRole("button", { name });
 
+it.each([
+  { name: "missing", settings: { selectedModelId: "m1" }, autoSend: true },
+  { name: "null", settings: { ...SETTINGS, voice: null }, autoSend: true },
+  { name: "partial", settings: { ...SETTINGS, voice: { autoSend: false } }, autoSend: false },
+])("opens saved chats and Voice settings when voice settings are $name", async ({ settings, autoSend }) => {
+  boot(makeApi({ settings: async () => settings }), [CONVS[2]]);
+
+  expect(await screen.findByRole("button", { name: "Standalone chat" })).toBeTruthy();
+  expect(screen.getByText(TURN.content)).toBeTruthy();
+  expect(screen.getByRole("textbox", { name: "Message" })).toBeTruthy();
+
+  fireEvent.click(railBtn("Settings"));
+  const dialog = await screen.findByRole("dialog", { name: "Settings" });
+  const categories = within(dialog).getByRole("navigation", { name: "Settings categories" });
+  fireEvent.click(within(categories).getByRole("button", { name: /^Voice/ }));
+  expect(await within(dialog).findByRole("heading", { name: "Dictation" })).toBeTruthy();
+  const send = within(dialog).getByRole<HTMLInputElement>("checkbox", { name: /send voice messages as soon as i stop talking/i });
+  expect(send.checked).toBe(autoSend);
+});
+
 it("shows the rejected model selection and retries that exact choice on request", async () => {
   const raw = "GenieX failed to load q/repo:W4A16\nSDKError(Model loading failed)\nContext error 1002";
   const error = { id: "model-load", title: raw.split("\n")[0], fix: "Choose another verified NPU model.", raw };

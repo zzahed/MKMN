@@ -10,7 +10,7 @@ import { hashText } from "../core/memo";
 import type { AppInfo, CatalogItem } from "../shared/api";
 import type { Artifact, FriendlyError, HardwareProfile, Meters, Project, ScheduledTask, ServerStatus, Settings, VoiceStatus } from "../shared/types";
 import { HUMAIN_LABEL, cloudProviderOf } from "../shared/humain";
-import { readBool, readSetting } from "../shared/settingsSchema";
+import { readBool, readSetting, voiceSettings as readVoiceSettings } from "../shared/settingsSchema";
 import { Chat } from "./Chat";
 import { SetupScreen } from "./SetupScreen";
 import type { SetupState } from "../core/setup";
@@ -133,6 +133,7 @@ export function App() {
    *  startup (the reload-after-restart path) and refreshed after a successful benchmark. */
   const [benchProfiles, setBenchProfiles] = useState<Record<string, BenchProfile>>({});
   const [settings, setSettings] = useState<Settings | null>(null);
+  const voiceSettings = useMemo(() => readVoiceSettings(settings), [settings]);
   const [server, setServer] = useState<ServerStatus | null>(null);
   const [voice, setVoice] = useState<VoiceStatus | null>(null);
   /** The voice notice the person closed: it stays away until the text changes. */
@@ -1187,7 +1188,7 @@ export function App() {
           // a conversation that is still answering stays mounted (hidden) so leaving it does not drop the stream
           <div key={c.id} style={{ display: tab === "chat" && c.id === active.id ? "contents" : "none" }}>
           <Chat
-            conv={c} selected={selected} server={server} voiceSettings={settings.voice} voiceStatus={voice}
+            conv={c} selected={selected} server={server} voiceSettings={voiceSettings} voiceStatus={voice}
             project={projects.find((x) => x.id === c.projectId) ?? null}
             items={items} onCatalogChanged={() => void refreshCatalog()} effort={readSetting(settings, "effort")} subagents={readBool(settings, "subagents")}
             settings={settings} onSettings={changeSettings} changingChatMode={changingChatMode}
