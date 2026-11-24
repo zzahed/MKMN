@@ -15,7 +15,8 @@ import { Conversation, Turn, titleFrom } from "./store";
 import { kindLabel } from "./ArtifactView";
 import { VersionedViewer, versionTitle } from "./VersionMenu";
 import type { VersionResult } from "../core/versionBook";
-import { LogoMark, ReservoirField, AgentsIcon, CheckShieldIcon, LoopIcon, PlusIcon, SlidersIcon } from "./Icons";
+import { WelcomeField } from "./WelcomeField";
+import { LogoMark, AgentsIcon, CheckShieldIcon, LoopIcon, PlusIcon, SlidersIcon } from "./Icons";
 import { BRAND } from "./brand";
 import { filesOpenBesideChat, noModelHeading } from "../core/settingsUi";
 import { readBool, readSetting } from "../shared/settingsSchema";
@@ -1668,7 +1669,8 @@ export function Chat(props: {
       <div className="sr-only" role="status" aria-live="polite">{announce}</div>
       {empty ? (
         <div className="welcome">
-          <div className="greet"><span className="greet-mark"><ReservoirField /><LogoMark className="logo-mark" /></span><h1>{greeting()}</h1></div>
+          <WelcomeField />
+          <div className="greet"><span className="greet-mark"><LogoMark className="logo-mark" /></span><h1>{greeting()}</h1></div>
           {composer}
           {notice && <div className="composer-notice">{notice}{pdfReading && <> <button className="notice-cancel" onClick={() => uploads.current?.cancel()}>Cancel</button></>}</div>}
           <StarterChips gone={!!(input.trim() || files.length)} onPick={(p) => { setDraft(p); focusSoon(); }} />

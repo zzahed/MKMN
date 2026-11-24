@@ -158,7 +158,10 @@ button.ghost:hover { background: color-mix(in srgb, var(--text) 5%, transparent)
 
 /* ---------- welcome: the reservoir field ---------- */
 .welcome, .setup { background-image: none; }
-.welcome { position: relative; isolation: isolate; overflow: hidden; }
+/* the welcome never clips: the composer's menus open inside it. Only the field's own layer clips (WelcomeField.tsx). */
+.welcome { position: relative; isolation: isolate; }
+.welcome > div.welcome-field { position: absolute; inset: 0; width: auto; overflow: hidden; z-index: -1; pointer-events: none; }
+.welcome-field .reservoir-field { left: var(--field-x, 50%); top: var(--field-y, 50%); }
 .welcome .greet { gap: 16px; margin-bottom: 4px; }
 .greet-mark { position: relative; display: grid; place-items: center; flex: none; }
 .welcome .greet .logo-mark { width: 36px; height: 36px; }

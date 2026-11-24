@@ -7,6 +7,21 @@ import { StepIcon } from "./StepIcon";
 import { api } from "./api";
 import { paletteOf, partialSvg, svgUrl } from "../core/svgPartial";
 import { buildItems, phrasesFor, stageTag } from "../core/workLog";
+import { QUALITY_BAR } from "../core/harness/quality";
+import "./quality.css";
+
+/** A finished file's quality score as the card says it: a whole percentage. */
+const pctOf = (score: number) => `${Math.round(score * 100)}%`;
+const weakPoints = (n: number) => `${n} weak point${n === 1 ? "" : "s"}`;
+/** The quality chip of a finished build: the score alone, so it fits a narrow chat column (it may shrink, never widen the card); what fell short is listed when the card is opened. */
+function QualityChip({ q, tokens }: { q: NonNullable<BuildRun["quality"]>; tokens?: number }) {
+  const weak = q.score < QUALITY_BAR;
+  return (
+    <span className={`bp-quality ${weak ? "weak" : "good"}`} title={`Scored by the app's ${q.rubric} quality check (no model): ${weak ? `below the ${pctOf(QUALITY_BAR)} bar, ${weakPoints(q.notes.length)}. Open the details to see them.` : `at or above the ${pctOf(QUALITY_BAR)} bar.`}${tokens ? ` ${tokens.toLocaleString("en-US")} tokens.` : ""}`}>
+      Quality {pctOf(q.score)}
+    </span>
+  );
+}
 
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 const secs = (g: BuildStage, now: number) => (g.status === "running" ? Math.max(0, Math.floor((now - (g.at ?? now)) / 1000)) : Math.round(g.sec ?? 0));
@@ -127,6 +142,7 @@ export function fullLog(build: BuildRun, machine = ""): string {
     "# MKMN · build log",
     build.request ? `Request: ${build.request}` : "",
     `Status: ${build.status}${build.phase ? ` · ${build.phase}` : ""}`,
+    build.quality ? `Quality: ${pctOf(build.quality.score)} (${build.quality.rubric} rubric)${build.quality.notes.map((n) => `\n  - ${n}`).join("")}` : "",
     `Models: ${[...new Set(stages.map((g) => g.model).concat(calls.map((c) => c.model)).filter(Boolean))].join(", ") || "(not recorded)"}`,
     `Totals: ${calls.length} calls · ${Math.round(sum((c) => c.sec))}s in calls · ${sum((c) => c.sent).toLocaleString()} characters sent · ${sum((c) => c.got).toLocaleString()} received · ${sum((c) => c.thought).toLocaleString()} thought${build.tokens ? ` · ${build.tokensEstimated ? "≈ " : ""}${build.tokens.toLocaleString("en-US")} tokens${build.tokensEstimated ? " (estimated)" : ""}` : ""}${build.lines ? ` · ${build.lines} lines written` : ""}`,
     byKind.size ? `By kind of call:\n${[...byKind].map(([k, v]) => `  ${k}: ${v.n} × · ${Math.round(v.sec)}s · ${v.got.toLocaleString()} characters answered${v.thought ? ` · ${v.thought.toLocaleString()} thought` : ""}`).join("\n")}` : "",
@@ -223,7 +239,9 @@ export function BuildCard({ build, content = "", onSkip }: { build: BuildRun; co
             <span key={running ? note : "done"} className="bp-note bp-phrase">{running ? note : doneSub}{running && quiet >= 12 ? ` · no news for ${clock(quiet)}, still working` : ""}</span>
           </span>
         </span>
-        {(build.tokens ?? 0) > 0 && <span className="bp-count" title="Tokens the model produced and lines written, all sessions together">{running || build.tokensEstimated ? "≈ " : ""}{build.tokens!.toLocaleString("en-US")} tokens{build.tokensEstimated ? " (estimated)" : ""}{build.lines ? ` · ${build.lines.toLocaleString("en-US")} lines` : ""}</span>}
+        {(build.tokens ?? 0) > 0 && !(!running && build.quality) && <span className="bp-count" title="Tokens the model produced and lines written, all sessions together">{running || build.tokensEstimated ? "≈ " : ""}{build.tokens!.toLocaleString("en-US")} tokens{build.tokensEstimated ? " (estimated)" : ""}{build.lines ? ` · ${build.lines.toLocaleString("en-US")} lines` : ""}</span>}
+        {/* finished, the score takes the token count's place: a narrow chat column holds one of them (the count rides the chip's title and the full log) */}
+        {!running && build.quality && <QualityChip q={build.quality} tokens={build.tokens} />}
         <span className="bp-time">{total >= 1 ? clock(total) : ""}</span>
         <Chevron />
       </button>
@@ -276,6 +294,12 @@ export function BuildCard({ build, content = "", onSkip }: { build: BuildRun; co
 
       <Unfold open={expanded}>
         <div className="bp-body">
+          {!running && (build.quality?.notes.length ?? 0) > 0 && (
+            <div className="bp-quality-notes">
+              <span className="muted small">{weakPoints(build.quality!.notes.length)} found by the quality check</span>
+              <ul>{build.quality!.notes.map((n, i) => <li key={i}>{n}</li>)}</ul>
+            </div>
+          )}
           <div className="bp-logbar"><button type="button" className="linkbtn" onClick={() => { void (async () => { let machine = ""; try { machine = await api().supportInfo(); } catch { /* the log is still worth copying */ } try { await navigator.clipboard?.writeText(fullLog(build, machine)); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* blocked */ } })(); }}>{copied ? "Copied" : "Copy full log"}</button></div>
           {started.length > 1 && (
             <ul className="bp-files">
