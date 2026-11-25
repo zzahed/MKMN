@@ -21,13 +21,21 @@ export class RouterUsers {
     this.alive = o.alive ?? ((pid) => { try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === "EPERM"; } });
   }
   private file(pid: number): string { return path.join(this.dir(), `${pid}.json`); }
-  /** This instance, an adopter, has `busy` uses running now. */
+  /** This instance, an adopter, has `busy` uses running now. The record is written to a
+   *  temporary file and renamed over the old one, so a reader never sees it half written. */
   mark(busy: number): void {
+    const file = this.file(this.pid);
+    const tmp = `${file}.${this.now()}.tmp`;
     try {
       fs.mkdirSync(this.dir(), { recursive: true });
-      fs.writeFileSync(this.file(this.pid), JSON.stringify({ busy, at: this.now() }));
+      fs.writeFileSync(tmp, JSON.stringify({ busy, at: this.now() }));
+      fs.renameSync(tmp, file);
       this.marked = true;
-    } catch { /* the owner then sees no use: it stops at its own idle window, as before */ }
+    } catch {
+      // the owner is reading the old record (a rename over an open file can fail on Windows):
+      // the old one stands, and the next use writes again
+      try { fs.rmSync(tmp, { force: true }); } catch { /* nothing more to clean */ }
+    }
   }
   /** This instance no longer uses another's router. */
   clear(): void {
@@ -47,7 +55,7 @@ export class RouterUsers {
       try {
         const u = JSON.parse(fs.readFileSync(path.join(this.dir(), name), "utf8")) as { busy?: unknown; at?: unknown };
         if ((typeof u.busy === "number" && u.busy > 0) || (typeof u.at === "number" && this.now() - u.at < idleMs)) active = true;
-      } catch { /* a file being written: read again at the next window */ }
+      } catch { active = true; } // a live instance's record that cannot be read: taken as a use, never as none
     }
     return active;
   }

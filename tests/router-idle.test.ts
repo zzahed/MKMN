@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
-import { ROUTER_GPU_AFTER, ROUTER_IDLE_MIN_MS, RouterIdleRelease, RouterPlacement, RouterWarmGate } from "../src/core/router";
+import { ROUTER_GPU_AFTER, ROUTER_IDLE_CHECK_MS, ROUTER_IDLE_MIN_MS, RouterIdleRelease, RouterPlacement, RouterWarmGate } from "../src/core/router";
 import { RouterUsers } from "../src/core/routerUsers";
 
 /**
@@ -84,6 +84,43 @@ describe("the router's idle release", () => {
     expect(placement.compute).toBe("cpu");
   });
 
+  // The Codex review on #78: the window was read only when the timer was set, so a change of
+  // the retention setting while the router was idle applied only after another use.
+  it("a switch to 'keep it ready' while idle cancels the pending stop", () => {
+    const release = vi.fn();
+    let ms = 300_000;
+    const idle = new RouterIdleRelease(() => ms, release);
+    idle.begin(); idle.end();
+    vi.advanceTimersByTime(100_000);
+    ms = 0;
+    vi.advanceTimersByTime(10 * 300_000);
+    expect(release).not.toHaveBeenCalled();
+  });
+
+  it("a switch from 'keep it ready' to a window while idle starts counting it", () => {
+    const release = vi.fn();
+    let ms = 0;
+    const idle = new RouterIdleRelease(() => ms, release);
+    idle.begin(); idle.end();
+    vi.advanceTimersByTime(100_000);
+    ms = 300_000;
+    vi.advanceTimersByTime(199_999);
+    expect(release).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(ROUTER_IDLE_CHECK_MS);
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it("a shorter window set while idle applies within a minute, not at the old deadline", () => {
+    const release = vi.fn();
+    let ms = 3_600_000;
+    const idle = new RouterIdleRelease(() => ms, release);
+    idle.begin(); idle.end();
+    vi.advanceTimersByTime(30_000);
+    ms = ROUTER_IDLE_MIN_MS;
+    vi.advanceTimersByTime(ROUTER_IDLE_MIN_MS - 30_000 + ROUTER_IDLE_CHECK_MS);
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
   it("does not stop a router another instance is using: it waits another window", () => {
     const release = vi.fn();
     let othersActive = true;
@@ -139,6 +176,21 @@ describe("the router's other users", () => {
     expect(owner.othersActive(300_000)).toBe(true);
     t += 1;
     expect(owner.othersActive(300_000)).toBe(false);
+  });
+
+  // The Codex review on #78: a record read while it is being written must not read as "no use".
+  it("a live instance's record that cannot be read (being written) counts as a use", () => {
+    writeFileSync(path.join(dir, "2.json"), "");
+    expect(users(1, () => 5).othersActive(300_000)).toBe(true);
+  });
+
+  it("a record is written whole, through a temporary file: no partial record is ever seen", () => {
+    const adopter = users(2, () => 5);
+    adopter.mark(3);
+    adopter.mark(0);
+    expect(readdirSync(dir)).toEqual(["2.json"]);
+    expect(JSON.parse(readFileSync(path.join(dir, "2.json"), "utf8"))).toEqual({ busy: 0, at: 5 });
+    expect(readFileSync(new URL("../src/core/routerUsers.ts", import.meta.url), "utf8")).toMatch(/renameSync\(/);
   });
 
   it("the owner's own file never counts", () => {

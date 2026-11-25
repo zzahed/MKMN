@@ -149,11 +149,15 @@ export const ROUTER_IDLE_MIN_MS = 60_000;
  * again. It is never a miss, so it never moves the router to the GPU. `begin`/`end` bracket every
  * use (a question, a sort, a warm-up); no release happens while one runs. Nor while another
  * instance that adopted this server is using it (`othersActive`, see RouterUsers): the window
- * then starts again.
+ * then starts again. The window is read again at least every ROUTER_IDLE_CHECK_MS while the
+ * router is idle: nothing tells the sidecar when the setting changes (the window saves it
+ * through the host), and a change must apply without waiting for another use.
  */
 export class RouterIdleRelease {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private busy = 0;
+  /** When the current idle window started: the end of the last use, or a deferral. */
+  private idleFrom = 0;
   constructor(private idleMs: () => number, private release: () => void, private othersActive: () => boolean = () => false) {}
   /** How many uses are running now. */
   get running(): number { return this.busy; }
@@ -162,23 +166,34 @@ export class RouterIdleRelease {
   /** A use ended: the idle window starts again from now. */
   end(): void {
     this.busy = Math.max(0, this.busy - 1);
-    if (this.busy === 0) this.arm();
+    if (this.busy === 0) { this.idleFrom = Date.now(); this.arm(); }
   }
   /** No release is due (the server was stopped for another reason). */
   cancel(): void { if (this.timer) { clearTimeout(this.timer); this.timer = null; } }
+  /** How long until the release is due under the setting as it is now; null while it says "keep it ready". */
+  private dueIn(): number | null {
+    const ms = this.idleMs();
+    if (!(ms > 0)) return null;
+    return Math.max(0, this.idleFrom + Math.max(ms, ROUTER_IDLE_MIN_MS) - Date.now());
+  }
   private arm(): void {
     this.cancel();
-    const ms = this.idleMs();
-    if (!(ms > 0)) return; // 0: kept ready
-    this.timer = setTimeout(() => {
-      this.timer = null;
-      if (this.busy !== 0) return;
-      if (this.othersActive()) this.arm(); // another instance uses this server: wait another window
-      else this.release();
-    }, Math.max(ms, ROUTER_IDLE_MIN_MS));
+    const due = this.dueIn();
+    this.timer = setTimeout(() => this.tick(), Math.min(due ?? ROUTER_IDLE_CHECK_MS, ROUTER_IDLE_CHECK_MS));
     (this.timer as { unref?: () => void }).unref?.();
   }
+  private tick(): void {
+    this.timer = null;
+    if (this.busy !== 0) return;
+    const due = this.dueIn();
+    if (due === null || due > 0) { this.arm(); return; } // not due under the current setting: look again
+    if (this.othersActive()) { this.idleFrom = Date.now(); this.arm(); return; } // another instance uses this server: wait another window
+    this.release();
+  }
 }
+
+/** The longest the idle release waits before it reads the setting again. */
+export const ROUTER_IDLE_CHECK_MS = 60_000;
 
 /**
  * Runs the router's warm-up one at a time. A plain request made while one runs is dropped (that
