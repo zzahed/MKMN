@@ -764,8 +764,8 @@ export async function* stepwise(o: StepwiseOptions): AsyncGenerator<ChatEvent, S
       // build, describe a known game, or ask to change files already in the chat.
       // Keep Arabic subjects alongside the existing English file vocabulary.
       const hasSubject = wantsFiles(request) || /لعبة|ألعاب|برنامج|تطبيق|موقع|صفحة|واجهة|أداة/u.test(request);
-      const editRequest = request.replace(/^\s*(?:can|could|would|will)\s+you\s+(?:please\s+)?/i, "").replace(/\?\s*$/, "");
-      const hasBuildContext = hasSubject || !!directPlan(request, []) || (files.length > 0 && looksLikeChange(editRequest));
+      const actionRequest = request.replace(/^\s*(?:can|could|would|will)\s+you\s+(?:please\s+)?/i, "").replace(/\?\s*$/, "");
+      const hasBuildContext = hasSubject || !!directPlan(actionRequest, []) || (files.length > 0 && looksLikeChange(actionRequest));
       return hasBuildContext ? "offer" : "chat";
     }
     if (await askIdentity() === true) return "chat";

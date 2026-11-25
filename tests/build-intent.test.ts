@@ -318,7 +318,7 @@ describe("a split build vote is answered in the chat, with the build offered as 
     expect(events.some((e) => e.type === "offer")).toBe(false);
   });
 
-  it.each(["Could you create a timer app?", "أريد لعبة إكس-أو", "أريد تطبيق مؤقت"])("keeps an offer for an ambiguous build request: %s", async (request) => {
+  it.each(["Could you create a timer app?", "Could you make Pong?", "Could you make Snake?", "Can you create Tetris?", "أريد لعبة إكس-أو", "أريد تطبيق مؤقت"])("keeps an offer for an ambiguous build request: %s", async (request) => {
     const { stream } = gateModel({ program: "yes", identity: "no" }, PROSE_PLAN);
     const { events, result } = await run(stepwise({
       id: "c", messages: [{ role: "user", content: request }],
@@ -326,6 +326,15 @@ describe("a split build vote is answered in the chat, with the build offered as 
     }));
     expect(result.handled).toBe(false);
     expect(events.filter((e) => e.type === "offer")).toEqual([{ id: "c", type: "offer", offer: { action: "build", request } }]);
+  });
+
+  it("keeps a question about a named game in chat without offering to build it", async () => {
+    const { stream } = gateModel({ program: "yes", identity: "no" }, PROSE_PLAN);
+    const { events } = await run(stepwise({
+      id: "c", messages: [{ role: "user", content: "What is Pong?" }],
+      stream, maxChars: 8000, askRouter: router(false),
+    }));
+    expect(events.some((e) => e.type === "offer")).toBe(false);
   });
 
   it.each([
