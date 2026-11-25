@@ -195,7 +195,7 @@ pub fn create_junction(link: &Path, target: &Path) -> bool {
 /// ├── GenieX\
 /// │   └── models\           <-- Controlled via GENIEX_DATADIR
 /// ├── Config\               <-- settings.json, hardware.json, custom-models.json
-/// ├── Logs\                 <-- mkmn.log, geniex.log (circular/rotated)
+/// ├── Logs\                 <-- mkmn.log, geniex.log (each rotated to <name>.1.log at 1 MiB)
 /// └── Workspace\            <-- conversations, artifacts, voice-models
 pub fn init_filesystem() {
     let local = get_local_appdata();
@@ -449,29 +449,119 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<usize> {
     Ok(count)
 }
 
+/// The size at which a log moves to `<name>.1.log` and a new one starts. Each log and
+/// its one older file stay near this size; an antivirus scan of either stays short.
+const LOG_MAX_BYTES: u64 = 1 << 20;
+
+/// `geniex.log` -> `geniex.1.log`. The name keeps its `.log` ending, so
+/// scripts/audit-context.mjs reads the older file too.
+fn rotated_path(path: &Path) -> PathBuf {
+    let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+    path.with_file_name(format!("{stem}.1.log"))
+}
+
+/// One log file kept open while the process runs. Opening and closing the file for
+/// every line made Microsoft Defender scan the whole file again after each line: it
+/// scans a changed file when its last handle closes. Writes are unbuffered, so a crash
+/// loses nothing that was written.
+struct LogSink {
+    path: PathBuf,
+    max: u64,
+    file: Option<fs::File>,
+    /// Bytes in the file as this sink knows them; other processes' lines are not counted
+    /// until the real size is read at the limit.
+    len: u64,
+    #[cfg(test)]
+    opens: u32,
+}
+
+impl LogSink {
+    fn new(path: PathBuf, max: u64) -> Self {
+        Self { path, max, file: None, len: 0, #[cfg(test)] opens: 0 }
+    }
+
+    fn open(&mut self) {
+        self.file = fs::OpenOptions::new().create(true).append(true).open(&self.path).ok();
+        self.len = self.file.as_ref().and_then(|f| f.metadata().ok()).map_or(0, |m| m.len());
+        #[cfg(test)]
+        {
+            self.opens += 1;
+        }
+    }
+
+    /// At the limit: when the file under the name is smaller than this sink's count,
+    /// another writer rotated it and this handle points at the older file, so it opens
+    /// the new one. Otherwise it moves the full file to `<name>.1.log` and starts again.
+    fn make_room(&mut self, incoming: u64) {
+        let real = fs::metadata(&self.path).map_or(0, |m| m.len());
+        if real < self.len {
+            self.open();
+            if self.len + incoming <= self.max {
+                return;
+            }
+        }
+        self.file = None;
+        let older = rotated_path(&self.path);
+        let _ = fs::remove_file(&older);
+        let moved = fs::rename(&self.path, &older).is_ok();
+        self.open();
+        if !moved {
+            // Another process holds the older file: keep writing and try again after
+            // another full limit, not on every line.
+            self.len = 0;
+        }
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        use std::io::Write;
+        if self.file.is_none() {
+            self.open();
+        }
+        if self.len + bytes.len() as u64 > self.max {
+            self.make_room(bytes.len() as u64);
+        }
+        if let Some(f) = self.file.as_mut()
+            && f.write_all(bytes).is_ok()
+        {
+            self.len += bytes.len() as u64;
+        } else {
+            self.file = None; // a failed write (the folder was removed): open again next line
+        }
+    }
+}
+
+/// The open logs, one per path. The lock also keeps a line from being split by a
+/// rotation in another thread.
+static LOG_SINKS: std::sync::Mutex<Vec<LogSink>> = std::sync::Mutex::new(Vec::new());
+
 /// Append log message to %LOCALAPPDATA%\MKMN\Logs\<kind>.log
 pub fn append_log(kind: &str, line: &str) {
-    use std::io::Write;
     let file_path = match kind {
         "geniex" => get_geniex_log_path(),
         _ => get_mkmn_log_path(),
     };
+    // The WHOLE line goes out in one write: write!/writeln! on a File issues one
+    // syscall per format piece, and concurrent writers — threads in one process,
+    // several MKMN processes in the field — interleave at piece granularity,
+    // shredding lines mid-timestamp and mid-detail. A single write_all of the
+    // fully formatted line is atomic at EOF in append mode.
+    let timestamp = chrono_lite_timestamp();
+    let mut full = String::with_capacity(timestamp.len() + line.len() + 4);
+    full.push('[');
+    full.push_str(&timestamp);
+    full.push_str("] ");
+    full.push_str(line);
+    full.push('\n');
 
-    if let Ok(mut f) = fs::OpenOptions::new().create(true).append(true).open(&file_path) {
-        // The WHOLE line goes out in one write: write!/writeln! on a File issues one
-        // syscall per format piece, and concurrent writers — threads in one process,
-        // several MKMN processes in the field — interleave at piece granularity,
-        // shredding lines mid-timestamp and mid-detail. A single write_all of the
-        // fully formatted line is atomic at EOF in append mode.
-        let timestamp = chrono_lite_timestamp();
-        let mut full = String::with_capacity(timestamp.len() + line.len() + 4);
-        full.push('[');
-        full.push_str(&timestamp);
-        full.push_str("] ");
-        full.push_str(line);
-        full.push('\n');
-        let _ = f.write_all(full.as_bytes());
-    }
+    let mut sinks = LOG_SINKS.lock().unwrap_or_else(|e| e.into_inner());
+    let at = match sinks.iter().position(|s| s.path == file_path) {
+        Some(i) => i,
+        None => {
+            sinks.push(LogSink::new(file_path, LOG_MAX_BYTES));
+            sinks.len() - 1
+        }
+    };
+    sinks[at].write(full.as_bytes());
 }
 
 /// The process identity that owns every subsequent startup log line. Multiple MKMN
@@ -614,6 +704,73 @@ mod tests {
     /// racing writers interleaved at piece granularity — a line came back missing
     /// its leading bracket with the next writer's bracket glued on the tail
     /// (observed live in the release cargo test).
+    fn sink_test_dir(tag: &str) -> PathBuf {
+        let dir = get_logs_dir().join(format!("sink-{tag}"));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("the sink test folder");
+        dir
+    }
+
+    /// The log stays open between lines. Opening and closing it for every line made
+    /// Microsoft Defender scan the whole file again after each line (a recording showed
+    /// geniex.log scanned 16 times, up to 64 ms each).
+    #[test]
+    fn a_log_is_opened_once_for_many_lines() {
+        let path = sink_test_dir("open-once").join("app.log");
+        let mut sink = LogSink::new(path.clone(), 1 << 20);
+        for i in 0..100 {
+            sink.write(format!("line {i}\n").as_bytes());
+        }
+        assert_eq!(sink.opens, 1, "100 lines need one open, not one per line");
+        let text = fs::read_to_string(&path).expect("the log can be read while it is open");
+        assert_eq!(text.lines().count(), 100, "every line landed");
+    }
+
+    /// A log that passes its size limit moves to `<name>.1.log` and a new one starts,
+    /// so neither file grows without end. The `.log` ending keeps the rotated file in
+    /// what scripts/audit-context.mjs reads.
+    #[test]
+    fn a_full_log_rotates_to_one_older_file() {
+        let dir = sink_test_dir("rotate");
+        let path = dir.join("app.log");
+        let older = dir.join("app.1.log");
+        let mut sink = LogSink::new(path.clone(), 1000);
+        let line = [b'x'; 99].iter().chain(b"\n").copied().collect::<Vec<u8>>();
+        for _ in 0..35 {
+            sink.write(&line);
+        }
+        let now = fs::metadata(&path).expect("the current log").len();
+        let old = fs::metadata(&older).expect("the rotated log").len();
+        assert!(now <= 1000, "the current log stays at its limit: {now} bytes");
+        assert!(old <= 1000, "the rotated log stays at its limit: {old} bytes");
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 2, "one older file is kept, no more");
+        assert_eq!(rotated_path(Path::new("x\\geniex.log")), PathBuf::from("x\\geniex.1.log"));
+    }
+
+    /// Several MKMN processes can write one log. When another writer has already
+    /// rotated it, this one opens the new file instead of rotating again, which would
+    /// move the nearly empty new file over the older one and lose its lines.
+    #[test]
+    fn a_log_another_writer_rotated_is_not_rotated_again() {
+        let dir = sink_test_dir("other-writer");
+        let path = dir.join("app.log");
+        let line = [b'y'; 99].iter().chain(b"\n").copied().collect::<Vec<u8>>();
+        let mut stale = LogSink::new(path.clone(), 1000);
+        stale.write(&line); // opened before the other writer rotates
+        let mut other = LogSink::new(path.clone(), 1000);
+        for _ in 0..12 {
+            other.write(&line); // rotates at the 10th line: 3 lines end up in app.log
+        }
+        for _ in 0..10 {
+            stale.write(&line); // its count fills; app.log itself is small
+        }
+        let old = fs::read_to_string(dir.join("app.1.log")).expect("the rotated log");
+        assert!(old.lines().count() >= 10, "the first rotation's lines are kept: {} lines", old.lines().count());
+        let now = fs::read_to_string(&path).unwrap();
+        assert_eq!(now.lines().count(), 4, "the other writer's 3 lines and the stale writer's last one");
+        assert_eq!(stale.opens, 2, "the stale writer opened the new file once");
+    }
+
     #[test]
     fn concurrent_log_writes_never_shred_a_line() {
         let _ = fs::create_dir_all(get_logs_dir());
