@@ -419,6 +419,10 @@ describe("small pieces", () => {
     expect(stageEffort("c:plan", 60)).toBe("off"); // the planner's reply is a form (a Mode line, File lines): minutes of thought only delay it — measured: a planner thought 118 s for a plain question and answered nothing
     expect(stageEffort("c:plan:again", 60)).toBe("off");
     expect(stageEffort("c:deckplan", 60)).toBe("low"); // the deck's plan carries the slides: it keeps its room
+    // the deck's brief and look are closed JSON forms: measured on Qwen3-8B, {"count": 1} took 258 tokens and 11.6 s, a look 900 tokens and 41 s
+    expect(stageEffort("c:brief:0", 20)).toBe("off");
+    expect(stageEffort("c:look:1", 20)).toBe("off");
+    expect(stageEffort("c:slide0:0", 20)).toBe("low");
     expect(stageEffort("c:x:0:Plan:2", 60)).toBe("off");
     expect(stageEffort("c:fix:0:x:Unit: onInc:1", 60)).toBe("off");
   });

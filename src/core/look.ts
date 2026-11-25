@@ -99,6 +99,21 @@ export const LOOK_INSTRUCTIONS = [
 ].join("\n");
 
 const FONT_LOWER = new Map(FONTS.map((f) => [f.toLowerCase(), f]));
+/**
+ * The look in the schema's shape, from the looser shapes a small model writes when the server does not hold it to the
+ * schema (GenieX ignores response_format): colours as a list (background, accent, then two more), fonts as a list
+ * (title, body), the background as one word, the seed at the top. Anything already in shape is left as it is.
+ */
+export function looseLook(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+  const l = { ...(raw as Record<string, unknown>) };
+  if (Array.isArray(l.colors)) { const [bg, accent, accent2, accent3] = l.colors; l.colors = Object.fromEntries(Object.entries({ bg, accent, accent2, accent3 }).filter(([, v]) => v !== undefined)); }
+  if (Array.isArray(l.fonts)) { const [title, body] = l.fonts; l.fonts = Object.fromEntries(Object.entries({ title, body }).filter(([, v]) => v !== undefined)); }
+  if (typeof l.background === "string") l.background = { kind: l.background.trim().toLowerCase() };
+  if (Number.isInteger(l.seed) && l.background && typeof l.background === "object" && !Array.isArray(l.background) && (l.background as { seed?: unknown }).seed === undefined) l.background = { ...(l.background as object), seed: Math.abs(l.seed as number) % 100000 };
+  delete l.seed;
+  return l;
+}
 /** What is wrong with a reply, in words the model can act on; empty when it can be used. */
 export function lookProblems(look: unknown, slideCount = 20): string[] {
   const out: string[] = [];

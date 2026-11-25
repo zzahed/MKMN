@@ -12,7 +12,7 @@ import { figureKey, type FigureLang } from "./figures";
 import type { Session } from "./build";
 import { clipPhrase } from "./slides";
 import { findTheme } from "./themeGen";
-import { LOOK_INSTRUCTIONS, LOOK_SCHEMA, firstJson, lookProblems, lookTweak, normalizeLook, seedOf, slideLookStyle, type SlideLook } from "./look";
+import { LOOK_INSTRUCTIONS, LOOK_SCHEMA, firstJson, looseLook, lookProblems, lookTweak, normalizeLook, seedOf, slideLookStyle, type SlideLook } from "./look";
 import { parseStyle } from "./slides";
 import { askBrief, countFacts, infoLevel, answerOf, themeFromBrief, type Ask, type Info } from "./deckBrief";
 import { keywords } from "./websearch";
@@ -527,7 +527,7 @@ async function* deckSteps(o: DeckOptions, keep: Salvage): AsyncGenerator<ChatEve
     for (let attempt = 0; attempt < 2 && !look; attempt++) {
       const ask = `The presentation: ${plan.title}\nSlides: ${plan.slides.map((x, k) => `${k + 1}. ${x.role === "cover" ? "cover" : x.role === "closing" ? "closing" : x.visual === "section" ? "divider" : x.topic.slice(0, 40)}`).join("; ")}\nWhat the person said about the look: ${styleAsk.trim().slice(0, 300) || "nothing"}\n${suggest.colour ? `Suggested after reading the subject: the main colour is ${suggest.colour}${suggest.setting && suggest.setting !== "unspecified" ? `, for ${suggest.setting}` : ""}. Keep it unless the person asked for another.\n` : ""}Starting point: ${base.name} (${base.hint})\n${attempt && problems.length ? `Your last JSON had these problems, fix them:\n- ${problems.join("\n- ")}\n` : ""}Write the look now.`;
       const reply = await collect(o.stream, `${o.id}:look:${attempt}`, [{ role: "system", content: LOOK_INSTRUCTIONS }, { role: "user", content: ask }], add, o.signal, "plan", LOOK_SCHEMA, meter).catch((e) => { if (o.signal?.aborted) throw e; return ""; });
-      raw = firstJson(reply) ?? raw;
+      raw = looseLook(firstJson(reply)) ?? raw;
       problems = raw ? lookProblems(raw, plan.slides.length) : ["the answer was not a JSON object"];
       if (raw && !problems.length) look = normalizeLook(raw, plan.slides.length);
     }

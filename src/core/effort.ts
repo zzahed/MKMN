@@ -45,6 +45,9 @@ export function stageEffort(sid: string, tokPerSec?: number | null): Effort {
   // answered nothing, and the person waited all of it before the first word. Like the closed asks,
   // it thinks off. The deck's planner keeps its room: its plan carries the slides themselves.
   if (/:plan(?::|$)/.test(sid)) return "off";
+  // the deck's brief and look are closed JSON forms too: measured on Qwen3-8B, {"count": 1} took 258 tokens and 11.6 s,
+  // a look of 60 tokens took 900 and 41 s, before the first slide was even begun
+  if (/:(?:brief|look):/.test(sid)) return "off";
   // thinking costs minutes at the speed of a small model on this chip: it is only worth it where tokens come fast
   return /:(?:repair|fix)(?::|$)/.test(sid) && (tokPerSec ?? 0) >= 20 ? "medium" : "low";
 }
