@@ -138,6 +138,63 @@ export class RouterWarmGate {
   reset(): void { this.warmed = false; }
 }
 
+/** The shortest idle window the router is given: one request's closed questions must never meet a stopped router. */
+export const ROUTER_IDLE_MIN_MS = 60_000;
+
+/**
+ * Stops the router's server after the user's idle window (`idleReleaseSec`; 0 keeps it ready). It
+ * held about 850 MB for 24 hours after one request. The whole process is stopped, not only the
+ * model unloaded, so the warm gate always knows: the owner resets the gate before the stop, and
+ * the next request is refused by the gate (the words decide) while a warm-up starts the server
+ * again. It is never a miss, so it never moves the router to the GPU. `begin`/`end` bracket every
+ * use (a question, a sort, a warm-up); no release happens while one runs. Nor while another
+ * instance that adopted this server is using it (`othersActive`, see RouterUsers): the window
+ * then starts again. The window is read again at least every ROUTER_IDLE_CHECK_MS while the
+ * router is idle: nothing tells the sidecar when the setting changes (the window saves it
+ * through the host), and a change must apply without waiting for another use.
+ */
+export class RouterIdleRelease {
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  private busy = 0;
+  /** When the current idle window started: the end of the last use, or a deferral. */
+  private idleFrom = 0;
+  constructor(private idleMs: () => number, private release: () => void, private othersActive: () => boolean = () => false) {}
+  /** How many uses are running now. */
+  get running(): number { return this.busy; }
+  /** A use starts: no release until it ends. */
+  begin(): void { this.busy++; this.cancel(); }
+  /** A use ended: the idle window starts again from now. */
+  end(): void {
+    this.busy = Math.max(0, this.busy - 1);
+    if (this.busy === 0) { this.idleFrom = Date.now(); this.arm(); }
+  }
+  /** No release is due (the server was stopped for another reason). */
+  cancel(): void { if (this.timer) { clearTimeout(this.timer); this.timer = null; } }
+  /** How long until the release is due under the setting as it is now; null while it says "keep it ready". */
+  private dueIn(): number | null {
+    const ms = this.idleMs();
+    if (!(ms > 0)) return null;
+    return Math.max(0, this.idleFrom + Math.max(ms, ROUTER_IDLE_MIN_MS) - Date.now());
+  }
+  private arm(): void {
+    this.cancel();
+    const due = this.dueIn();
+    this.timer = setTimeout(() => this.tick(), Math.min(due ?? ROUTER_IDLE_CHECK_MS, ROUTER_IDLE_CHECK_MS));
+    (this.timer as { unref?: () => void }).unref?.();
+  }
+  private tick(): void {
+    this.timer = null;
+    if (this.busy !== 0) return;
+    const due = this.dueIn();
+    if (due === null || due > 0) { this.arm(); return; } // not due under the current setting: look again
+    if (this.othersActive()) { this.idleFrom = Date.now(); this.arm(); return; } // another instance uses this server: wait another window
+    this.release();
+  }
+}
+
+/** The longest the idle release waits before it reads the setting again. */
+export const ROUTER_IDLE_CHECK_MS = 60_000;
+
 /**
  * Runs the router's warm-up one at a time. A plain request made while one runs is dropped (that
  * one will do), but a FORCED one is kept and run once more when it ends: the server it warms may

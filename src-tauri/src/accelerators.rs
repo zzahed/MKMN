@@ -397,9 +397,76 @@ pub fn classify_gpu_counters(
     out
 }
 
+/// The adapters that are the NPU, by the same evidence `classify_gpu_counters` uses: an
+/// `engtype_NPU` engine instance, or the device inventory naming the adapter an NPU.
+/// Only the instance names are read, so the values of `engine` need not be a valid rate.
+pub fn npu_adapter_luids(engine: &[CounterInstance], inventory: &AdapterInventory) -> HashSet<String> {
+    let mut out: HashSet<String> = inventory
+        .adapters
+        .iter()
+        .filter(|(_, (class, _))| *class == AdapterClass::Npu)
+        .map(|(luid, _)| luid.clone())
+        .collect();
+    for (name, _, _) in engine {
+        if engtype_of(name) == "npu"
+            && let Some(luid) = luid_key(name)
+        {
+            out.insert(luid);
+        }
+    }
+    out
+}
+
+/// The NPU's memory in use, in bytes: the shared plus dedicated usage of the "GPU Adapter
+/// Memory" instances of the NPU's adapters (`memory` holds both counters' rows). None when
+/// no valid row belongs to an NPU adapter: unknown, never a measured 0.
+pub fn npu_memory_bytes(memory: &[CounterInstance], npu: &HashSet<String>) -> Option<f64> {
+    let mut total = 0.0f64;
+    let mut seen = false;
+    for (name, val, status) in memory {
+        let valid = *status == PDH_CSTATUS_VALID_DATA || *status == PDH_CSTATUS_NEW_DATA;
+        if !valid || !val.is_finite() || *val < 0.0 {
+            continue;
+        }
+        if luid_key(name).is_some_and(|l| npu.contains(&l)) {
+            total += val;
+            seen = true;
+        }
+    }
+    seen.then_some(total)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The NPU's memory is the sum of its own adapter's shared and dedicated rows; the
+    /// GPU's rows and invalid rows never count, and no NPU row is unknown, not 0.
+    #[test]
+    fn npu_memory_counts_only_the_npu_adapters_valid_rows() {
+        let npu: HashSet<String> = [NPU.to_string()].into();
+        let rows = vec![
+            (format!("{NPU}_phys_0"), 12_730_368.0, PDH_CSTATUS_VALID_DATA), // shared
+            (format!("{NPU}_phys_0"), 1_000.0, PDH_CSTATUS_VALID_DATA),      // dedicated
+            (format!("{GPU}_phys_0"), 932_007_936.0, PDH_CSTATUS_VALID_DATA),
+            (format!("{NPU}_phys_0"), 5e9, 0xC000_0BBA),                      // not valid data
+        ];
+        assert_eq!(npu_memory_bytes(&rows, &npu), Some(12_731_368.0));
+        assert_eq!(npu_memory_bytes(&rows[2..3], &npu), None, "only the GPU's row: unknown");
+        assert_eq!(npu_memory_bytes(&[], &npu), None);
+    }
+
+    /// The NPU adapters come from engtype_NPU instances and from the inventory alike:
+    /// on a Snapdragon X the NPU is a compute-only adapter the inventory names.
+    #[test]
+    fn npu_adapters_come_from_engines_and_the_inventory() {
+        let by_inventory = inv(&[(GPU, AdapterClass::Gpu), (NPU, AdapterClass::Npu)]);
+        let engines = vec![inst(1, GPU, 0, 0, "3D", 0.0), inst(1, NPU, 0, 0, "Compute", 0.0)];
+        assert_eq!(npu_adapter_luids(&engines, &by_inventory), [NPU.to_string()].into());
+        let other = "luid_0x00000000_0x0000beef";
+        let by_engine = vec![inst(1, other, 0, 0, "NPU", 0.0)];
+        assert_eq!(npu_adapter_luids(&by_engine, &inv(&[])), [other.to_string()].into());
+    }
 
     fn inv(entries: &[(&str, AdapterClass)]) -> AdapterInventory {
         AdapterInventory {

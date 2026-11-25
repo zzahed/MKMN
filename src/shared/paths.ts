@@ -33,6 +33,8 @@ export interface MkmnPaths {
   qairtDir: string;
   /** %LOCALAPPDATA%\MKMN\Embeddings: the multilingual search model the knowledge retrieval may use (installed only when the person asks). */
   embeddingsDir: string;
+  /** %LOCALAPPDATA%\MKMN\RouterUsers: one small file per instance that uses another instance's router (RouterUsers). */
+  routerUsersDir: string;
   /** %APPDATA%\MKMN: the earlier sidecar folder, read only for migration. */
   legacyDataDir: string;
   sources: MkmnPathSources;
@@ -68,6 +70,7 @@ export function mkmnPaths(env: NodeJS.ProcessEnv = process.env): MkmnPaths {
     logsDir: path.join(dataDir, "Logs"),
     qairtDir: path.join(dataDir, "QAIRT"),
     embeddingsDir: path.join(dataDir, "Embeddings"),
+    routerUsersDir: path.join(dataDir, "RouterUsers"),
     legacyDataDir: path.join(roaming.dir, "MKMN"),
     sources: { dataDir: local.source, legacyDataDir: roaming.source },
   };
