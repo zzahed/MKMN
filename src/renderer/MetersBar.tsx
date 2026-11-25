@@ -39,14 +39,14 @@ export function MetersBar({ meters, estNpuGB, busy, phase = "fresh", observedAt 
   /** Re-runs the poll right now (the poll effect's own tick — no new subscription). */
   onRetry?: () => void;
 }) {
-  const retry = onRetry ? <button type="button" className="ghost obs-retry" onClick={onRetry}>Retry</button> : null;
+  const retry = onRetry ? <button type="button" className="ghost obs-retry" onClick={onRetry}>Try again</button> : null;
 
   if (phase === "failed" || phase === "disconnected") {
     return (
       <div className="meters obs-state" role="status">
         <div className="muted small">
           {phase === "disconnected"
-            ? "Resource readings unavailable — the backend is not answering right now. The app keeps working with what is saved on this PC."
+            ? "Resource readings unavailable — MKMN's AI service isn't answering right now. The app keeps working with what is saved on this PC."
             : "Resource readings unavailable — no reading has arrived yet."}
           {retry}
         </div>

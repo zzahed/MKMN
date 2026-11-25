@@ -21,6 +21,19 @@ Updates the Windows ARM64 toolchain, native search and speech runtimes, and page
   project says it cannot be undone. Audit and writing rules:
   [usability-audit.md](design/usability-audit.md). Other screens follow in
   [#62](https://github.com/zzahed/MKMN/issues/62).
+- **Skill patterns can no longer freeze the window — check your own skills**
+  ([#62](https://github.com/zzahed/MKMN/issues/62), [#75](https://github.com/zzahed/MKMN/pull/75)).
+  A skill's "start by itself" words are checked against every message you send,
+  and a badly written pattern could make the window stop responding. Patterns
+  you write by hand can no longer repeat a part with `+`, `*` or `{…}`. Plain
+  words separated by commas, the form the skill editor offers, work as before,
+  and so do the built-in skills.
+  **What you may notice:** a skill you saved earlier whose pattern uses `+`, `*`
+  or `{…}` (for example `invoice\w*`, or an edited copy of a built-in skill's
+  pattern) no longer starts by itself, and the Skills list says why. You can
+  still start it by typing / and its name. To make it start by itself again,
+  open it, and under **Advanced** replace the pattern with plain words separated
+  by commas (for example `invoice, invoices`).
 
 ## 0.0.3-rc.1 — Engineering hardening candidate
 

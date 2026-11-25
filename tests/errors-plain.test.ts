@@ -65,6 +65,23 @@ describe("setup and status", () => {
     expect(app).not.toContain("the status check keeps failing");
     expect(app).not.toContain("backend is not answering");
   });
+
+  it("the failed state stays a short name; the next step follows the restart count", () => {
+    const app = readFileSync("src/renderer/App.tsx", "utf8");
+    // STATE_LABEL is also the tooltip's "Last known state: …", so it holds no instruction
+    expect(app).toMatch(/failed: "The AI stopped working",/);
+    expect(app).toContain('server.state === "failed" ? ". Send your message again, or see Settings › Developer › Last error." : ""');
+  });
+
+  it("the stale pill and the meters bar use the same words as the rest of the status", () => {
+    const app = readFileSync("src/renderer/App.tsx", "utf8");
+    expect(app).toContain("`Status may be out of date · last updated ${lastUpdatedText(serverView.at)}`");
+    expect(app).not.toContain("Status unavailable · last updated");
+    const meters = readFileSync("src/renderer/MetersBar.tsx", "utf8");
+    expect(meters).toContain(">Try again</button>");
+    expect(meters).not.toContain(">Retry</button>");
+    expect(meters).not.toContain("backend is not answering");
+  });
 });
 
 describe("phase 4, round 2: no promise the code does not keep, and plain setup errors", () => {
