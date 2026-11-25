@@ -37,7 +37,7 @@ export interface GeniexInstallDeps {
 export async function installGeniex(d: GeniexInstallDeps, progress: (percent: number | null, message: string) => void): Promise<string> {
   // a feed that names a release older than the minimum is refused before anything is downloaded
   if (d.release && compareVersions(d.release.tag.replace(/^v/i, "").replace(/[-+].*$/, ""), GENIEX_MIN_VERSION) < 0) {
-    throw new Error(`Qualcomm's latest stable GenieX is ${d.release.tag}, and MKMN needs v${GENIEX_MIN_VERSION} or newer. Nothing was downloaded; GenieX inference stays off.`);
+    throw new Error(`Qualcomm's current NPU engine is too old for MKMN, so nothing was downloaded. Try again later; until then, models can't run on the NPU. Details for support: latest ${d.release.tag}, needs v${GENIEX_MIN_VERSION} or newer.`);
   }
   fs.mkdirSync(d.tmpDir, { recursive: true });
   // The downloader resumes partial files, so keep each published artifact's bytes separate.
@@ -48,11 +48,11 @@ export async function installGeniex(d: GeniexInstallDeps, progress: (percent: nu
     // the feed's checksum is checked before anything else: a file that is not the published one is never run, signed or not
     progress(null, `Checking the installer against GenieX ${d.release.tag}…`);
     const got = (await d.sha256(dest)).toLowerCase();
-    if (got !== d.release.sha256) throw new Error(`The downloaded GenieX installer was not run: its SHA-256 ${got} does not match the SHA-256 Qualcomm published for GenieX ${d.release.tag} (${d.release.sha256}). Try again later.`);
+    if (got !== d.release.sha256) throw new Error(`The download from Qualcomm was damaged or incomplete, so it was not run. Try again. Details for support: its SHA-256 ${got} does not match the SHA-256 Qualcomm published for GenieX ${d.release.tag} (${d.release.sha256}).`);
   }
   progress(null, "Checking the installer's signature…");
   const trust = judgeSignature(await d.signature(dest));
-  if (trust.verdict === "refused") throw new Error(`The downloaded GenieX installer was not run: ${trust.reason}. Try again later, or install GenieX from Qualcomm yourself and use Settings → Developer → Locate geniex.exe.`);
+  if (trust.verdict === "refused") throw new Error(`The NPU engine's installer did not pass MKMN's safety check, so it was not run. Try again later, or install GenieX from Qualcomm yourself and use Settings › Developer › Locate geniex.exe. Details for support: ${trust.reason}.`);
   if (trust.verdict === "unsigned") {
     const digest = await d.sha256(dest);
     if (!d.allowUnsigned || d.allowUnsigned !== digest) throw new UnsignedInstallerError(digest);
@@ -60,18 +60,18 @@ export async function installGeniex(d: GeniexInstallDeps, progress: (percent: nu
   progress(null, "Running the GenieX installer… (a Qualcomm window may appear; follow it if so)");
   const r = await d.run(dest);
   const tail = r.output.trim().split(/\r?\n/).slice(-6).join(" | ").slice(0, 400);
-  if (r.code !== 0) throw new Error(`The GenieX installer stopped with code ${r.code}. Installer said: ${tail || "(nothing)"}`);
+  if (r.code !== 0) throw new Error(`The NPU engine's installer stopped before it finished. Try again. If it fails again, restart the PC and try once more. Details for support: code ${r.code}, installer said: ${tail || "(nothing)"}`);
   const found = locateGeniex(r.output, d.env, d.exists);
-  if (!found) throw new Error(`The installer finished but geniex.exe was not found. Open a new terminal and run "geniex version", then use Settings → Developer → Locate geniex.exe. Installer said: ${tail || "(nothing)"}`);
+  if (!found) throw new Error(`The installer finished, but MKMN can't find the engine. Restart MKMN. If it is still missing, use Settings › Developer › Locate geniex.exe. Details for support: installer said: ${tail || "(nothing)"}`);
   const reported = await d.probe(found);
   const version = reported?.match(/\bv?(\d+\.\d+\.\d+(?:-[\w.-]+)?)\b/)?.[1];
-  if (!version) throw new Error("The installer finished, but the detected GenieX could not report a version and working serve command.");
+  if (!version) throw new Error("The engine was installed but doesn't respond. Try again, or restart the PC. Details for support: GenieX reported no version or working serve command.");
   if (d.release && version !== d.release.tag.replace(/^v/, "")) {
-    throw new Error(`The installer finished, but the detected GenieX reports ${version}; expected ${d.release.tag}. Check the installed executable and retry.`);
+    throw new Error(`A different version of the engine was found than the one just installed. Try again. Details for support: found ${version}, expected ${d.release.tag}.`);
   }
   // the installed executable is checked against the minimum again: inference stays off until it passes
   if (compareVersions(version.replace(/[-+].*$/, ""), GENIEX_MIN_VERSION) < 0) {
-    throw new Error(`The installer finished, but the detected GenieX reports v${version}; MKMN needs v${GENIEX_MIN_VERSION} or newer. GenieX inference stays off.`);
+    throw new Error(`The NPU engine on this PC is too old for MKMN; until it is updated, models can't run on the NPU. Try again to install the current one. Details for support: found v${version}, needs v${GENIEX_MIN_VERSION} or newer.`);
   }
   return found;
 }

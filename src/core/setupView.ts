@@ -73,7 +73,7 @@ export function setupOutcomeView(state: SetupState): SetupOutcomeView {
     return {
       outcome: "failed",
       heading: "Some components couldn't be installed",
-      description: `${listNames(failed.map((s) => s.label))} didn't finish installing. Retry below, or continue with limited features — you can reinstall anytime in Settings.`,
+      description: `${failed.length === 1 ? "One part" : `${failed.length} parts`} didn't finish installing: ${listNames(failed.map((s) => s.label))}. Use Try again, or continue with fewer features. You can install ${failed.length === 1 ? "it" : "them"} later in Settings › Developer.`,
     };
   }
   const skipped = state.steps.filter((s) => s.state === "skipped");

@@ -209,7 +209,7 @@ export class ServerManager extends EventEmitter {
     if (token !== this.startToken) throw new Error("Server start cancelled");
     if (!ready) {
       if (this.state !== "failed" && this.state !== "stopped" && this.state !== "restarting") {
-        this.fail(this.lastError ?? { id: "timeout", title: "The model server did not start", fix: "Check the last server error in Settings, then retry.", raw: this.log.slice(-10).join("\n") });
+        this.fail(this.lastError ?? { id: "timeout", title: "The AI engine did not start", fix: "Try again. If it keeps happening, see Settings › Developer › Last error.", raw: this.log.slice(-10).join("\n") });
       }
       throw new Error(this.lastError?.title ?? "server did not become ready");
     }
@@ -269,7 +269,7 @@ export class ServerManager extends EventEmitter {
     const known = this.lastError ?? friendly(tail);
     // a refused mapping does not depend on the context, and every new launch on a NPU that a failed load left in a bad state fails the same way (or worse): stop, the app resets the NPU
     if (/buffer mapping failed|fastrpc_mmap/i.test(tail)) {
-      this.fail(known ?? { id: "npu-overflow", title: "The NPU refused to map the model", fix: "Reset the NPU, then try again.", raw: tail });
+      this.fail(known ?? { id: "npu-overflow", title: "The NPU couldn't load the model", fix: "Use Settings › Developer › Reset the NPU, then try again.", raw: tail });
       return;
     }
     // An adoptable server (the router) whose own spawn died before it ever served: when
@@ -285,12 +285,12 @@ export class ServerManager extends EventEmitter {
       // something answers but is not a server this one may adopt: another program holds the port
       const stranger = await this.probe();
       if (this.state !== "failed") this.fail(this.lastError ?? (stranger
-        ? { id: "endpoint-foreign", title: `Another program is using the port ${this.host.split(":").pop()}`, fix: "It answers there but is not MKMN's model server, so nothing is sent to it. Close that program; MKMN tries again with the next request.", raw: tail }
-        : { id: "endpoint-held", title: "The model server's port is held by a process that does not answer", fix: "It is tried again with the next request; the endpoint is adopted when that process answers.", raw: tail }));
+        ? { id: "endpoint-foreign", title: `Another program is blocking MKMN's AI (port ${this.host.split(":").pop()})`, fix: "Close other AI apps, then send your message again.", raw: tail }
+        : { id: "endpoint-held", title: "MKMN's AI can't start right now", fix: "Send your message again. If it keeps happening, restart the PC.", raw: tail }));
       return;
     }
     if (this.restarts >= max) {
-      this.fail(known ?? { id: "crash", title: "The model server keeps crashing", fix: "Look at the last server error in Settings; try a smaller model or context.", raw: tail });
+      this.fail(known ?? { id: "crash", title: "The AI keeps stopping", fix: "Choose a smaller model in Local Models, or a shorter conversation length in Settings › Speed & memory › Advanced.", raw: tail });
       return;
     }
     this.restarts++;

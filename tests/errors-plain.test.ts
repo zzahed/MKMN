@@ -37,7 +37,9 @@ describe("PDF messages", () => {
   it("a PDF without readable text says what to do, without 'vision model'", () => {
     const m = noPdfText("scan.pdf");
     expect(m).toContain("found no text it could read");
-    expect(m).toContain("paste it into the chat");
+    // the same helper serves chat attachments and project files, so the advice fits both
+    expect(m).toContain("even on scanned pages");
+    expect(m).toContain("If you have the text elsewhere, paste it in");
     expect(m).not.toMatch(/vision model|selectable|\(a scan\?\)/);
   });
 
@@ -62,5 +64,25 @@ describe("setup and status", () => {
     expect(app).toContain("Can't check the AI right now. Try again, or restart MKMN if this continues.");
     expect(app).not.toContain("the status check keeps failing");
     expect(app).not.toContain("backend is not answering");
+  });
+});
+
+describe("phase 4, round 2: no promise the code does not keep, and plain setup errors", () => {
+  it("errors that may end in a failed state say MKMN tries, never that it will", () => {
+    expect(translateError("ggml-hex: HTP0 buffer mapping failed")?.fix).toMatch(/^MKMN tries to restart the AI with less room/);
+    expect(translateError("fetch failed")?.fix).toMatch(/^MKMN tries to restart it/);
+  });
+
+  it("first-run installer errors lead with what happened and what to do; details only for support", () => {
+    const svc = readFileSync("src/core/setupService.ts", "utf8");
+    for (const m of svc.match(/throw new Error\(`[^`]*`\)|throw new Error\("[^"]*"\)/g) ?? []) {
+      const lead = m.split("Details for support")[0];
+      expect(lead, m).not.toMatch(/SHA-256|geniex\.exe was not found|serve command|inference stays off|Open a new terminal|stopped with code/);
+    }
+  });
+
+  it("settings paths use the › style and name tabs that exist", () => {
+    const errs = readFileSync("src/core/errors.ts", "utf8") + readFileSync("src/core/setupService.ts", "utf8");
+    expect(errs).not.toMatch(/Settings → |Settings, HUMAIN/);
   });
 });

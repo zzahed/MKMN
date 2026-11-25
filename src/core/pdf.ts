@@ -105,8 +105,8 @@ export async function extractPdfText(doc: PdfDocLike, maxChars = 2_000_000, o?: 
 /**
  * Why a PDF could not be attached, in plain words, from the error's class and message.
  * The classes are pdf.js's own (PasswordException, InvalidPDFException, MissingPDFException,
- * AbortError); anything else keeps the underlying reason, cut, so no page text ever lands in
- * the message — a pdf.js parse error can quote a fragment of the document.
+ * AbortError); anything else shows only a sanitized category (pdfErrorCategory), never the
+ * underlying message — a pdf.js parse error can quote a fragment of the document.
  */
 export function describePdfError(name: string, e: unknown): string {
   const en = (e as { name?: string } | null)?.name ?? "";

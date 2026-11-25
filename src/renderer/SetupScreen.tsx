@@ -61,7 +61,7 @@ export function SetupScreen({ state }: { state: SetupState }) {
         )}
         {!state.awaitingConfirm && view.outcome !== "busy" && <button className="primary" onClick={() => void api().setupDismiss()}>{view.outcome === "failed" ? "Continue anyway" : "Start"}</button>}
         <div className="muted small">For cloud chat, skip local setup and choose HUMAIN Fuse or HUMAIN Node under Cloud Intelligence in Settings.</div>
-        <div className="muted small">You can change or reinstall any of this later in Settings.</div>
+        <div className="muted small">You can change or reinstall any of this later in Settings › Developer.</div>
         <div className="muted small brand-tagline">{BRAND.tagline}</div>
         <div className="muted small brand-supporting">{BRAND.supporting}</div>
       </div>

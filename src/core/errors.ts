@@ -27,13 +27,13 @@ const RULES: Rule[] = [
     id: "humain-key",
     test: /HUMAIN (Fuse|Node): HTTP 401|invalid_api_key|missing_api_key/i,
     title: "The HUMAIN key was refused",
-    fix: "The key is missing, revoked or wrong. Save a new key in Settings, HUMAIN."
+    fix: "The key is missing, revoked or wrong. Save a new key in Settings › HUMAIN Fuse (or HUMAIN Node)."
   },
   {
     id: "humain-model",
     test: /HUMAIN (Fuse|Node): HTTP 404 · model_not_found/i,
     title: "This HUMAIN model is not available to your key",
-    fix: "Load the models again in Settings, HUMAIN, and choose one from the list."
+    fix: "In Settings › HUMAIN Fuse (or HUMAIN Node), load the models again and choose one."
   },
   {
     id: "humain-limit",
@@ -70,7 +70,7 @@ const RULES: Rule[] = [
     id: "npu-overflow",
     test: /dspqueue_read failed|ggml-hex/i,
     title: "The model did not fit in the NPU's memory",
-    fix: "MKMN will restart it with a shorter conversation length. Close other apps that use the NPU, then try again. If it keeps failing, use Settings › Developer › Reset the NPU, or restart the PC."
+    fix: "MKMN tries to restart the AI with less room for the conversation and attachments. If this message stays, close other apps that use the NPU and use Settings › Developer › Reset the NPU, then try again. If it still fails, restart the PC."
   },
   {
     // GenieX's generic catch-all (code -100000). A real out-of-NPU-memory failure says
@@ -87,7 +87,7 @@ const RULES: Rule[] = [
     id: "connection-reset",
     test: /ERR_CONNECTION_RESET|ECONNRESET|ECONNREFUSED|fetch failed/i,
     title: "The AI on this PC is not running",
-    fix: "MKMN is restarting it. If this keeps happening, see the last error in Settings › Developer."
+    fix: "MKMN tries to restart it. If it doesn't come back, send your message again, or restart MKMN. Details are in Settings › Developer › Last error."
   },
   {
     id: "ram-exhausted",
@@ -105,7 +105,7 @@ const RULES: Rule[] = [
     id: "no-chipset",
     test: /Requested chipset not available|chipset\s+"[^"]*"\s+not available/i,
     title: "No version of this model is built for this PC's NPU",
-    fix: "Qualcomm hasn't published one for your chip (a Snapdragon X Plus is listed separately, and not every model has one). MKMN can try a general version instead, and checks on this PC whether it runs on the NPU."
+    fix: "Qualcomm hasn't published one for your chip (a Snapdragon X Plus is listed separately). Choose another version of it, or another model, in Local Models."
   },
   {
     id: "win193",

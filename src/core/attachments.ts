@@ -70,4 +70,4 @@ export function textOf(m: ChatMessage["content"]): string {
 }
 
 /** Said when a PDF has no text layer (a scan or a photo): there is nothing to read without OCR. */
-export const noPdfText = (name: string) => `${name}: MKMN found no text it could read in this PDF. If it is a scan, copy its text and paste it into the chat, or add a version of the file that contains text.`;
+export const noPdfText = (name: string) => `${name}: MKMN found no text it could read in this PDF, even on scanned pages. If you have the text elsewhere, paste it in, or add a version of the file that contains text.`;

@@ -273,7 +273,8 @@ describe("ServerManager on a port another instance already serves", () => {
       await new Promise((r) => setTimeout(r, 1200)); // the old code's restart backoff fires within this window
       expect(spawned.length).toBe(1);
       expect(m.status().state).toBe("failed");
-      expect(m.status().lastError?.title).toMatch(/does not answer|held/);
+      expect(m.status().lastError?.id).toBe("endpoint-held");
+      expect(m.status().lastError?.title).toBe("MKMN's AI can't start right now");
     } finally { await m.stop(); }
   });
 

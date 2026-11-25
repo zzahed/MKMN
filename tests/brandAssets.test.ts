@@ -296,7 +296,7 @@ describe("setup copy follows the real outcome", () => {
     expect(v.heading).toMatch(/couldn't be installed/);
     expect(v.description).toContain("AI engine for the NPU (Qualcomm GenieX)");
     expect(v.description).toContain("Read-aloud model: Piper");
-    expect(v.description).toMatch(/Retry below|continue with limited features/);
+    expect(v.description).toMatch(/Use Try again, or continue with fewer features/);
   });
   it("distinguishes skipped components from success", () => {
     const v = setupOutcomeView(state({ "voice-stt": { state: "skipped", message: "Skipped" }, "voice-tts": { state: "skipped", message: "Skipped" } }));
