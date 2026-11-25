@@ -123,34 +123,48 @@ export function npuReadingFromHost(r: unknown): NpuReading | null {
 const NO_NPU_READING: NpuReading = { util: null, memBytes: null, pidUtil: {}, pidMem: {}, sets: [], samples: 0 };
 
 /**
- * The benchmark's NPU memory reader. The host's PDH reading answers without a spawn. Only
- * when it has no memory figure is PowerShell asked, and its answer decides the session:
- * a figure keeps PowerShell as the source (counters only it can read, such as other
- * languages' names); no figure means no source has one, and PowerShell is not asked at
- * every memory point again.
+ * The benchmark's NPU memory reader. The host's PDH reading answers without a spawn, and it is
+ * asked at every point: one miss (a timeout while the benchmark loads the machine) never hands
+ * the session to PowerShell. PowerShell is asked when the host has no figure (counters only it
+ * can read, such as other languages' names), except once it has shown it has none either while
+ * the host still answers: the host's reading, with its utilization, then stands. With no host
+ * reading at all, PowerShell answers every point, so a point never loses its utilization.
+ * A FAILED PowerShell read (a timeout under load) shows nothing: it is asked again after
+ * NPU_MEMORY_RETRY_MS, not at every point and not never again.
  */
 export function createNpuMemoryReader(o: {
   host: () => Promise<NpuReading | null>;
   powershell: () => Promise<NpuReading>;
   log?: (line: string) => void;
+  now?: () => number;
 }): () => Promise<NpuReading> {
-  let usePowershell = false;
-  let powershellChecked = false;
+  const now = o.now ?? Date.now;
+  /** What PowerShell's first answer showed: null until it has answered. */
+  let powershellHasFigure: boolean | null = null;
+  /** After a failed PowerShell read, it is not asked again before this time. */
+  let retryAt = 0;
   return async () => {
-    if (usePowershell) return o.powershell().catch(() => NO_NPU_READING);
     const host = await o.host().catch(() => null);
     if (host && host.memBytes !== null) return host;
-    if (powershellChecked) return host ?? NO_NPU_READING;
-    powershellChecked = true;
+    if (host && powershellHasFigure === false) return host;
+    if (now() < retryAt) return host ?? NO_NPU_READING;
     const ps = await o.powershell().catch(() => null);
-    if (ps && ps.memBytes !== null) {
-      usePowershell = true;
-      o.log?.("[readings] npu memory: the host has no figure, PowerShell has one; PowerShell is used for this session");
-      return ps;
+    if (!ps) {
+      retryAt = now() + NPU_MEMORY_RETRY_MS;
+      return host ?? NO_NPU_READING;
     }
-    return host ?? ps ?? NO_NPU_READING;
+    const figure = ps.memBytes !== null;
+    if (powershellHasFigure === null) {
+      powershellHasFigure = figure;
+      if (figure) o.log?.("[readings] npu memory: the host has no figure, PowerShell has one; PowerShell answers when the host has none");
+    }
+    if (figure) return ps;
+    return host ?? ps;
   };
 }
+
+/** How long a failed PowerShell memory read waits before it is asked again. */
+export const NPU_MEMORY_RETRY_MS = 60_000;
 
 const SHARED = /shared/i;
 const DEDICATED = /dedicated/i;

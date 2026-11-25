@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { batteryFromHost, batteryPercent, createCachedPowerReader, createHostFirstBatteryReader, type BatteryReading } from "../src/core/battery";
-import { createNpuMemoryReader, npuReadingFromHost, type NpuReading } from "../src/core/perf";
+import { NPU_MEMORY_RETRY_MS, createNpuMemoryReader, npuReadingFromHost, type NpuReading } from "../src/core/perf";
 
 /**
  * The host-native readings (src-tauri/src/battery.rs, the monitor's PDH sample) that
@@ -63,21 +63,56 @@ describe("the NPU memory reader — the host first, PowerShell only when it has 
     expect(powershell).toHaveBeenCalledTimes(1);
   });
 
-  it("a figure only PowerShell finds (counters the host cannot read): PowerShell is kept for the session", async () => {
-    const host = vi.fn(async () => null);
+  it("a figure only PowerShell finds (counters the host cannot read): PowerShell answers the points the host has none for", async () => {
+    const host = vi.fn(async () => r(null));
     const powershell = vi.fn(async () => r(7));
     const lines: string[] = [];
     const read = createNpuMemoryReader({ host, powershell, log: (l) => lines.push(l) });
     expect((await read()).memBytes).toBe(7);
     expect((await read()).memBytes).toBe(7);
-    expect(host).toHaveBeenCalledTimes(1);
+    expect(host).toHaveBeenCalledTimes(2);
     expect(powershell).toHaveBeenCalledTimes(2);
     expect(lines).toHaveLength(1);
+  });
+
+  it("one host miss (a timeout under load) does not hand the rest of the session to PowerShell", async () => {
+    let calls = 0;
+    const host = vi.fn(async () => (calls++ === 0 ? null : r(12_000_000)));
+    const powershell = vi.fn(async () => r(7));
+    const read = createNpuMemoryReader({ host, powershell });
+    expect((await read()).memBytes).toBe(7);
+    expect((await read()).memBytes).toBe(12_000_000);
+    expect((await read()).memBytes).toBe(12_000_000);
+    expect(powershell).toHaveBeenCalledTimes(1);
+  });
+
+  it("no host reading at all: every point still carries PowerShell's utilization, never an empty reading", async () => {
+    const host = vi.fn(async () => null);
+    const powershell = vi.fn(async () => r(null));
+    const read = createNpuMemoryReader({ host, powershell });
+    for (let i = 0; i < 3; i++) expect((await read()).util).toBe(5);
+    expect(powershell).toHaveBeenCalledTimes(3);
   });
 
   it("a failed PowerShell read keeps the host's reading", async () => {
     const read = createNpuMemoryReader({ host: async () => r(null), powershell: async () => { throw new Error("no PowerShell"); } });
     expect((await read()).util).toBe(5);
+  });
+
+  it("a failed PowerShell read is not taken as 'no figure': it is asked again after a pause (the Codex review on #78)", async () => {
+    let now = 0;
+    let failing = true;
+    const host = vi.fn(async () => r(null));
+    const powershell = vi.fn(async () => { if (failing) throw new Error("timed out"); return r(7); });
+    const read = createNpuMemoryReader({ host, powershell, now: () => now });
+    expect((await read()).memBytes).toBeNull(); // the first read timed out
+    now += NPU_MEMORY_RETRY_MS - 1;
+    expect((await read()).memBytes).toBeNull(); // not hammered during the pause
+    expect(powershell).toHaveBeenCalledTimes(1);
+    failing = false;
+    now += 1;
+    expect((await read()).memBytes).toBe(7); // recovered: its figure is used
+    expect(powershell).toHaveBeenCalledTimes(2);
   });
 });
 
