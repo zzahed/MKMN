@@ -104,18 +104,51 @@ export interface NpuReading {
  * sample), as an `NpuReading`. Null when the payload is not a host reading (the host
  * refused, errored, or answered something else) — the caller then takes its fallback.
  * An unknown utilization stays null, which downstream means UNKNOWN, never idle.
- * There is no supported NPU memory reading: `memBytes` is always null, never a guess.
+ * `memBytes` is the host's PDH reading of the NPU adapter's memory (`npuMemoryReading`),
+ * or null when it has none: never a guess.
  */
 export function npuReadingFromHost(r: unknown): NpuReading | null {
   if (!r || typeof r !== "object" || !("util" in (r as Record<string, unknown>))) return null;
-  const util = (r as Record<string, unknown>).util;
+  const { util, memBytes } = r as Record<string, unknown>;
   return {
     util: typeof util === "number" && Number.isFinite(util) ? util : null,
-    memBytes: null,
+    memBytes: typeof memBytes === "number" && Number.isFinite(memBytes) && memBytes >= 0 ? memBytes : null,
     pidUtil: {},
     pidMem: {},
     sets: [],
     samples: 0,
+  };
+}
+
+const NO_NPU_READING: NpuReading = { util: null, memBytes: null, pidUtil: {}, pidMem: {}, sets: [], samples: 0 };
+
+/**
+ * The benchmark's NPU memory reader. The host's PDH reading answers without a spawn. Only
+ * when it has no memory figure is PowerShell asked, and its answer decides the session:
+ * a figure keeps PowerShell as the source (counters only it can read, such as other
+ * languages' names); no figure means no source has one, and PowerShell is not asked at
+ * every memory point again.
+ */
+export function createNpuMemoryReader(o: {
+  host: () => Promise<NpuReading | null>;
+  powershell: () => Promise<NpuReading>;
+  log?: (line: string) => void;
+}): () => Promise<NpuReading> {
+  let usePowershell = false;
+  let powershellChecked = false;
+  return async () => {
+    if (usePowershell) return o.powershell().catch(() => NO_NPU_READING);
+    const host = await o.host().catch(() => null);
+    if (host && host.memBytes !== null) return host;
+    if (powershellChecked) return host ?? NO_NPU_READING;
+    powershellChecked = true;
+    const ps = await o.powershell().catch(() => null);
+    if (ps && ps.memBytes !== null) {
+      usePowershell = true;
+      o.log?.("[readings] npu memory: the host has no figure, PowerShell has one; PowerShell is used for this session");
+      return ps;
+    }
+    return host ?? ps ?? NO_NPU_READING;
   };
 }
 

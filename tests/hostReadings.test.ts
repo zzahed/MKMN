@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { batteryFromHost, batteryPercent, createCachedPowerReader, createHostFirstBatteryReader, type BatteryReading } from "../src/core/battery";
-import { npuReadingFromHost } from "../src/core/perf";
+import { createNpuMemoryReader, npuReadingFromHost, type NpuReading } from "../src/core/perf";
 
 /**
  * The host-native readings (src-tauri/src/battery.rs, the monitor's PDH sample) that
@@ -19,6 +19,12 @@ describe("npuReadingFromHost — the host's PDH sample", () => {
 
   it("there is never an invented NPU memory figure", () => {
     expect(npuReadingFromHost({ util: 3, memBytes: null })!.memBytes).toBeNull();
+    expect(npuReadingFromHost({ util: 3, memBytes: -1 })!.memBytes).toBeNull();
+    expect(npuReadingFromHost({ util: 3, memBytes: "12" })!.memBytes).toBeNull();
+  });
+
+  it("the host's PDH memory reading is kept", () => {
+    expect(npuReadingFromHost({ util: 4, memBytes: 12_730_368 })!.memBytes).toBe(12_730_368);
   });
 
   it("a stale host answer keeps util null (never an old number shown as the load now)", () => {
@@ -35,6 +41,43 @@ describe("npuReadingFromHost — the host's PDH sample", () => {
     expect(npuReadingFromHost(undefined)).toBeNull();
     expect(npuReadingFromHost("error")).toBeNull();
     expect(npuReadingFromHost({})).toBeNull(); // no util field: not a host reading
+  });
+});
+
+describe("the NPU memory reader — the host first, PowerShell only when it has no figure", () => {
+  const r = (memBytes: number | null) => ({ util: 5, memBytes, pidUtil: {}, pidMem: {}, sets: [], samples: 0 } as NpuReading);
+
+  it("a host memory figure is used without spawning PowerShell", async () => {
+    const host = vi.fn(async () => r(12_000_000));
+    const powershell = vi.fn(async () => r(1));
+    const read = createNpuMemoryReader({ host, powershell });
+    for (let i = 0; i < 5; i++) expect((await read()).memBytes).toBe(12_000_000);
+    expect(powershell).not.toHaveBeenCalled();
+  });
+
+  it("no figure from the host or PowerShell: PowerShell is asked once, not at every point", async () => {
+    const host = vi.fn(async () => r(null));
+    const powershell = vi.fn(async () => r(null));
+    const read = createNpuMemoryReader({ host, powershell });
+    for (let i = 0; i < 5; i++) expect((await read()).memBytes).toBeNull();
+    expect(powershell).toHaveBeenCalledTimes(1);
+  });
+
+  it("a figure only PowerShell finds (counters the host cannot read): PowerShell is kept for the session", async () => {
+    const host = vi.fn(async () => null);
+    const powershell = vi.fn(async () => r(7));
+    const lines: string[] = [];
+    const read = createNpuMemoryReader({ host, powershell, log: (l) => lines.push(l) });
+    expect((await read()).memBytes).toBe(7);
+    expect((await read()).memBytes).toBe(7);
+    expect(host).toHaveBeenCalledTimes(1);
+    expect(powershell).toHaveBeenCalledTimes(2);
+    expect(lines).toHaveLength(1);
+  });
+
+  it("a failed PowerShell read keeps the host's reading", async () => {
+    const read = createNpuMemoryReader({ host: async () => r(null), powershell: async () => { throw new Error("no PowerShell"); } });
+    expect((await read()).util).toBe(5);
   });
 });
 

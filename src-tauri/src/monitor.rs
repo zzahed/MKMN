@@ -8,7 +8,8 @@ use tauri::{AppHandle, Emitter};
 use tokio::sync::RwLock;
 
 use crate::accelerators::{
-    classify_gpu_counters, luid_key, AdapterInventory, ClassifiedSample, CounterInstance,
+    classify_gpu_counters, luid_key, npu_adapter_luids, npu_memory_bytes, AdapterInventory,
+    ClassifiedSample, CounterInstance,
 };
 
 use windows_sys::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE};
@@ -269,6 +270,38 @@ pub fn current_npu_utilization() -> Option<f64> {
     Some(util)
 }
 
+/// The samplers behind `current_npu_memory_bytes`, kept for the session: the engine
+/// names (which adapter is the NPU) and the adapter memory usage, shared and dedicated.
+struct MemorySamplers {
+    engine: PdhGpuSampler,
+    shared: PdhGpuSampler,
+    dedicated: PdhGpuSampler,
+}
+
+static MEMORY_SAMPLERS: std::sync::OnceLock<std::sync::Mutex<Option<MemorySamplers>>> = std::sync::OnceLock::new();
+
+/// The memory in use on the NPU, in bytes, read through PDH ("GPU Adapter Memory",
+/// shared plus dedicated usage of the NPU's adapters). The usage counters are gauges, so
+/// one collection is a reading. The sidecar's benchmark used to spawn PowerShell for
+/// every memory point. None is unknown (no counters, no NPU adapter), never 0.
+pub fn current_npu_memory_bytes() -> Option<f64> {
+    let Ok(mut slot) = MEMORY_SAMPLERS.get_or_init(|| std::sync::Mutex::new(None)).lock() else { return None };
+    if slot.is_none() {
+        *slot = (|| {
+            Some(MemorySamplers {
+                engine: PdhGpuSampler::new()?,
+                shared: PdhGpuSampler::with_counter("\\GPU Adapter Memory(*)\\Shared Usage")?,
+                dedicated: PdhGpuSampler::with_counter("\\GPU Adapter Memory(*)\\Dedicated Usage")?,
+            })
+        })();
+    }
+    let s = slot.as_mut()?;
+    let npu = npu_adapter_luids(&s.engine.collect(), AdapterInventory::shared());
+    let mut rows = s.shared.collect();
+    rows.extend(s.dedicated.collect());
+    npu_memory_bytes(&rows, &npu)
+}
+
 /// Sampling cadence policy: 1.8 s while the window is focused and visible (the live-metrics
 /// specification), 5 s when visible but unfocused (the user is reading, not watching the
 /// meters), 10 s when hidden/minimized to tray. Pure so the policy is pinned by tests.
@@ -503,15 +536,19 @@ pub struct PdhGpuSampler {
 
 impl PdhGpuSampler {
     pub fn new() -> Option<Self> {
+        Self::with_counter("\\GPU Engine(*)\\Utilization Percentage")
+    }
+
+    /// A sampler of any wildcard counter, by its English path (the NPU memory reading
+    /// uses the "GPU Adapter Memory" usage counters).
+    pub fn with_counter(path: &str) -> Option<Self> {
         let mut query: isize = 0;
         let status = unsafe { PdhOpenQueryW(std::ptr::null(), 0, &mut query) };
         if status != 0 || query == 0 {
             return None;
         }
 
-        let counter_path: Vec<u16> = "\\GPU Engine(*)\\Utilization Percentage\0"
-            .encode_utf16()
-            .collect();
+        let counter_path: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
         let mut counter: isize = 0;
         let add_status = unsafe {
             PdhAddEnglishCounterW(query, counter_path.as_ptr(), 0, &mut counter)

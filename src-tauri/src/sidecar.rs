@@ -898,8 +898,8 @@ async fn host_capability(app: &AppHandle, method: &str, args: &Value) -> Result<
         // recent; when that sample is stale (a rested monitor can be hours old) a light
         // PDH read is taken here instead, so an old number is never presented as the load
         // now. The sidecar used to spawn PowerShell for this, seconds of CPU per call. A
-        // None is "unknown" (the classification withheld the reading), never idle. There
-        // is no supported NPU memory reading: memBytes stays null.
+        // None is "unknown" (the classification withheld the reading), never idle. This
+        // frequent reading carries no memory: memBytes stays null (see npuMemoryReading).
         "npuReading" => {
             // the light read may wait a quarter of a second between its two samples:
             // off this async handler's thread
@@ -907,6 +907,17 @@ async fn host_capability(app: &AppHandle, method: &str, args: &Value) -> Result<
                 .await
                 .map_err(|e| format!("the NPU reading task failed: {}", e))?;
             Ok(json!({ "util": util, "memBytes": Value::Null }))
+        }
+        // The same reading with the NPU's memory in use (PDH "GPU Adapter Memory" of the
+        // NPU's adapters), for the benchmark's memory points. The sidecar used to spawn
+        // PowerShell for every point. memBytes null is unknown, never 0.
+        "npuMemoryReading" => {
+            let (util, mem) = tokio::task::spawn_blocking(|| {
+                (crate::monitor::current_npu_utilization(), crate::monitor::current_npu_memory_bytes())
+            })
+            .await
+            .map_err(|e| format!("the NPU memory reading task failed: {}", e))?;
+            Ok(json!({ "util": util, "memBytes": mem }))
         }
         // The battery read natively (battery.rs, the class driver's IOCTLs over the
         // enumerated battery devices): the same fields the sidecar's battery reading

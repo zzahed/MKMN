@@ -66,7 +66,7 @@ import { sString } from "../core/harness/schema";
 import { applyEffort, effectiveEffort, thinkingSupport } from "../core/effort";
 import { DEFAULT_ENDPOINT, geniexVersion, setBackgroundChildHook } from "../core/geniex";
 import { GeniexGate, parseGeniexCliVersion } from "../core/geniexGate";
-import { NPU_UTIL_SCRIPT, WINDOWS_BUILD_SCRIPT, npuReadingFromHost, parseNpuCounters, type NpuReading } from "../core/perf";
+import { NPU_UTIL_SCRIPT, WINDOWS_BUILD_SCRIPT, createNpuMemoryReader, npuReadingFromHost, parseNpuCounters, type NpuReading } from "../core/perf";
 import { BATTERY_SCRIPT, batteryFromHost, batteryPercent, createCachedPowerReader, createHostFirstBatteryReader, parseBattery } from "../core/battery";
 import { ROUTER_CTX, ROUTER_HOST, ROUTER_MODEL, ROUTER_PREFERRED, RouterIdleRelease, RouterPlacement, ROUTER_TIMEOUT_MS, PRODUCE_VOTES, Q, TREE, FileKindMemo, RouterBreaker, RouterWarmGate, SortMemory, WarmUp, parseYesNo, servesRouterModel, readSearchQuery, routerSampling, searchQueryPrompt, settled, sortByQuestions, yesNoPrompt, type Asked } from "../core/router";
 import { ServerManager } from "../core/server";
@@ -243,15 +243,22 @@ async function readNpuOnce(): Promise<NpuReading> {
 }
 
 /**
- * The NPU counters read with PowerShell. This is the ONLY source that measures NPU memory
- * (the host's own sample carries none), so the benchmark's memory-record points use this
- * rather than the cheap host probe; the frequent live samples keep the host reading. It
- * also carries the utilization, so a memory point gets both from one spawn.
+ * The NPU's memory (and utilization) for the benchmark's memory points: the host's PDH
+ * reading of the NPU adapter's memory, with the PowerShell counters only when the host
+ * has no figure (createNpuMemoryReader). Each point used to spawn PowerShell.
  */
-async function readNpuMemoryOnce(): Promise<NpuReading> {
-  noteReadSource("npu memory", "powershell");
-  return ps(NPU_UTIL_SCRIPT, 8000).then(parseNpuCounters);
-}
+const readNpuMemoryOnce = createNpuMemoryReader({
+  host: async () => {
+    const r = npuReadingFromHost(await callHostReading("npuMemoryReading"));
+    if (r?.memBytes != null) noteReadSource("npu memory", "host");
+    return r;
+  },
+  powershell: () => {
+    noteReadSource("npu memory", "powershell");
+    return ps(NPU_UTIL_SCRIPT, 8000).then(parseNpuCounters);
+  },
+  log: (line) => console.log(line),
+});
 
 /** One battery reading: the host's native IOCTLs first; the WMI script when the host
  * errors, refuses, or answers "no battery" the script contradicts. The choice is held
