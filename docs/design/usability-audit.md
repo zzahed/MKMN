@@ -194,7 +194,7 @@ What a person notices: a skill saved earlier whose pattern uses `+`, `*` or
 `{…}` (for example `invoice\w*`, or an edited copy of a built-in pattern) no
 longer starts by itself, and the Skills list marks it with the reason.
 Rewriting it as plain words separated by commas fixes it. The release notes
-for this version must say so.
+say so under Unreleased (`docs/RELEASE-NOTES.md`).
 
 ## Phases
 
