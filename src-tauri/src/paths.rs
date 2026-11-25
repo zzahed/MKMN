@@ -471,18 +471,59 @@ struct LogSink {
     /// Bytes in the file as this sink knows them; other processes' lines are not counted
     /// until the real size is read at the limit.
     len: u64,
+    /// How often the open file is checked against the file under the name (see `still_current`).
+    recheck: std::time::Duration,
+    checked_at: std::time::Instant,
     #[cfg(test)]
     opens: u32,
 }
 
+/// The identity of an open file: its volume and file index. Two handles with the same
+/// identity are the same file, whatever its name is now.
+fn file_identity(f: &fs::File) -> Option<(u32, u32, u32)> {
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Storage::FileSystem::{GetFileInformationByHandle, BY_HANDLE_FILE_INFORMATION};
+    let mut info: BY_HANDLE_FILE_INFORMATION = unsafe { std::mem::zeroed() };
+    let ok = unsafe { GetFileInformationByHandle(f.as_raw_handle() as _, &mut info) };
+    (ok != 0).then_some((info.dwVolumeSerialNumber, info.nFileIndexHigh, info.nFileIndexLow))
+}
+
 impl LogSink {
     fn new(path: PathBuf, max: u64) -> Self {
-        Self { path, max, file: None, len: 0, #[cfg(test)] opens: 0 }
+        Self {
+            path,
+            max,
+            file: None,
+            len: 0,
+            recheck: std::time::Duration::from_secs(1),
+            checked_at: std::time::Instant::now(),
+            #[cfg(test)]
+            opens: 0,
+        }
+    }
+
+    /// Whether the open file is still the one under the name. Another MKMN process
+    /// that rotated the log moved it away; one that rotated it twice deleted it, and
+    /// lines written to a deleted file are in neither log. The name is opened for its
+    /// attributes only (no data access, so no antivirus scan), at most once per `recheck`.
+    fn still_current(&mut self) -> bool {
+        use std::os::windows::fs::OpenOptionsExt;
+        if self.checked_at.elapsed() < self.recheck {
+            return true;
+        }
+        self.checked_at = std::time::Instant::now();
+        const FILE_READ_ATTRIBUTES: u32 = 0x80;
+        let Some(open) = self.file.as_ref().and_then(file_identity) else { return false };
+        match fs::OpenOptions::new().access_mode(FILE_READ_ATTRIBUTES).open(&self.path) {
+            Ok(named) => file_identity(&named) == Some(open),
+            Err(_) => false, // the name is gone: open a new file
+        }
     }
 
     fn open(&mut self) {
         self.file = fs::OpenOptions::new().create(true).append(true).open(&self.path).ok();
         self.len = self.file.as_ref().and_then(|f| f.metadata().ok()).map_or(0, |m| m.len());
+        self.checked_at = std::time::Instant::now();
         #[cfg(test)]
         {
             self.opens += 1;
@@ -514,7 +555,7 @@ impl LogSink {
 
     fn write(&mut self, bytes: &[u8]) {
         use std::io::Write;
-        if self.file.is_none() {
+        if self.file.is_none() || !self.still_current() {
             self.open();
         }
         if self.len + bytes.len() as u64 > self.max {
@@ -769,6 +810,26 @@ mod tests {
         let now = fs::read_to_string(&path).unwrap();
         assert_eq!(now.lines().count(), 4, "the other writer's 3 lines and the stale writer's last one");
         assert_eq!(stale.opens, 2, "the stale writer opened the new file once");
+    }
+
+    /// A quiet writer whose file another writer rotated twice (so the file it held was
+    /// deleted) checks the file under the name before it appends, and its line lands in
+    /// the current log instead of disappearing (the Codex review on #78).
+    #[test]
+    fn a_quiet_writer_after_two_rotations_still_lands_its_line() {
+        let dir = sink_test_dir("two-rotations");
+        let path = dir.join("app.log");
+        let line = [b'z'; 99].iter().chain(b"\n").copied().collect::<Vec<u8>>();
+        let mut quiet = LogSink::new(path.clone(), 1000);
+        quiet.recheck = std::time::Duration::ZERO;
+        quiet.write(&line);
+        let mut busy = LogSink::new(path.clone(), 1000);
+        for _ in 0..25 {
+            busy.write(&line); // rotates twice: the file `quiet` holds is removed
+        }
+        quiet.write(b"the quiet writer's line\n");
+        let now = fs::read_to_string(&path).unwrap();
+        assert!(now.contains("the quiet writer's line"), "the line is in the current log");
     }
 
     #[test]

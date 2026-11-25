@@ -68,7 +68,8 @@ import { DEFAULT_ENDPOINT, geniexVersion, setBackgroundChildHook } from "../core
 import { GeniexGate, parseGeniexCliVersion } from "../core/geniexGate";
 import { NPU_UTIL_SCRIPT, WINDOWS_BUILD_SCRIPT, createNpuMemoryReader, npuReadingFromHost, parseNpuCounters, type NpuReading } from "../core/perf";
 import { BATTERY_SCRIPT, batteryFromHost, batteryPercent, createCachedPowerReader, createHostFirstBatteryReader, parseBattery } from "../core/battery";
-import { ROUTER_CTX, ROUTER_HOST, ROUTER_MODEL, ROUTER_PREFERRED, RouterIdleRelease, RouterPlacement, ROUTER_TIMEOUT_MS, PRODUCE_VOTES, Q, TREE, FileKindMemo, RouterBreaker, RouterWarmGate, SortMemory, WarmUp, parseYesNo, servesRouterModel, readSearchQuery, routerSampling, searchQueryPrompt, settled, sortByQuestions, yesNoPrompt, type Asked } from "../core/router";
+import { RouterUsers } from "../core/routerUsers";
+import { ROUTER_CTX, ROUTER_HOST, ROUTER_IDLE_MIN_MS, ROUTER_MODEL, ROUTER_PREFERRED, RouterIdleRelease, RouterPlacement, ROUTER_TIMEOUT_MS, PRODUCE_VOTES, Q, TREE, FileKindMemo, RouterBreaker, RouterWarmGate, SortMemory, WarmUp, parseYesNo, servesRouterModel, readSearchQuery, routerSampling, searchQueryPrompt, settled, sortByQuestions, yesNoPrompt, type Asked } from "../core/router";
 import { ServerManager } from "../core/server";
 import type { TemplateKind } from "../core/templates/kit";
 import { runnerFor, withPip } from "../core/runcode";
@@ -1126,11 +1127,19 @@ function releaseIdleRouter(): void {
   routerWarmGate.reset();
   void srv.stop().catch(() => undefined);
 }
-const routerIdle = new RouterIdleRelease(routerIdleMs, releaseIdleRouter);
+/** The other instances that adopted this one's router: the owner does not stop a server one of them is using. */
+const routerUsers = new RouterUsers(() => path.join(dataDir(), path.basename(PATHS.routerUsersDir)));
+const routerIdle = new RouterIdleRelease(routerIdleMs, releaseIdleRouter, () => routerUsers.othersActive(Math.max(routerIdleMs(), ROUTER_IDLE_MIN_MS)));
+/** An adopter records its uses for the owner; an instance that serves its own router clears its record. */
+function noteRouterUse(): void {
+  if (routerSrv?.isAdopted()) routerUsers.mark(routerIdle.running);
+  else routerUsers.clear();
+}
 /** Runs one use of the router (a question, a sort, a warm-up): the idle window counts from its end. */
 async function routerUse<T>(fn: () => Promise<T>): Promise<T> {
   routerIdle.begin();
-  try { return await fn(); } finally { routerIdle.end(); }
+  noteRouterUse();
+  try { return await fn(); } finally { routerIdle.end(); noteRouterUse(); }
 }
 
 /** The router's model: the one chosen in the settings when it is installed, else the best installed candidate, else the shipped default. */
@@ -1182,6 +1191,7 @@ async function ensureRouterServer(exe: string): Promise<ServerManager> {
     await routerSrv.start(ROUTER_CTX); // the adopted server died: serve our own
     routerWarmGate.reset();
   }
+  noteRouterUse(); // adopted just now: the running use is recorded before it reaches the server
   return routerSrv;
 }
 

@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import * as path from "node:path";
 import { ROUTER_GPU_AFTER, ROUTER_IDLE_MIN_MS, RouterIdleRelease, RouterPlacement, RouterWarmGate } from "../src/core/router";
+import { RouterUsers } from "../src/core/routerUsers";
 
 /**
  * The router's server held its model (about 850 MB) for 24 hours after one request. It is now
@@ -81,6 +84,18 @@ describe("the router's idle release", () => {
     expect(placement.compute).toBe("cpu");
   });
 
+  it("does not stop a router another instance is using: it waits another window", () => {
+    const release = vi.fn();
+    let othersActive = true;
+    const idle = new RouterIdleRelease(() => 300_000, release, () => othersActive);
+    idle.begin(); idle.end();
+    vi.advanceTimersByTime(300_000);
+    expect(release).not.toHaveBeenCalled();
+    othersActive = false;
+    vi.advanceTimersByTime(300_000);
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
   it("is wired in the sidecar: every use is counted, and the release resets the gate before it stops the server", () => {
     const main = readFileSync(new URL("../src/sidecar/main.ts", import.meta.url), "utf8");
     expect(main).toMatch(/new RouterIdleRelease\(/);
@@ -89,5 +104,57 @@ describe("the router's idle release", () => {
     expect(main.match(/routerIdle\.begin\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(1);
     // the server's own keep-alive stays long: GenieX must never unload the model behind the gate's back
     expect(main).toMatch(/host: ROUTER_HOST[^\n]*keepaliveSec: 86_400/);
+    // the owner asks the other instances before it stops, and an adopter records its uses
+    expect(main).toMatch(/new RouterIdleRelease\([^\n]*routerUsers\.othersActive/);
+    expect(main).toMatch(/routerUsers\.mark\(/);
+  });
+});
+
+/**
+ * A second MKMN instance adopts the first one's router. Its uses are recorded in a file of its
+ * own, so the owner does not stop the shared server while the adopter is using it (the Codex
+ * review on #78: the owner's local idleness stopped the server mid-question for the adopter).
+ */
+describe("the router's other users", () => {
+  let dir: string;
+  beforeEach(() => { dir = mkdtempSync(path.join(tmpdir(), "mkmn-router-users-")); });
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+
+  const users = (pid: number, now: () => number, alive = (_: number) => true) => new RouterUsers(() => dir, { pid, now, alive });
+
+  it("an adopter's recent or running use keeps the owner from stopping the server", () => {
+    let t = 1_000_000;
+    const owner = users(1, () => t), adopter = users(2, () => t);
+    expect(owner.othersActive(300_000)).toBe(false);
+    adopter.mark(1); // a long question starts
+    t += 10 * 300_000;
+    expect(owner.othersActive(300_000)).toBe(true); // still running, however long ago it began
+    adopter.mark(0); // it ended
+    t += 299_999;
+    expect(owner.othersActive(300_000)).toBe(true);
+    t += 1;
+    expect(owner.othersActive(300_000)).toBe(false);
+  });
+
+  it("the owner's own file never counts", () => {
+    const owner = users(1, () => 5);
+    owner.mark(1);
+    expect(owner.othersActive(300_000)).toBe(false);
+  });
+
+  it("a file left by an instance that is gone is removed and does not count", () => {
+    const adopter = users(2, () => 5);
+    adopter.mark(1);
+    const owner = users(1, () => 5, (pid) => pid !== 2);
+    expect(owner.othersActive(300_000)).toBe(false);
+    expect(readdirSync(dir)).toEqual([]);
+  });
+
+  it("an instance that stops adopting clears its file", () => {
+    const adopter = users(2, () => 5);
+    adopter.mark(1);
+    adopter.clear();
+    expect(readdirSync(dir)).toEqual([]);
+    expect(users(1, () => 5).othersActive(300_000)).toBe(false);
   });
 });
