@@ -26,6 +26,23 @@ describe("the installer's requirements", () => {
     for (const w of ["Windows 11", "ARM64", "GenieX v0.11.0 or newer", "NPU driver", "WebView2", "speech runtime"]) expect(welcome).toContain(w);
   });
 
+  it("puts icon.ico where the shortcuts and the Apps list look for it", () => {
+    // seen: icon.ico was copied after SetOutPath "$INSTDIR\Runtime", the shortcuts pointed at $INSTDIR\icon.ico,
+    // and the taskbar and Start menu showed a blank page instead of the app's icon
+    const install = nsi.slice(nsi.indexOf('Section "Install"'), nsi.indexOf("SectionEnd", nsi.indexOf('Section "Install"')));
+    const copied: string[] = [];
+    let out = "";
+    for (const l of install.split(/\r?\n/)) {
+      const dir = /^\s*SetOutPath\s+"([^"]+)"/.exec(l);
+      if (dir) out = dir[1];
+      const file = /^\s*File\s+"(?:[^"]*\\)?([^"\\]+)"/.exec(l);
+      if (file) copied.push(`${out}\\${file[1]}`);
+    }
+    const wanted = [...nsi.matchAll(/"(\$INSTDIR\\[^"]*icon\.ico)"/g)].map((m) => m[1]);
+    expect(wanted.length).toBeGreaterThan(0);
+    for (const w of new Set(wanted)) expect(copied).toContain(w);
+  });
+
   it("never ships an installer without the speech runtime", () => {
     const voice = nsi.split(/\r?\n/).filter((l) => /sherpa-onnx/.test(l) && /^\s*File\b/.test(l));
     expect(voice.length).toBe(2);

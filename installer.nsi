@@ -240,13 +240,14 @@ Section "Install" SecInstall
   File "src-tauri\target\aarch64-pc-windows-msvc\release\MKMN.exe"
   File "src-tauri\target\aarch64-pc-windows-msvc\release\comctl32.dll"
   File "src-tauri\target\aarch64-pc-windows-msvc\release\MKMN.exe.manifest"
+  ; next to MKMN.exe: the shortcuts and the Apps list (DisplayIcon) point at $INSTDIR\icon.ico
+  File "build\icon.ico"
   ; the pinned Computer Use driver, built by the SAME cargo invocation as the host
   ; (src-tauri\src\bin\agent-desktop.rs): the host looks for Runtime\agent-desktop.exe
   ; first when it is installed. Mandatory: an installer without the driver would ship
   ; a Window agent that can only report the driver missing.
   SetOutPath "$INSTDIR\Runtime"
   File "src-tauri\target\aarch64-pc-windows-msvc\release\agent-desktop.exe"
-  File "build\icon.ico"
   File "build\tray.png"
   ; the app's own and its dependencies' licences travel with the installed files
   File "LICENSE"
