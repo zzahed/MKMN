@@ -1,6 +1,6 @@
 {
   "name": "mkmn",
-  "version": "0.0.3-rc.2",
+  "version": "0.0.3-rc.3",
   "description": "MKMN AI — Private AI, powered by your PC. Local-first AI workspace for Windows 11 ARM64 (Qualcomm Snapdragon X Elite / Hexagon NPU 45 TOPS).",
   "keywords": [
     "snapdragon",

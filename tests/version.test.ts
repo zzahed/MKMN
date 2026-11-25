@@ -6,8 +6,8 @@ import { readFileSync } from "node:fs";
  * and refuses to run when the others disagree, so this test fails on the same
  * mismatch before a 20-minute build does.
  */
-describe("the v0.0.3-rc.2 candidate version", () => {
-  const version = "0.0.3-rc.2";
+describe("the v0.0.3-rc.3 candidate version", () => {
+  const version = "0.0.3-rc.3";
   const pkg = JSON.parse(readFileSync("package.json", "utf8")).version;
   const tauri = JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8")).version;
   const cargo = /\[package\][\s\S]*?^version\s*=\s*"([^"]+)"/m.exec(readFileSync("src-tauri/Cargo.toml", "utf8"))?.[1];

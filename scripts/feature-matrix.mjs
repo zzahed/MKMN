@@ -1,4 +1,4 @@
-// The source-side inventory behind docs/MKMN_FEATURE_TEST_MATRIX_0.0.2.md.
+// The source-side inventory behind docs/MKMN_FEATURE_TEST_MATRIX_0.0.3-rc.3.md.
 // A feature is not "tested" because this file says so: every name below must
 // appear in the matrix, so a new command, method, setting, screen or script
 // cannot ship without a row that says how it was checked.

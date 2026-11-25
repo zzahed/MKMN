@@ -1,6 +1,6 @@
-# MKMN AI v0.0.2 — feature test matrix
+# MKMN AI v0.0.3-rc.3 — feature test matrix
 
-MKMN 0.0.2 requires Qualcomm GenieX v0.11.0 or newer for local inference and checks it before any GenieX server starts or is adopted. This inventory is generated from source.
+MKMN 0.0.3-rc.3 requires Qualcomm GenieX v0.11.0 or newer for local inference and checks it before any GenieX server starts or is adopted. This inventory is generated from source.
 
 Generated from 40 host commands, 133 sidecar methods, 0 Settings groups, 51 Settings sections, 107 Settings rows, 4 Smart functions, 9 screens and 45 scripts.
 
@@ -38,7 +38,7 @@ node scripts/generate-feature-matrix.mjs --check
 | REL008 | Build status uses the generated three-state name | Release gate | tests/build.test.ts | PASS |
 | REL009 | English and Arabic only, with a named allowlist | Release gate | tests/language.test.ts; node scripts/check-language.mjs | PASS |
 | REL010 | Full automated suite | Release gate | pnpm typecheck; pnpm test; cargo test | Automated release checks |
-| REL011 | Version 0.0.2 in every manifest | Release gate | tests/version.test.ts | CONTRACT |
+| REL011 | Version 0.0.3-rc.3 in every manifest | Release gate | tests/version.test.ts | CONTRACT |
 | REL012 | HUMAIN chat, secure credentials and provider selection | Release gate | tests/humain.test.ts; tests/humain-settings.test.tsx; tests/humain-model-selection.test.ts; tests/chat-send-guard.test.tsx | CONTRACT |
 | REL013 | Grouped Settings, provider search, keyboard navigation and chat location | Release gate | tests/settings-ui.test.ts; tests/navigation.test.tsx; tests/chat-send-guard.test.tsx; tests/brandAssets.test.ts | CONTRACT |
 

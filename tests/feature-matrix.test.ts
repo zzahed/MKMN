@@ -8,8 +8,8 @@ import { matrixText } from "../scripts/generate-feature-matrix.mjs";
  * method, Settings row, screen and script is read from the
  * source and must have its own row; adding one without a row fails here.
  */
-describe("the v0.0.2 feature test matrix", () => {
-  const matrix = readFileSync("docs/MKMN_FEATURE_TEST_MATRIX_0.0.2.md", "utf8").replace(/\r\n/g, "\n");
+describe("the v0.0.3-rc.3 feature test matrix", () => {
+  const matrix = readFileSync("docs/MKMN_FEATURE_TEST_MATRIX_0.0.3-rc.3.md", "utf8").replace(/\r\n/g, "\n");
   const inventory = featureInventory(process.cwd());
 
   it("lists every feature the source exposes, in every group", () => {
@@ -32,7 +32,7 @@ describe("the v0.0.2 feature test matrix", () => {
   });
 
   it("states the release and the test commands it summarises", () => {
-    expect(matrix).toContain("0.0.2");
+    expect(matrix).toContain("0.0.3-rc.3");
     expect(matrix).toContain("pnpm exec vitest run");
     expect(matrix).toContain("cargo test");
     expect(matrix).toContain("node scripts/check-language.mjs");
