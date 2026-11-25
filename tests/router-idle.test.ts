@@ -107,6 +107,11 @@ describe("the router's idle release", () => {
     // the owner asks the other instances before it stops, and an adopter records its uses
     expect(main).toMatch(/new RouterIdleRelease\([^\n]*routerUsers\.othersActive/);
     expect(main).toMatch(/routerUsers\.mark\(/);
+    // every end of a use updates the shared record, or an adopter's busy count stays positive and
+    // the owner keeps the router forever (the Codex review on #78: the router benchmark's cleanup)
+    const ends = main.match(/routerIdle\.end\(\);[^\n]*/g) ?? [];
+    expect(ends.length).toBeGreaterThanOrEqual(2);
+    for (const end of ends) expect(end).toMatch(/noteRouterUse\(\)/);
   });
 });
 

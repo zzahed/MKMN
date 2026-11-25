@@ -1519,6 +1519,7 @@ dispatcher.register("routerBench", async () => {
   const installed = (await installedEntries()).filter((e) => !isDynamicId(e.id));
   const rows: { id: string; name: string; sizeGB: number; ms: number | null; right: number; total: number; error: string | null }[] = [];
   routerIdle.begin(); // no idle release while the candidates are measured
+  noteRouterUse();
   try {
     for (const e of routerCandidates(installed)) {
       const row = { id: e.id, name: e.name, sizeGB: e.sizeGB, ms: null as number | null, right: 0, total: ROUTER_PROBES.length, error: null as string | null };
@@ -1533,7 +1534,7 @@ dispatcher.register("routerBench", async () => {
       } catch (err) { row.error = (err as Error).message.slice(0, 120); }
       rows.push(row);
     }
-  } finally { routerIdle.end(); }
+  } finally { routerIdle.end(); noteRouterUse(); } // an adopter's record must drop to 0 too, or the owner keeps the router forever
   const best = rows.filter((r) => r.ms !== null && r.right === r.total).sort((a, b) => a.ms! - b.ms!)[0];
   if (best) { saveSettings({ dynamic: { ...(settings().dynamic ?? {}), routerModel: best.id } }); routerSortMemory.clear(); }
   return { rows, chosen: best?.id ?? null };
