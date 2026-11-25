@@ -1,5 +1,5 @@
 import type { SettingsTab } from "./settingsSearch";
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type UIEvent, type WheelEvent as RWheel, type KeyboardEvent as RKey, type PointerEvent as RPointer } from "react";
+import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type UIEvent, type WheelEvent as RWheel, type KeyboardEvent as RKey, type PointerEvent as RPointer } from "react";
 import { ResetNpuButton } from "./ResetNpuButton";
 import { HUMAIN_LABEL, cloudProviderOf } from "../shared/humain";
 import { ComputerUseChip, WindowPicker, AgentPickedRow, AgentRunStrip, AgentOutcomeLine, DocEditReviewCard, useComputerUse } from "./computerUse";
@@ -587,6 +587,7 @@ const AssistantTurn = memo(function AssistantTurn(props: {
   const { t, i, isLast, prevTurn, busy, ttsReady, voiceOn, voiceVisuals, caption, vstate, cleaning, starting, loadOn, openIndex, settings, onSettings, onSkip, onOpenTurn, onHideVisuals, retry, vc, onBuild } = props;
   const files = prevTurn?.role === "user" ? (prevTurn.attachments ?? []).map((a) => a.name) : [];
   const body = hideEdits(stripSubagents(t.content));
+  const offerDescriptionId = useId();
   return (
     <>
       <TurnWork t={t} settings={settings} onSettings={onSettings} onSkip={onSkip} files={files} />
@@ -609,7 +610,10 @@ const AssistantTurn = memo(function AssistantTurn(props: {
       {t.stopped && !t.pending && <div className="muted small stopped-note">Stopped</div>}
       {/* The split vote's offered action: the build is one click away, the click is the yes. */}
       {!t.pending && isLast && !busy && t.offer?.action === "build" && (
-        <button type="button" className="primary offer-build" onClick={() => onBuild(t.offer!.request)}>Build it instead</button>
+        <div className="offer-build">
+          <button type="button" className="ghost" aria-describedby={offerDescriptionId} onClick={() => onBuild(t.offer!.request)}>Create or edit files</button>
+          <p id={offerDescriptionId} className="muted small">Use your original request to create or update working files.</p>
+        </div>
       )}
       {!t.pending && (body || t.stopped) && (
         <div className="actions">
@@ -1253,7 +1257,7 @@ export function Chat(props: {
   const retryRef = useRef(retry);
   retryRef.current = retry;
   const retryStable = useCallback(() => retryRef.current(), []);
-  // "Build it instead" on an offered answer: the same request goes through the build path
+  // The optional file action sends the same request through the build path
   // (the click is the yes), so the send just adds buildWanted — a fresh turn, no redo.
   const buildInstead = useCallback((request: string) => { void sendRef.current(request, false, undefined, true); }, []);
   const skipStable = useCallback((back?: boolean) => { if (chatId.current) void api().skipStep(chatId.current, back); }, []);

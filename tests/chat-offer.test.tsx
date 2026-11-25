@@ -2,7 +2,7 @@
 /**
  * When the build votes split (the router says no or does not answer, the chat
  * model says yes), the request is answered in the chat and ONE action is offered under
- * the answer, "Build it instead". Clicking it sends the SAME request through the build
+ * the answer, "Create or edit files". Clicking it sends the SAME request through the build
  * path — the chat call carries `buildWanted`, and the click is the yes (no vote is
  * asked again). This pins the renderer half: the offer renders from the turn, and the
  * click reaches the chat API with the request and the flag.
@@ -90,11 +90,11 @@ afterEach(() => {
 });
 
 describe("the offered build action", () => {
-  it("clicking 'Build it instead' sends the same request through the build path (buildWanted)", async () => {
+  it("clicking a saved offer sends the same request through the build path (buildWanted)", async () => {
     const chatCalls: { id: string; messages: ChatMessage[]; opts: Record<string, unknown> }[] = [];
     boot(chatCalls);
     fireEvent.click(await screen.findByText("Chat one"));
-    const button = await screen.findByRole("button", { name: "Build it instead" });
+    const button = await screen.findByRole("button", { name: "Create or edit files" });
     await act(async () => { fireEvent.click(button); });
     await waitFor(() => expect(chatCalls).toHaveLength(1));
     const call = chatCalls[0];

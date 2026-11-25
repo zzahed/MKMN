@@ -27,7 +27,7 @@ export interface Turn {
   run?: RunView;
   /** Things done to the request or answer that the person should know (older messages left out, a cut answer continued). */
   notices?: string[];
-  /** The build votes split: the answer stands in the chat, and this one action is offered under it ("Build it instead"). */
+  /** An ambiguous build request was answered in chat, with an optional file action underneath. */
   offer?: { action: "build"; request: string };
 }
 

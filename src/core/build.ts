@@ -683,9 +683,9 @@ export async function* stepwise(o: StepwiseOptions): AsyncGenerator<ChatEvent, S
 
   if (lastUserAt < 0) return passthrough();
 
-  // What the person wants is decided by a model, never by the length of the message or by a list of words: a small closed question, the
-  // router first (about a second, on the processor) and the chat model itself when the router is not there. The words below only stand in
-  // when no model answered at all.
+  // Models decide whether to build: the router first, then the chat model.
+  // Word checks supply a fallback when neither answers and filter optional offers
+  // when their votes split.
   const askModel = async (question: string): Promise<boolean | null> => {
     const p = yesNoPrompt(request, question);
     let reply = "";
@@ -707,8 +707,8 @@ export async function* stepwise(o: StepwiseOptions): AsyncGenerator<ChatEvent, S
   // not say yes — it said no, or did not answer — and the chat model says yes, the request is NEVER built
   // silently. The confirming question this case used in an earlier build is gone: the real confgate measured it adding
   // nothing (both of its false builds went through the model's own confirmed yes) — the request is answered in
-  // the chat, and one action is offered under the answer, "Build it instead", which sends the same request
-  // through the build path. A router yes still builds directly. When there is no router at all (no askRouter —
+  // the chat, and requests with build context get an optional file action under the answer,
+  // which sends the same request through the build path. A router yes still builds directly. When there is no router at all (no askRouter —
   // a configuration, not a split of two votes) the confirming question stands: the lone chat-model yes
   // measured 4 of 24 knowledge answers built into pages in an earlier build.
   const trail: string[] = [];
@@ -760,7 +760,13 @@ export async function* stepwise(o: StepwiseOptions): AsyncGenerator<ChatEvent, S
     // action — an identity question ("Who are you?") is answered in the chat with nothing offered
     if (wants === "offer") {
       if (await askIdentity() === true) return "chat";
-      return "offer";
+      // Disagreement alone is insufficient: the request must name something to
+      // build, describe a known game, or ask to change files already in the chat.
+      // Keep Arabic subjects alongside the existing English file vocabulary.
+      const hasSubject = wantsFiles(request) || /لعبة|ألعاب|برنامج|تطبيق|موقع|صفحة|واجهة|أداة/u.test(request);
+      const actionRequest = request.replace(/^\s*(?:can|could|would|will)\s+you\s+(?:please\s+)?/i, "").replace(/\?\s*$/, "");
+      const hasBuildContext = hasSubject || !!directPlan(actionRequest, []) || (files.length > 0 && looksLikeChange(actionRequest));
+      return hasBuildContext ? "offer" : "chat";
     }
     if (await askIdentity() === true) return "chat";
     if (!files.length) return "new";
