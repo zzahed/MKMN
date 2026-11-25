@@ -102,21 +102,21 @@ export function installMockIfNeeded() {
     chat: async (id, _m, msgs, opts?: { buildWanted?: boolean }) => {
       const emit = (e: ChatEvent) => cl.forEach((f) => f(e));
       const lastUser = textOf(msgs[msgs.length - 1]?.content ?? "");
-      if (/\bspare key\b/i.test(lastUser)) {
+      if (/\btimer app\b/i.test(lastUser)) {
         // the split-vote demo: the votes split (router no, chat model yes), so the
         // request is answered in the chat with the build offered as one action; pressing
-        // "Build it instead" sends the same request with buildWanted, and it builds
+        // "Create or edit files" sends the same request with buildWanted, and it builds
         const wait = (ms: number) => new Promise((x) => setTimeout(x, ms));
         if (!opts?.buildWanted) {
           emit({ id, type: "notice", text: "Understood as: chat (something that runs to make or change: router no, chat model yes)" });
           emit({ id, type: "offer", offer: { action: "build", request: lastUser } });
-          const reply = "The spare key to the reading room is kept in drawer C-12, by the front desk.";
+          const reply = "A timer app can have a countdown, start and pause controls, and a reset button.";
           for (let i = 0; i < reply.length; i += 12) { await wait(20); emit({ id, type: "answer", text: reply.slice(i, i + 12) }); }
           emit({ id, type: "done", stats: { ttftSec: 1, tokPerSec: 14, tokens: 40, totalSec: 2 } });
           return;
         }
         emit({ id, type: "notice", text: "Understood as: new (the offered action was pressed: the click is the yes)" });
-        const reply = 'Here is the spare-key log the build made.\n<artifact type="html" title="Spare key log">\n<!doctype html><html><body style="font-family:sans-serif;padding:40px"><h1>Spare key log</h1><p>Reading room — drawer C-12, by the front desk.</p></body></html>\n</artifact>';
+        const reply = 'Here is a timer app starting point.\n<artifact type="html" title="Timer app">\n<!doctype html><html><body style="font-family:sans-serif;padding:40px"><h1>Timer app</h1><p>Preview of the file creation flow.</p></body></html>\n</artifact>';
         for (let i = 0; i < reply.length; i += 12) { await wait(25); emit({ id, type: "answer", text: reply.slice(i, i + 12) }); }
         emit({ id, type: "done", stats: { ttftSec: 1, tokPerSec: 14, tokens: 120, totalSec: 5 } });
         return;

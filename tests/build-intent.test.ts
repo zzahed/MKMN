@@ -286,7 +286,7 @@ describe("a split build vote is answered in the chat, with the build offered as 
   };
   const router = (program: boolean | null) => async (_q: string) => program;
 
-  it("(a) the 4b pattern (router no; chat model yes, its confirm would also say yes): answered in the chat, the build offered as one action, and the confirming question never asked", async () => {
+  it("a knowledge question stays in chat when the models disagree, without a build offer", async () => {
     const { stream, asked } = gateModel({ program: "yes", confirm: "yes", identity: "no" }, PROSE_PLAN);
     const { events, result } = await run(stepwise({
       id: "c",
@@ -301,11 +301,50 @@ describe("a split build vote is answered in the chat, with the build offered as 
     // question and the identity question, and nothing more
     expect(asked.filter((q) => q.includes("make a program, page or file"))).toEqual([]);
     const offers = events.filter((e): e is Extract<ChatEvent, { type: "offer" }> => e.type === "offer");
-    expect(offers).toHaveLength(1);
-    expect(offers[0].offer).toEqual({ action: "build", request: "where is the spare key?" });
+    expect(offers).toHaveLength(0);
     const notices = events.filter((e): e is Extract<ChatEvent, { type: "notice" }> => e.type === "notice").map((n) => n.text).join(" ");
     expect(notices).toMatch(/Understood as: chat/);
     expect(notices).toMatch(/router no, chat model yes/);
+  });
+
+  it.each([false, null])("the acceptance reply gets no offer when the router answers %s", async (vote) => {
+    const { stream } = gateModel({ program: "yes", identity: "no" }, PROSE_PLAN);
+    const { events, result } = await run(stepwise({
+      id: "c",
+      messages: [{ role: "user", content: "Acceptance check. Reply with only the number 7." }],
+      stream, maxChars: 8000, askRouter: router(vote),
+    }));
+    expect(result.handled).toBe(false);
+    expect(events.some((e) => e.type === "offer")).toBe(false);
+  });
+
+  it.each(["Could you create a timer app?", "أريد لعبة إكس-أو", "أريد تطبيق مؤقت"])("keeps an offer for an ambiguous build request: %s", async (request) => {
+    const { stream } = gateModel({ program: "yes", identity: "no" }, PROSE_PLAN);
+    const { events, result } = await run(stepwise({
+      id: "c", messages: [{ role: "user", content: request }],
+      stream, maxChars: 8000, askRouter: router(false),
+    }));
+    expect(result.handled).toBe(false);
+    expect(events.filter((e) => e.type === "offer")).toEqual([{ id: "c", type: "offer", offer: { action: "build", request } }]);
+  });
+
+  it.each([
+    ["Make the background blue", true],
+    ["Could you make the background blue?", true],
+    ["Can you please make it blue?", true],
+    ["What is the background colour?", false],
+    ["Acceptance check. Reply with only the number 7.", false],
+  ])("filters offers in existing-file context: %s", async (request, offered) => {
+    const { stream } = gateModel({ program: "yes", identity: "no" }, PROSE_PLAN);
+    const { events } = await run(stepwise({
+      id: "c",
+      messages: [
+        { role: "assistant", content: '<artifact type="html" title="index.html">\n<html><body>Hello</body></html>\n</artifact>' },
+        { role: "user", content: request },
+      ],
+      stream, maxChars: 8000, askRouter: router(false),
+    }));
+    expect(events.some((e) => e.type === "offer")).toBe(offered);
   });
 
   it("(c) a router yes builds directly ('make a snake game'), with no action offered", async () => {

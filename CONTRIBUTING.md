@@ -52,7 +52,7 @@ for: a Snapdragon X Plus with 16 GB and a Hexagon NPU, a model catalogue with
 three models installed, a model server that is ready, GenieX, settings, voice
 models, projects, files and their versions, scheduled tasks and the
 benchmark. Chat replies are canned text streamed in small pieces; a few words
-in a message (for example "spare key" or "sub-agent") start a scripted demo of
+in a message (for example "timer app" or "sub-agent") start a scripted demo of
 that feature. Nothing runs on an NPU, no model is downloaded and nothing is
 saved outside the browser's local storage.
 
