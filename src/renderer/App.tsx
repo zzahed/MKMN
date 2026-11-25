@@ -52,7 +52,7 @@ const SIDE_MIN = 200, SIDE_MAX = 440, NARROW_AT = 820;
 const RAIL_W = 60, RAIL_W_EXPANDED = 168;
 const SHORT_STATE: Record<ServerStatus["state"], string> = { stopped: "Idle", starting: "Starting…", loading: "Loading…", ready: "Ready", busy: "Generating…", restarting: "Restarting…", failed: "Stopped", unloaded: "Unloaded" };
 const STATE_LABEL:Record<ServerStatus["state"], string> = {
-  stopped: "Model idle", starting: "Starting…", loading: "Loading model…", ready: BRAND.modelReady, busy: "Generating…", restarting: "Restarting…", failed: "The AI stopped working. Send your message again, or see Settings › Developer › Last error", unloaded: "Model unloaded — it reloads on the next message"
+  stopped: "Model idle", starting: "Starting…", loading: "Loading model…", ready: BRAND.modelReady, busy: "Generating…", restarting: "Restarting…", failed: "The AI stopped working", unloaded: "Model unloaded — it reloads on the next message"
 };
 
 /** Every DISPLAYED meter field takes part in the value comparison: a changed memory
@@ -873,7 +873,7 @@ export function App() {
       {server && serverPhase === "fresh" && (
         <div className={`server-pill ${server.state}`} title={server.lastError?.title ?? server.endpoint}>
           <span className="dot" />
-          <span>{STATE_LABEL[server.state]}{server.restarts > 0 ? ` · ${server.restarts} restart(s)` : ""}</span>
+          <span>{STATE_LABEL[server.state]}{server.restarts > 0 ? ` · ${server.restarts} restart(s)` : ""}{server.state === "failed" ? ". Send your message again, or see Settings › Developer › Last error." : ""}</span>
         </div>
       )}
       {/* A stale, failed or disconnected status observation must never read as a live
@@ -882,7 +882,7 @@ export function App() {
         <div className={`server-pill ${server ? server.state : ""} obs-unavailable`} title={server ? `Last known state: ${STATE_LABEL[server.state]}` : undefined} role="status">
           <span className="dot" />
           <span>
-            {serverPhase === "stale" && `Status unavailable · last updated ${lastUpdatedText(serverView.at)}`}
+            {serverPhase === "stale" && `Status may be out of date · last updated ${lastUpdatedText(serverView.at)}`}
             {serverPhase === "failed" && "Can't check the AI right now. Try again, or restart MKMN if this continues."}
             {serverPhase === "disconnected" && "MKMN's AI service isn't answering. Try again, or restart MKMN."}
             {serverPhase === "loading" && "Checking AI status…"}

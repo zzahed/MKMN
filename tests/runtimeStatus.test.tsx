@@ -132,11 +132,11 @@ describe("poll freshness (status panel)", () => {
     await settleBoot();
     const panel = openPanel();
     expect(panel.textContent).toContain("Resource readings unavailable");
-    expect(screen.getAllByRole("button", { name: "Retry" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "Try again" }).length).toBeGreaterThan(0);
     // recovery: the SAME instance retries in place — the reading returns
     fail = false;
     await act(async () => {
-      fireEvent.click(screen.getAllByRole("button", { name: "Retry" })[0]);
+      fireEvent.click(screen.getAllByRole("button", { name: "Try again" })[0]);
       await Promise.resolve(); await Promise.resolve();
     });
     expect(panel.textContent).toContain("8 / 16 GB");
@@ -158,13 +158,13 @@ describe("poll freshness (status panel)", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(33_000); });
     expect(panel.textContent).toContain("Readings stale");
     expect(panel.textContent).toContain("last updated");
-    expect(panel.textContent).toContain("Retry");
+    expect(panel.textContent).toContain("Try again");
     // the last values stay on screen but DIMMED — visibly not live
     expect(document.querySelectorAll(".meter-stale").length).toBe(3);
     // recovery renews the feed in place
     fail = false; n = 0;
     await act(async () => {
-      fireEvent.click(screen.getAllByRole("button", { name: "Retry" })[0]);
+      fireEvent.click(screen.getAllByRole("button", { name: "Try again" })[0]);
       await Promise.resolve(); await Promise.resolve();
     });
     expect(panel.textContent).not.toContain("Readings stale");
@@ -251,7 +251,7 @@ describe("poll freshness (status panel)", () => {
     fail = true;
     await act(async () => { await vi.advanceTimersByTimeAsync(33_000); });
     // the fresh-looking state label is replaced by the honest one, with a stamp and Retry
-    expect(panel.textContent).toContain("Status unavailable · last updated");
+    expect(panel.textContent).toContain("Status may be out of date · last updated");
     expect(panel.textContent).not.toContain("Ready on this device");
     // recovery restores the live state
     fail = false; n = 0;
@@ -352,7 +352,7 @@ describe("reliability hardening (feeds, watchdog, ordering, progressive startup)
     // The independent 1 s watchdog still expires the readings at the 30 s contract.
     await act(async () => { await vi.advanceTimersByTimeAsync(31_000); });
     expect(panel.textContent).toContain("Readings stale");
-    expect(panel.textContent).toContain("Status unavailable · last updated");
+    expect(panel.textContent).toContain("Status may be out of date · last updated");
     expect(document.querySelectorAll(".meter-stale").length).toBe(3);
   });
 

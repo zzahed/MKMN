@@ -171,15 +171,30 @@ code that reacts to them is unchanged.
 | E4 | PDF without text: "no selectable text (a scan?) … use a vision model with page images". | Medium | Says MKMN could not read text in it and what to do. |
 | E5 | Unknown PDF error: "could not be read (error category: invalid)". | Low | A next step first; the category stays as a code for support. |
 
-## Open security item found during review
+## Security item found during review (resolved)
 
 A skill's "start by itself" pattern written by hand, or carried in an
 imported `.md` skill's `when:` line, is compiled and run against every
 message in the renderer. A catastrophic pattern such as `(a+)+$` could
-freeze the window; the 300-character limit does not prevent it. This
-predates the plain-language work; the new words form (escaped literals in
-one alternation) adds no risk. To do: refuse nested quantifiers on save and
-import, or match with a length or time guard. Tracked in #62.
+freeze the window; the 300-character limit did not prevent it. This
+predates the plain-language work; the words form (escaped literals in one
+alternation) adds no risk.
+
+Resolved in phase 4 (`patternRisk` in `src/core/skills.ts`), after three
+cost models for repeats were each broken in review:
+
+- A hand-written pattern may not repeat at all: no `+`, `*` or `{…}`. It may
+  still use classes, groups, `|` and `?`, with at most 64 ways to match at
+  one position.
+- The built-in skills' own patterns are trusted only exactly as shipped.
+- The `u` flag is used only for the app's own words form, so a pattern can no
+  longer force it.
+
+What a person notices: a skill saved earlier whose pattern uses `+`, `*` or
+`{…}` (for example `invoice\w*`, or an edited copy of a built-in pattern) no
+longer starts by itself, and the Skills list marks it with the reason.
+Rewriting it as plain words separated by commas fixes it. The release notes
+for this version must say so.
 
 ## Phases
 
