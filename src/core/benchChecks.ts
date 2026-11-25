@@ -159,7 +159,10 @@ export function pythonCheck(answer: string, cases: [string, unknown][]): Check {
     PY_GUARD, code, "", "import json as __j",
     ...cases.map(([expr]) => `try:\n    print(__j.dumps(${expr}))\nexcept Exception as __e:\n    print("ERR " + type(__e).__name__)`)
   ].join("\n");
-  const r = spawnSync(py, py === "py" ? ["-3", "-I", "-c", script] : ["-I", "-c", script], { timeout: 8000, cwd: os.tmpdir(), encoding: "utf8", windowsHide: true, maxBuffer: 1 << 20, env: pythonEnv() });
+  const runOnce = () => spawnSync(py, py === "py" ? ["-3", "-I", "-c", script] : ["-I", "-c", script], { timeout: 8000, cwd: os.tmpdir(), encoding: "utf8", windowsHide: true, maxBuffer: 1 << 20, env: pythonEnv() });
+  let r = runOnce();
+  // timed out before printing a single line: Python was slow to start on a busy PC, not the code slow on its cases (a correct answer scored 0 on a loaded CI runner). One more try; code that hangs still scores 0.
+  if ((r.error as NodeJS.ErrnoException | undefined)?.code === "ETIMEDOUT" && !(r.stdout ?? "").trim()) r = runOnce();
   if (r.error) return { score: 0, note: `could not run: ${r.error.message.slice(0, 80)}` };
   const lines = (r.stdout ?? "").split(/\r?\n/);
   let passed = 0;
