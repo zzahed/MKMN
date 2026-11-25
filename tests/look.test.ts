@@ -94,6 +94,13 @@ describe("the look step of a deck", () => {
     expect(r.text).toMatch(/Theme: [^\n]*\| bg=F5EBDC accent=B45309 bgkind=waves seed=4/);
     expect(r.text).toMatch(/Style: accent=0F766E/);
   });
+  it("reads the loose shapes a small model sends when the server ignores the schema, without asking again", async () => {
+    // Qwen3-8B on GenieX, word for word: colours and fonts as lists, the background as a word, the seed at the top
+    const loose = '\n\n{\n  "colors": ["#E6F2FF", "#007BFF", "#FFFFFF", "#808080"],\n  "fonts": ["Times New Roman", "Arial"],\n  "background": "gradient",\n  "seed": 1234,\n  "closing": "line"\n}';
+    const r = await run([loose, loose]);
+    expect(r.calls).toBe(1);
+    expect(r.text).toMatch(/Theme: [^\n]*\| bg=E6F2FF accent=007BFF accent2=FFFFFF accent3=808080 titlefont="Times New Roman" font=Arial bgkind=gradient seed=1234/);
+  });
   it("keeps going with the theme when no look comes back", async () => {
     const r = await run(["not json", "still not json"]);
     expect(r.text).toMatch(/Theme: /);
