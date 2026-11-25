@@ -28,8 +28,13 @@ const CREATE = /\b(make|create|build|generate|write|prepare|produce|draft|design
 const DECK_WORDS = /\b(slides?|slideshow|presentations?|powerpoint|pptx|keynote|deck)\b/i;
 const NOT_A_REQUEST = /\b(summari[sz]e|analy[sz]e|analyse|explain|what is|translate|read)\b.*\b(this|the|my)\b.*\b(slides?|deck|presentation|pptx)\b/i;
 
+// a request written as a noun phrase, without a verb: "one slide presentation for ...", "a 5-slide deck on ...", "presentation about ...";
+// "my presentation for tomorrow ..." or "the presentation of the data ..." talk about one, they do not ask for one
+const NOUN_ASK = /^\s*(?!(?:my|the|this|that|these|those|your|our|their|his|her|its)\b)(?:[\w-]+\s+){0,4}?(?:slides?|slideshow|presentations?|powerpoint|pptx|keynote|deck)\s+(?:for|on|about|of|covering|explaining|showing)\b/i;
+
 /** A request to make a presentation from nothing. A change to one that exists goes the usual way, with edit blocks. */
-export const wantsDeck = (request: string, chatHasDeck: boolean) => !chatHasDeck && DECK_WORDS.test(request) && CREATE.test(request) && !NOT_A_REQUEST.test(request);
+export const wantsDeck = (request: string, chatHasDeck: boolean) =>
+  !chatHasDeck && DECK_WORDS.test(request) && (CREATE.test(request) || (NOUN_ASK.test(request) && !/\?\s*$/.test(request))) && !NOT_A_REQUEST.test(request);
 
 /** How many slides the person asked for, when they said. */
 export function slideCountOf(request: string): number | null {

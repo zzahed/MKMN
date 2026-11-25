@@ -178,6 +178,8 @@ export function guessFile(names: string[], request: string): string | undefined 
 }
 
 const FILE_NAME = /^[\w][\w .-]{0,38}\.[a-z0-9]{1,5}$/i;
+/** Office files: zips, never written as raw text by a file writer. */
+const OFFICE_FILE = /\.(pptx|docx|xlsx)$/i;
 const cleanName = (s: string) => s.trim().replace(/^[`"'*]+|[`"'*]+$/g, "").replace(/^\.?\/+/, "").split("/").pop() ?? "";
 
 /** The planner's reply as a plan. Lenient: a reply that is not in the format at all gets a sensible default from the request. */
@@ -859,6 +861,14 @@ export async function* stepwise(o: StepwiseOptions): AsyncGenerator<ChatEvent, S
       recordCall(`${o.id}:plan`, planMsgs, reply, think, planBegan, planStats, "plan");
       if (o.signal?.aborted) throw new Error("aborted");
       plan = parsePlan(reply, files.map((f) => f.title), request);
+      // a Word, Excel or PowerPoint file is a zip: a writer told to reply with its raw content has nothing to write, and the
+      // canvas shows it as code with no preview. The chat makes those files in the app's own text form instead.
+      const office = plan.files.find((f) => OFFICE_FILE.test(f.name));
+      if (office) {
+        planning.status = "done";
+        yield idle();
+        return passthrough(`${office.name} is an Office file, made by the chat and not by a file writer`);
+      }
       // A model already said this request builds something: a planner reply in prose, with no Mode/File line,
       // is not a decision to answer it instead. Only an explicit `Mode: answer` is, and the person is told so.
       // When the model said the request needs SEVERAL files, a page would contradict it: use the word-based

@@ -12,6 +12,13 @@ describe("asking for a deck", () => {
     expect(wantsDeck("Make me a presentation about volcanoes", true)).toBe(false);
     expect(wantsDeck("summarize this presentation for me", false)).toBe(false);
     expect(wantsDeck("what is a slide deck?", false)).toBe(false);
+    // asked as a noun phrase, without a verb: seen with "one slide presentation for the upstream…", which went to the file builder
+    expect(wantsDeck("one slide presentation for the upstream business for the Q3 interim results", false)).toBe(true);
+    expect(wantsDeck("A 5-slide deck on our Q3 results", false)).toBe(true);
+    expect(wantsDeck("presentation about volcanoes", false)).toBe(true);
+    expect(wantsDeck("my presentation for tomorrow is too long", false)).toBe(false);
+    expect(wantsDeck("the presentation of the data is confusing", false)).toBe(false);
+    expect(wantsDeck("slides for the meeting?", false)).toBe(false);
     expect(slideCountOf("a 10 slides deck")).toBe(10);
     expect(slideCountOf("a slideshow of 8 slides")).toBe(8);
     expect(slideCountOf("a deck")).toBeNull();
