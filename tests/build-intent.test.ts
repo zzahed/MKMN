@@ -88,6 +88,14 @@ describe("a model-confirmed build is not lost to a prose plan", () => {
     expect(events.filter((e) => e.type === "notice").map((n) => (n as any).text).join(" ")).not.toMatch(/planner/i);
   });
 
+  it("never writes an Office file as raw text: a planned .pptx goes back to the chat, no writer is started", async () => {
+    // seen: "presentation.pptx" planned as a file, typed as code in a language called "pptx", and the canvas stayed empty
+    const { m, result } = await build({ program: "yes", several: "none", planner: "Mode: build\nFile: presentation.pptx | new | the one slide" }, "one slide presentation for the upstream business");
+    expect(result.handled).toBe(false);
+    expect(artifactsIn(result.text ?? "")).toEqual([]);
+    expect(m.seen.map((s) => s.sid).filter((sid) => !sid.endsWith(":plan"))).toEqual([]);
+  });
+
   it("still uses the word fallback for a game when no model answered at all", async () => {
     const { result } = await build({ program: "none", several: "none", planner: "hmm" }, "make me a snake game");
     expect(result.handled).toBe(true);
