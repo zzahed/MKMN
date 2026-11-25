@@ -180,13 +180,14 @@ describe("the 'no selectable text' message only when recognition found nothing e
     const w = uploadWorld(async (_f, o) => { o.onOcrProblem?.(pack); return ""; });
     await w.mgr.add([file("scan.pdf", "application/pdf")]);
     expect(w.env.notice).toContain(pack);
-    expect(w.env.notice).not.toContain("no selectable text");
+    expect(w.env.notice).not.toContain("found no text it could read");
   });
 
   it("recognition wired but silent (or absent): the honest generic message stands", async () => {
     const w = uploadWorld(async () => "");
     await w.mgr.add([file("scan.pdf", "application/pdf")]);
-    expect(w.env.notice).toContain("no selectable text");
+    expect(w.env.notice).toContain("found no text it could read");
+    expect(w.env.notice).not.toMatch(/vision model|selectable/); // no engine words
   });
 
   it("recognition that did read the page: no message at all, the text rides", async () => {

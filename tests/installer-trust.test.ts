@@ -65,7 +65,7 @@ describe("installGeniex checks before it runs", () => {
   });
   it("refuses another signer without running anything", async () => {
     const d = deps({ signature: async () => ({ status: "Valid", signer: "CN=Someone Else" }) });
-    await expect(installGeniex(d, () => undefined)).rejects.toThrow(/was not run: it is signed by someone else/);
+    await expect(installGeniex(d, () => undefined)).rejects.toThrow(/so it was not run\..*Details for support: it is signed by someone else/);
     expect(d.run).not.toHaveBeenCalled();
   });
 });

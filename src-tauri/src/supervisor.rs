@@ -254,75 +254,79 @@ pub fn classify_load_error(raw: &str) -> FriendlyError {
     let (id, title, fix) = if port_conflict && !warmup_model_load {
         (
             "port-conflict",
-            "The port GenieX needs is already in use",
-            "Close the other GenieX or MKMN server holding the port, or choose a different port in Settings, then retry. MKMN did not stop that process.",
+            "Another program is using the port MKMN's AI needs",
+            "Close other AI apps or another copy of MKMN, then try again. MKMN did not stop that program.",
         )
     } else if is_model_load_rejection(&l) {
         (
             "model-load",
-            "GenieX failed to load the requested model",
-            "Use Try again to explicitly retry this model, or choose another installed NPU model in Models. See Raw message for the build and runtime error.",
+            "The model failed to load",
+            "Use Try again, or choose another installed model in Local Models. The engine's own message is under Raw message.",
         )
     } else if l.contains("model list does not hold") {
         (
             "model-not-listed",
-            "GenieX does not have this model",
-            "The server is running, but this exact build is not in GenieX's model cache. Install it again in Models, then choose it. Raw message lists what GenieX has.",
+            "This model isn't installed in the AI engine",
+            "Install it again in Local Models, then choose it. Raw message lists the models the engine has.",
         )
     } else if l.contains("not found in local cache") || l.contains("file not found or inaccessible") {
         (
             "missing-artifact",
-            "The model's files are not in the GenieX cache",
-            "Install the model again from Models (it may have been removed, or the cache moved).",
+            "The model's files are missing",
+            "Install the model again in Local Models (it may have been removed, or its folder moved).",
         )
     } else if l.contains("unknown flag") || l.contains("unrecognized") || l.contains("rejected the serve command line") || l.contains("no such flag") {
         (
             "unsupported-capability",
-            "This GenieX version does not support a requested setting",
-            "The setting was not applied; update GenieX or clear the setting in Developer settings.",
+            "The installed AI engine doesn't support a setting you chose",
+            "The setting was not applied. Update the engine, or clear the setting in Settings › Developer.",
         )
     } else if l.contains("pre-flight ram check") || l.contains("insufficient memory") || l.contains("not enough memory") || l.contains("memory required") {
         (
             "insufficient-memory",
-            "Not enough free RAM to load this model",
-            "Close other apps, pick a smaller model, or lower the context window in Developer settings. The NPU works in the PC's RAM.",
+            "Not enough free memory to load this model",
+            "Close other apps, choose a smaller model in Local Models, or set a shorter conversation length in Settings › Speed & memory › Advanced. The NPU uses the PC's main memory.",
         )
     } else if l.contains("timed out") || l.contains("readiness check") || l.contains("did not answer") {
         (
             "timeout",
             "The model did not finish loading in time",
-            "A first load of a big model can take minutes. Retry; if it keeps timing out, check the server log in Developer settings.",
+            "A big model can take minutes to load the first time. Try again. If it keeps timing out, see Settings › Developer › Last error.",
         )
     } else if l.contains("exited prematurely") || l.contains("exited during warm-up") || l.contains("exited unexpectedly") || l.contains("failed to spawn") {
         (
             "runtime-crash",
-            "The model runtime stopped while loading",
-            "Check the server log in Developer settings for the runtime's last message.",
+            "The AI engine stopped while loading the model",
+            "Try again. If it happens again, see Settings › Developer › Last error for the engine's last message.",
         )
     } else if l.contains("is an application model id") || l.contains("was not resolved") {
         (
             "model-resolution",
-            "The model id was not resolved to an installed model",
-            "Pick the model again in Models so the app resolves its real cache name.",
+            "MKMN couldn't find the installed model you chose",
+            "Choose the model again in Local Models.",
         )
     } else if l.contains("not found on system") || l.contains("geniex.exe not found") {
         (
             "runtime-missing",
-            "GenieX is not installed",
-            "Install GenieX from the first-launch setup, or point to it in Developer settings.",
+            "The NPU's AI engine isn't installed",
+            "Install it from the setup screen, or point to it in Settings › Developer › Locate geniex.exe.",
         )
     } else {
         (
             "server",
-            "The model server reported an error",
-            "Look in Developer settings for the server logs.",
+            "The AI engine reported an error",
+            "Try again. If it happens again, see Settings › Developer › Last error.",
         )
     };
-    let title = if id == "model-load" { raw.lines().next().unwrap_or(title) } else { title };
+    // a failed load names the model in plain words; the engine's own first line stays in raw
+    let title = match raw.lines().next().and_then(|line| line.strip_prefix("GenieX failed to load ")) {
+        Some(model) if id == "model-load" => format!("The model {model} failed to load"),
+        _ => title.to_owned(),
+    };
     let mut fix = fix.to_owned();
     if id == "model-load" {
         if let Some((supported, bundle)) = raw.lines().find_map(context_blob_versions) {
-            fix = format!("The active NPU runtime rejected context format {bundle} and reported support through {supported}. Choose another installed NPU model, or retry after changing the runtime or model build. See Raw message for details.");
+            fix = format!("This model was built for a newer NPU engine (format {bundle}) than the one installed (format {supported} or older). Choose another model in Local Models, or update the engine. Raw message has the details.");
         }
         if let Some(model) = raw.lines().find_map(|line| line.strip_prefix("Verified installed NPU model: ")) {
             fix.push_str(&format!(" {model} answered on the NPU with this runtime."));
@@ -331,7 +335,7 @@ pub fn classify_load_error(raw: &str) -> FriendlyError {
             fix = format!("{WARMUP_PAUSED} {fix}");
         }
     }
-    FriendlyError { id: id.to_owned(), title: title.to_owned(), fix, raw: raw.to_owned() }
+    FriendlyError { id: id.to_owned(), title, fix, raw: raw.to_owned() }
 }
 
 fn is_model_load_rejection(message: &str) -> bool {
@@ -532,7 +536,7 @@ mod warmup_recovery_tests {
         let error = classify_load_error(&raw);
         assert_eq!(error.id, "model-load");
         assert!(error.title.contains("qualcomm/Qwen3-8B"));
-        assert!(error.fix.contains("context format 4.0.x"));
+        assert!(error.fix.contains("format 4.0.x"));
         assert!(error.fix.contains("3.3.x"));
     }
 }

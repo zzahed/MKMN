@@ -45,7 +45,7 @@ export function judgeSignature(sig: Signature, publishers: readonly string[] = G
 /** The installer is not signed: it runs only once the person approves this exact file. */
 export class UnsignedInstallerError extends Error {
   constructor(readonly sha256: string) {
-    super(`The GenieX installer is not signed by its publisher, so it was not run. SHA-256 ${sha256}. Run it anyway only if you trust this download.`);
+    super(`The NPU engine's installer isn't signed by its publisher, so MKMN didn't run it. Choose Run it anyway only if you trust this download. Details for support: SHA-256 ${sha256}.`);
     this.name = "UnsignedInstallerError";
   }
 }

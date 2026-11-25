@@ -1,4 +1,5 @@
 import { libraryFromMarkdown, libraryPrompt, libraryProblems, libraryToMarkdown, type SkillLibrary } from "./skillLibs";
+import shippedSkills from "./skills-default.json";
 export type { SkillLibrary } from "./skillLibs";
 
 /**
@@ -84,27 +85,25 @@ export function triggerForInput(when: string | undefined): string {
 /** A skill's pattern, compiled: the u flag when it uses Unicode classes (the words form), so a
  *  pattern written by hand under the old rules keeps compiling exactly as before. */
 export function skillPattern(when: string, flags: string): RegExp {
-  return new RegExp(when, when.includes("\\p{") ? `${flags}u` : flags);
+  // the u flag only for the app's own plain-words form: a hand-written pattern could carry the
+  // text "\p{" in a class ([\\p{]) to force it, and u makes "." far slower on Arabic or emoji
+  return new RegExp(when, isWordsForm(when) ? `${flags}u` : flags);
 }
 
 /** The most a "start by itself" pattern reads of a message: enough to recognise a request,
- *  and with the grammar below every allowed pattern stays quick (at worst the square of this). */
+ *  and it bounds the work of every allowed pattern. */
 export const SKILL_MATCH_CHARS = 1000;
 
-/** Repeats of varying length (+, *, {n,m}) one path through a pattern may hold: two in a row
- *  cost the cube of the message length (\w*\w*! took 0.6 s on 1,000 characters). */
-const MAX_VARIABLE_REPEATS = 1;
-/** Repeats of varying length in the whole pattern, across its alternatives: each branch's
- *  repeat is tried at every position (60 branches of \w*! cost 165 ms a message). */
-const MAX_TOTAL_REPEATS = 3;
 /** Ways a pattern can try to match at one position: alternatives add up, parts in a row
  *  multiply, an optional part doubles. Overlapping alternatives in a row, (a|a)(a|a)…,
  *  are exponential with no repeat at all (25 of them ran for more than 8 s). */
 const MAX_WAYS = 64;
 /** The longest pattern checked or run, in any form: the editor's own limit. */
 const MAX_PATTERN_CHARS = 300;
-/** The largest number a {n} or {n,m} may use. */
-const MAX_BOUND = 100;
+/** The patterns the app ships with its built-in skills. They use repeats (\w+, [^.\n]{0,50})
+ *  and were measured safe; trusted only as shipped, character for character, so a copy of a
+ *  built-in skill keeps working and an edited one is checked like any other. */
+const SHIPPED_PATTERNS: ReadonlySet<string> = new Set((shippedSkills as { when?: string }[]).map((s) => s.when).filter((w): w is string => !!w));
 
 const WORD_LITERAL = /^(?:\\[.*+?^${}()|[\]\\]|[^.*+?^${}()|[\]\\])+$/;
 
@@ -117,35 +116,34 @@ function isWordsForm(p: string): boolean {
 
 class Refused extends Error {}
 
-/** What the pattern costs at one position: the varying repeats along its worst path, and the
- *  number of ways it can try to match. */
-interface Cost { repeats: number; ways: number }
-const ONE: Cost = { repeats: 0, ways: 1 };
+/** What the pattern costs at one position: the number of ways it can try to match. */
+interface Cost { ways: number }
+const ONE: Cost = { ways: 1 };
 
 /**
  * Why a hand-written "start by itself" pattern could make the window freeze, or null when it
- * is safe to run on every message. The pattern runs on the window's own thread, and a list of
- * known dangerous shapes always misses one, so this ALLOWS a small grammar and refuses the rest:
+ * is safe to run on every message. The pattern runs on the window's own thread. Three security
+ * reviews broke three cost models for repeats, so a hand-written pattern may not repeat at all,
+ * and this ALLOWS a small grammar and refuses the rest:
  *  - letters and escaped symbols, `.`, `^`, `$`, `\b`, `\d \w \s` (and capitals), character
  *    classes, groups `( )` and `(?: )`, and `|`;
- *  - a repeat (`+ * {n,m}`) only on a single character, escape or class, and at most one
- *    repeat of varying length along any path through the pattern;
- *  - `?` on a single item or on a group with no repeat inside;
+ *  - `?` on a single item or on a group; no `+`, `*` or `{…}`;
  *  - at most 64 ways to try a match at one position (alternatives add, parts in a row
- *    multiply, `?` doubles) and at most three varying repeats in the whole pattern;
- *  - no repeat on a group, no lookarounds, no back-references, no \p, \u, \x or \c;
+ *    multiply, `?` doubles);
+ *  - no lookarounds, no back-references, no \p, \u, \x or \c;
  *  - at most 300 characters, whatever its form.
- * Every built-in skill's pattern and the plain-words form pass.
+ * With no repeat, the work at each position of the message is at most the ways times the
+ * pattern's length. The plain-words form passes, and so do the built-in skills' own patterns,
+ * exactly as shipped.
  */
 export function patternRisk(p: string): string | null {
   if (p.length > MAX_PATTERN_CHARS) return `it is longer than ${MAX_PATTERN_CHARS} characters`;
-  if (isWordsForm(p)) return null;
-  let i = 0, totalRepeats = 0;
+  if (isWordsForm(p) || SHIPPED_PATTERNS.has(p)) return null;
+  let i = 0;
   const fail = (why: string): never => { throw new Refused(why); };
-  /** Two parts in a row: their repeats add up along the path, their ways multiply. */
-  const then = (a: Cost, b: Cost): Cost => ({ repeats: a.repeats + b.repeats, ways: a.ways * b.ways });
+  /** Two parts in a row: their ways multiply. */
+  const then = (a: Cost, b: Cost): Cost => ({ ways: a.ways * b.ways });
   const check = (c: Cost): Cost => {
-    if (c.repeats > MAX_VARIABLE_REPEATS) fail("it repeats more than one part of varying length in a row");
     if (c.ways > MAX_WAYS) fail("it has too many alternatives or optional parts");
     return c;
   };
@@ -154,19 +152,13 @@ export function patternRisk(p: string): string | null {
   const quantifier = (): Cost => {
     const c = p[i];
     let cost: Cost = ONE;
-    if (c === "?") { i++; cost = { repeats: 0, ways: 2 }; }
-    else if (c === "+" || c === "*") { i++; cost = { repeats: 1, ways: 1 }; }
-    else if (c === "{") {
-      const m = /^\{(\d+)(,(\d*))?\}/.exec(p.slice(i));
-      if (!m) fail("it has a { that is not a count");
-      const lo = Number(m![1]), hi = m![2] === undefined ? lo : m![3] === "" ? null : Number(m![3]);
-      if (lo > MAX_BOUND || (hi !== null && hi > MAX_BOUND)) fail(`it repeats something more than ${MAX_BOUND} times`);
-      i += m![0].length;
-      if (hi === null || hi > lo) cost = { repeats: 1, ways: 1 };
-    } else return cost;
-    if (p[i] === "?") i++; // a lazy repeat costs the same
-    if (p[i] === "+" || p[i] === "*" || p[i] === "{" || (p[i] === "?" && cost.ways > 1)) fail("it repeats a repeat");
-    if (cost.repeats && ++totalRepeats > MAX_TOTAL_REPEATS) fail("it has too many parts of varying length");
+    if (c === "?") { i++; cost = { ways: 2 }; }
+    // No repeats at all in a hand-written pattern. Three security reviews each found a repeat
+    // shape a cost model missed ((a?){500}, \w*\w*, \w*(?:\w{100})?…); with no repeat the work
+    // at one position is bounded by the ways times the pattern's length, whatever the message.
+    else if (c === "+" || c === "*" || c === "{") fail("it repeats a part (with +, * or {…}); use plain words, or ? for an optional letter");
+    else return cost;
+    if (p[i] && "?+*{".includes(p[i])) fail("it repeats a repeat");
     return cost;
   };
 
@@ -204,9 +196,8 @@ export function patternRisk(p: string): string | null {
         // any repeat of a group, even a fixed count such as (a?){50}, multiplies what is inside
         if (p[i] === "+" || p[i] === "*" || p[i] === "{") fail("it repeats a group");
         const q = quantifier();
-        if (q.ways > 1 && inner.repeats) fail("it makes optional a group that has a repeat inside");
         // an optional group: skip it, or any of its own ways
-        cost = check(then(cost, q.ways > 1 ? { repeats: 0, ways: inner.ways + 1 } : inner));
+        cost = check(then(cost, q.ways > 1 ? { ways: inner.ways + 1 } : inner));
       } else if (c === "[") {
         charClass();
         cost = check(then(cost, quantifier()));
@@ -231,12 +222,12 @@ export function patternRisk(p: string): string | null {
   };
 
   const alternation = (): Cost => {
-    // alternatives: the worst path's repeats, and every branch's ways added up
+    // alternatives: every branch's ways added up
     let all = sequence();
     while (p[i] === "|") {
       i++;
       const b = sequence();
-      all = check({ repeats: Math.max(all.repeats, b.repeats), ways: all.ways + b.ways });
+      all = check({ ways: all.ways + b.ways });
     }
     return all;
   };

@@ -256,7 +256,7 @@ describe("poll freshness (status panel)", () => {
     // recovery restores the live state
     fail = false; n = 0;
     await act(async () => {
-      fireEvent.click(screen.getAllByRole("button", { name: "Retry" })[0]);
+      fireEvent.click(screen.getAllByRole("button", { name: "Try again" })[0]);
       await Promise.resolve(); await Promise.resolve();
     });
     expect(panel.textContent).toContain("Ready on this device");
@@ -538,18 +538,18 @@ describe("reliability hardening (feeds, watchdog, ordering, progressive startup)
     // reads as failed
     await act(async () => { await vi.advanceTimersByTimeAsync(10_500); });
     const panel = openPanel();
-    expect(panel.textContent).toContain("AI status unavailable");
+    expect(panel.textContent).toContain("Can't check the AI right now. Try again, or restart MKMN if this continues.");
     expect(calls).toBe(2);
     // a manual retry sends ONE new request…
     await act(async () => {
-      fireEvent.click(screen.getAllByRole("button", { name: "Retry" })[0]);
+      fireEvent.click(screen.getAllByRole("button", { name: "Try again" })[0]);
       await Promise.resolve();
     });
     expect(calls).toBe(3);
     // …but while THAT one is in flight, further retries are skipped, not stacked
     await act(async () => {
-      fireEvent.click(screen.getAllByRole("button", { name: "Retry" })[0]);
-      fireEvent.click(screen.getAllByRole("button", { name: "Retry" })[0]);
+      fireEvent.click(screen.getAllByRole("button", { name: "Try again" })[0]);
+      fireEvent.click(screen.getAllByRole("button", { name: "Try again" })[0]);
       await Promise.resolve();
     });
     expect(calls).toBe(3);

@@ -83,7 +83,7 @@ describe("the router adopts only a server that serves its model", () => {
       await expect(m.start(2048)).rejects.toThrow();
       expect(m.status().adopted ?? false).toBe(false);
       expect(spawned.length).toBe(1);
-      expect(m.status().lastError?.title).toBe("Another program is using the port 18192");
+      expect(m.status().lastError?.title).toBe("Another program is blocking MKMN's AI (port 18192)");
     } finally { await m.stop(); }
   });
 

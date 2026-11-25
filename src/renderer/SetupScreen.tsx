@@ -46,8 +46,8 @@ export function SetupScreen({ state }: { state: SetupState }) {
                 {s.error && <div className="error-box">{s.error}</div>}
               </div>
               <div className="step-actions">
-                {s.state === "error" && <button className="primary" onClick={() => void api().setupRetry(s.id)}>Retry</button>}
-                {s.state === "error" && s.unsigned && <button className="ghost" title={`Runs this exact file (SHA-256 ${s.unsigned}) although it is not signed`} onClick={() => void api().setupRunUnsigned(s.id)}>Run it anyway</button>}
+                {s.state === "error" && <button className="primary" onClick={() => void api().setupRetry(s.id)}>Try again</button>}
+                {s.state === "error" && s.unsigned && <button className="ghost" title={`Runs this exact file even though its maker did not sign it. Only do this if you trust where it came from. (SHA-256 ${s.unsigned})`} onClick={() => void api().setupRunUnsigned(s.id)}>Run it anyway</button>}
                 {(s.state === "pending" || s.state === "error") && !state.awaitingConfirm && <button className="ghost" onClick={() => void api().setupSkip(s.id)}>Skip</button>}
               </div>
             </div>

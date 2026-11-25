@@ -81,7 +81,7 @@ describe("installGeniex with the published release", () => {
     await expect(installGeniex(deps({ release: WIN, probe: async () => null }), () => undefined)).rejects.toThrow(/working serve command/);
   });
   it("refuses an installed GenieX below the minimum even when no release tag was compared", async () => {
-    await expect(installGeniex(deps({ release: null, probe: async () => "GenieX CLI Version: v0.10.0" }), () => undefined)).rejects.toThrow(/v0\.10\.0; MKMN needs v0\.11\.0 or newer/);
+    await expect(installGeniex(deps({ release: null, probe: async () => "GenieX CLI Version: v0.10.0" }), () => undefined)).rejects.toThrow(/too old for MKMN.*found v0\.10\.0, needs v0\.11\.0 or newer/);
   });
   it("downloads the versioned installer and runs it when its SHA-256 is the published one", async () => {
     const d = deps({ release: WIN });

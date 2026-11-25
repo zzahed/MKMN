@@ -157,6 +157,20 @@ NPU clock modes before anything they could act on.
 | K6 | Tasks intro: "Prompts … using your NPU. Results and any artifacts land here." | Medium | "Instructions the assistant carries out by itself on a schedule… files it makes appear in Files." |
 | K7 | Task and file deletes do not say what is lost or that they cannot be undone. | Medium | Each names what goes and what stays (checked against the delete handler), and says it cannot be undone. |
 
+## Phase 4: errors, status, setup and PDF messages
+
+Most chat errors already follow "what happened, then what to do". The ones
+that leaked engine words are rewritten; every error keeps its id, so the
+code that reacts to them is unchanged.
+
+| # | Finding | Sev | Change |
+| --- | --- | --- | --- |
+| E1 | Chat errors named "GenieX", "SDK error, code -100000", "MXFP4", "GGUF", "context", "metadata". | High | Plain titles and next steps; the engine's own text stays under Raw message. |
+| E2 | Status pill: "AI status unavailable — the status check keeps failing", "MKMN AI's backend is not answering", "Server failed". | Medium | Says what is wrong and what to do: try again, then restart MKMN. Button "Try again". |
+| E3 | Setup steps: "GenieX runtime (runs models on the NPU)", "Qualcomm's command-line runtime", "llama.cpp (runs models on the GPU or the CPU)". | Medium | Named for what they do ("AI engine for the NPU"), with the product name in brackets; "Retry" becomes "Try again". |
+| E4 | PDF without text: "no selectable text (a scan?) … use a vision model with page images". | Medium | Says MKMN could not read text in it and what to do. |
+| E5 | Unknown PDF error: "could not be read (error category: invalid)". | Low | A next step first; the category stays as a code for support. |
+
 ## Open security item found during review
 
 A skill's "start by itself" pattern written by hand, or carried in an
@@ -172,4 +186,4 @@ import, or match with a length or time guard. Tracked in #62.
 1. **Projects** — done in this branch (P1–P13).
 2. **Settings › Speed & memory and the Models library** — S3, S4 (M1–M6, L1–L3), branch `ux/plain-language-settings`.
 3. **Skills, About me, Tasks, Files** — S1, S2, S5 (K1–K7), branch `ux/plain-language-skills-tasks`.
-4. **Errors, status and setup** — S6, S7, S8, and the shared PDF messages above.
+4. **Errors, status, setup and PDF messages** — S6, S7, S8 (E1–E5), branch `ux/plain-language-errors-setup`.

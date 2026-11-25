@@ -105,8 +105,8 @@ export async function extractPdfText(doc: PdfDocLike, maxChars = 2_000_000, o?: 
 /**
  * Why a PDF could not be attached, in plain words, from the error's class and message.
  * The classes are pdf.js's own (PasswordException, InvalidPDFException, MissingPDFException,
- * AbortError); anything else keeps the underlying reason, cut, so no page text ever lands in
- * the message — a pdf.js parse error can quote a fragment of the document.
+ * AbortError); anything else shows only a sanitized category (pdfErrorCategory), never the
+ * underlying message — a pdf.js parse error can quote a fragment of the document.
  */
 export function describePdfError(name: string, e: unknown): string {
   const en = (e as { name?: string } | null)?.name ?? "";
@@ -114,11 +114,11 @@ export function describePdfError(name: string, e: unknown): string {
   if (en === "AbortError" || /aborted|was stopped|worker was destroyed/i.test(msg)) return `${name}: reading was stopped.`;
   if (en === "PasswordException" || /password/i.test(msg)) return `${name}: this PDF is protected by a password. Open it, remove the protection (print it to a new PDF) and attach that one.`;
   if (en === "InvalidPDFException" || /invalid pdf|corrupt|damaged/i.test(msg)) return `${name}: this file is damaged or is not a readable PDF.`;
-  if (en === "MissingPDFException" || en === "UnexpectedResponseException") return `${name}: the PDF's pages could not be found in the file.`;
+  if (en === "MissingPDFException" || en === "UnexpectedResponseException") return `${name}: the PDF's pages could not be found in the file. Save it again as a PDF, then add it again.`;
   if (/fake worker|setting up fake worker|worker/i.test(msg)) return `${name}: the PDF reader could not start in this window. Try again; if it keeps failing, restart the app.`;
   // an unknown error: no part of its raw message is shown — a parser message can quote the document's
   // own text, and truncating it cannot guarantee that none survives. The sanitized category is shown instead.
-  return `${name}: could not be read (error category: ${pdfErrorCategory(e)}).`;
+  return `${name}: could not be read. Save it again as a PDF, then add it again. (Code for support: ${pdfErrorCategory(e)})`;
 }
 
 /** Short category of a PDF failure for diagnostics — no name, no content, safe to log. */
