@@ -284,7 +284,7 @@ const CODE_LEAF: Partial<Record<TaskCategory, string>> = { web_code: "q_web", co
  * The prompt lab (`docs/prompt-lab/prompt-lab-router.md`) asks the same questions with hard requests, so a change here is measured there.
  */
 export const Q = {
-  program: "Does it ask to build, write or change something that RUNS: a program, game, app, tool or web page, or say that something in one does not work or looks wrong? (Answer no for a chat, a question, an explanation, a chart, a spreadsheet, an Excel or Word file, a text document or a thanks.)",
+  program: "Does it ask to build, write or change something that RUNS: a program, game, app, tool or web page, or say that something in one does not work or looks wrong? (Answer no for a chat, a question, an explanation, a chart, a spreadsheet, an Excel or Word file, a text document, a story, a poem, an essay or other creative writing, or a thanks.)",
   produce: "Does the person ask you to PRODUCE a file or a document now (make it, write it, create it), rather than ask for help, advice, an explanation, a summary, a review, or just talk?",
   produce2: "Does the message tell you to make, write or create a new file or document for the person (a letter, a sheet, a report, a CV)?",
   produce3: "Is the thing wanted a NEW file or document as the result, rather than an answer in the chat?",
@@ -296,7 +296,7 @@ export const Q = {
   file: "What file does the request ask to be made? sheet = an Excel spreadsheet or a table of figures; document = a written document (a letter, a report, a CV, minutes, a contract, a research document); site = a website or a landing page; calculator = a small calculator, converter or simulator page; none = anything else (a program, a game, a chat, a question, a chart).",
   web: "Does answering it need recent facts, or looking something up on the web, that a model would not know by heart?",
   identity: "Is the message asking who you are, what your name is, or who made or built you? (Answer no when it asks you to make, write or change anything, or asks about a person, a thing or any other subject.)",
-  programConfirm: "Does the message ask you to make a program, page or file? (Answer no when it only asks a question or wants an answer in the chat.)",
+  programConfirm: "Does the message ask you to make a program, page or file? (Answer no when it only asks a question or wants an answer in the chat, such as a story, a poem, an essay or other creative writing.)",
   agents: "Does this request ask for sub-agents, or is it a big job that splits into independent parts that can each be worked out alone (researching several things, drafting several sections, comparing several options)? (Answer no for a greeting, a chat, a small question or a single simple task.)",
   recall: "Does the message ask about something that was said, decided, written or agreed EARLIER in the conversation, which the summary of it at the start may not hold in full (an earlier answer, an earlier file, a value or a name from before)? (Answer no when the message is only about what is on the screen now, or asks for something new.)"
 } as const;
@@ -351,7 +351,7 @@ const SHOTS: [string, [string, boolean][]][] = [
   [Q.program, [["make me a tic-tac-toe game", true], ["I would like a stopwatch app with lap times", true], ["the score does not update after a level, fix it", true], ["add a dark mode switch to the page", true],
     ["make me a chess game I can play against the computer", true], ["أريد لعبة إكس-أو ألعبها ضد الكمبيوتر", true],
     ["explain the difference between a list and a tuple in python", false], ["write an email to move my appointment", false], ["make me an excel table of my groceries", false], ["what is the capital of Canada?", false],
-    ["what was the score of yesterday's game?", false]]],
+    ["what was the score of yesterday's game?", false], ["write me a 500-word story about a dragon who opens a bakery", false], ["a poem about autumn in Kyoto, four verses", false]]],
   [Q.produce, [["create a rental contract for me as a Word document", true], ["make an Excel file with my monthly expenses", true], ["do some research on solar panels and write a report", true], ["make me a family budget in a spreadsheet", true],
     ["can you check my CV and tell me what to improve?", false], ["I have a probability exercise, can you help me understand it?", false], ["here, this is my file", false], ["can you summarize this text for me?", false]]],
   [Q.sheet, [["a workbook to track my employees' hours", true], ["build me a spreadsheet to compare three loan offers", true], ["a monthly budget in excel", true],
@@ -370,7 +370,7 @@ const SHOTS: [string, [string, boolean][]][] = [
     ["make me a chatbot page for my shop", false], ["write a poem about a robot who lost its name", false], ["من هو مخترع الهاتف؟", false], ["make me a site for my robotics club", false]]],
   // the confirming question of the build gate (a yes from the chat model alone, the router not saying yes): other subjects than the lab's requests and the eval cases
   [Q.programConfirm, [["build me a pomodoro timer page", true], ["make a small program that renames my photos by the date taken", true], ["زر الحفظ في الأداة لا يعمل، أصلحه", true],
-    ["what time does the museum open?", false], ["ما عاصمة اليابان؟", false], ["summarize the meeting notes for me", false]]]
+    ["what time does the museum open?", false], ["ما عاصمة اليابان؟", false], ["summarize the meeting notes for me", false], ["tell me a long story about a fox who sails to Greece", false], ["write a poem for my mother's birthday", false]]]
 ];
 const SHOTS_OF = new Map<string, [string, boolean][]>([...SHOTS, [Q.produce2, SHOTS[1][1]], [Q.produce3, SHOTS[1][1]]]);
 /** The solved cases of the question (a context line may stand in front of it), written on one line. */

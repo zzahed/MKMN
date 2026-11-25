@@ -248,6 +248,18 @@ describe("the build question's solved cases", () => {
     expect(sys).toMatch(/لعبة إكس-أو[^;]*-> yes/);
     expect(sys).toMatch(/yesterday's game\? -> no/);
   });
+
+  // A real run: "tell me a story of Pasta and pizza to recommend eating them in italy. for 1000 words!"
+  // was built into an index.html. Neither build question said a story is answered in the chat,
+  // and neither had a story or a poem among its solved cases.
+  it("say creative writing is answered in the chat, with a story and a poem as solved noes", () => {
+    for (const q of [Q.program, Q.programConfirm]) {
+      expect(q).toMatch(/Answer no [^)]*a story, a poem, an essay or other creative writing/);
+      const sys = yesNoPrompt("a story about a lighthouse keeper", q).system;
+      expect(sys).toMatch(/story[^;]*-> no/);
+      expect(sys).toMatch(/poem[^;]*-> no/);
+    }
+  });
 });
 
 /**
