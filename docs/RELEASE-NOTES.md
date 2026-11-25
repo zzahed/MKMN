@@ -2,13 +2,11 @@
 
 **Current release: v0.0.2**
 
-**Current candidate: v0.0.3-rc.2** (controlled pilot). [GitHub prerelease](https://github.com/zzahed/MKMN/releases/tag/v0.0.3-rc.2) · [Candidate notes](releases/RELEASE_NOTES_v0.0.3-rc.2.md).
+**Current candidate: v0.0.3-rc.3** (controlled pilot). [Candidate notes](releases/RELEASE_NOTES_v0.0.3-rc.3.md).
 
-## 0.0.3-rc.2 — Dependency and runtime hardening
+## 0.0.3-rc.3 — Router performance and clearer setup
 
-Updates the Windows ARM64 toolchain, native search and speech runtimes, and page editor. Includes the sandbox and recovery fixes merged after RC1. [Candidate notes](releases/RELEASE_NOTES_v0.0.3-rc.2.md).
-
-## Unreleased
+The router shuts down when idle, application logs rotate, and native hardware readings avoid repeated helper processes. Setup, model errors and status messages explain what to do next. [Candidate notes](releases/RELEASE_NOTES_v0.0.3-rc.3.md).
 
 - **Projects screen in plain English** ([#61](https://github.com/zzahed/MKMN/issues/61)).
   The reference-files meter no longer shows confusing counts such as "139k / 5k":
@@ -34,6 +32,10 @@ Updates the Windows ARM64 toolchain, native search and speech runtimes, and page
   still start it by typing / and its name. To make it start by itself again,
   open it, and under **Advanced** replace the pattern with plain words separated
   by commas (for example `invoice, invoices`).
+
+## 0.0.3-rc.2 — Dependency and runtime hardening
+
+Updates the Windows ARM64 toolchain, native search and speech runtimes, and page editor. Includes the sandbox and recovery fixes merged after RC1. [Candidate notes](releases/RELEASE_NOTES_v0.0.3-rc.2.md).
 
 ## 0.0.3-rc.1 — Engineering hardening candidate
 
