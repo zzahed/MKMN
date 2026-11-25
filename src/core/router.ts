@@ -138,6 +138,39 @@ export class RouterWarmGate {
   reset(): void { this.warmed = false; }
 }
 
+/** The shortest idle window the router is given: one request's closed questions must never meet a stopped router. */
+export const ROUTER_IDLE_MIN_MS = 60_000;
+
+/**
+ * Stops the router's server after the user's idle window (`idleReleaseSec`; 0 keeps it ready). It
+ * held about 850 MB for 24 hours after one request. The whole process is stopped, not only the
+ * model unloaded, so the warm gate always knows: the owner resets the gate before the stop, and
+ * the next request is refused by the gate (the words decide) while a warm-up starts the server
+ * again. It is never a miss, so it never moves the router to the GPU. `begin`/`end` bracket every
+ * use (a question, a sort, a warm-up); no release happens while one runs.
+ */
+export class RouterIdleRelease {
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  private busy = 0;
+  constructor(private idleMs: () => number, private release: () => void) {}
+  /** A use starts: no release until it ends. */
+  begin(): void { this.busy++; this.cancel(); }
+  /** A use ended: the idle window starts again from now. */
+  end(): void {
+    this.busy = Math.max(0, this.busy - 1);
+    if (this.busy === 0) this.arm();
+  }
+  /** No release is due (the server was stopped for another reason). */
+  cancel(): void { if (this.timer) { clearTimeout(this.timer); this.timer = null; } }
+  private arm(): void {
+    this.cancel();
+    const ms = this.idleMs();
+    if (!(ms > 0)) return; // 0: kept ready
+    this.timer = setTimeout(() => { this.timer = null; if (this.busy === 0) this.release(); }, Math.max(ms, ROUTER_IDLE_MIN_MS));
+    (this.timer as { unref?: () => void }).unref?.();
+  }
+}
+
 /**
  * Runs the router's warm-up one at a time. A plain request made while one runs is dropped (that
  * one will do), but a FORCED one is kept and run once more when it ends: the server it warms may

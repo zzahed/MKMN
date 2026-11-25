@@ -24,6 +24,7 @@ import { checkRequirements, checkUpdates, geniexInstallerNewer, installRequireme
 import { HARDWARE_SCRIPT, buildProfile, parseRawHardware, type RawHardware } from "../core/hardware";
 import { effectiveHardware } from "../core/budget";
 import { readBool, readSetting, voiceSettings as readVoiceSettings } from "../shared/settingsSchema";
+import { retentionFromIdle } from "../core/settingsUi";
 import { HfClient } from "../core/hf";
 import { run, updateProbeArgs, installedRefsOf, findGeniex, pullModel, removeModel, diskCheck, freeDiskGB, modelsDir, listInstalled, canonicalName, installedState, type Pull, type PullOptions } from "../core/geniex";
 import { compiledContextOf } from "../core/qairt";
@@ -67,7 +68,7 @@ import { DEFAULT_ENDPOINT, geniexVersion, setBackgroundChildHook } from "../core
 import { GeniexGate, parseGeniexCliVersion } from "../core/geniexGate";
 import { NPU_UTIL_SCRIPT, WINDOWS_BUILD_SCRIPT, npuReadingFromHost, parseNpuCounters, type NpuReading } from "../core/perf";
 import { BATTERY_SCRIPT, batteryFromHost, batteryPercent, createCachedPowerReader, createHostFirstBatteryReader, parseBattery } from "../core/battery";
-import { ROUTER_CTX, ROUTER_HOST, ROUTER_MODEL, ROUTER_PREFERRED, RouterPlacement, ROUTER_TIMEOUT_MS, PRODUCE_VOTES, Q, TREE, FileKindMemo, RouterBreaker, RouterWarmGate, SortMemory, WarmUp, parseYesNo, servesRouterModel, readSearchQuery, routerSampling, searchQueryPrompt, settled, sortByQuestions, yesNoPrompt, type Asked } from "../core/router";
+import { ROUTER_CTX, ROUTER_HOST, ROUTER_MODEL, ROUTER_PREFERRED, RouterIdleRelease, RouterPlacement, ROUTER_TIMEOUT_MS, PRODUCE_VOTES, Q, TREE, FileKindMemo, RouterBreaker, RouterWarmGate, SortMemory, WarmUp, parseYesNo, servesRouterModel, readSearchQuery, routerSampling, searchQueryPrompt, settled, sortByQuestions, yesNoPrompt, type Asked } from "../core/router";
 import { ServerManager } from "../core/server";
 import type { TemplateKind } from "../core/templates/kit";
 import { runnerFor, withPip } from "../core/runcode";
@@ -1104,6 +1105,27 @@ const routerBreaker = new RouterBreaker();
 /** No ask reaches the server until its model has answered once: a fresh geniex says "ready" about 0.6 s after it is spawned, with no model loaded, and the load takes about 3.5 s — the asks of that window burned the whole router timeout (the b-runs' cold-server silence). */
 const routerWarmGate = new RouterWarmGate();
 
+/** The user's idle window, read the way the chat model's is (0 keeps the router ready too). */
+const routerIdleMs = () => { const s = settings(); return retentionFromIdle(s.idleReleaseSec, s.keepaliveSec).idleReleaseSec * 1000; };
+/**
+ * The router's server is stopped after the idle window: its model held about 850 MB for 24 hours after one request.
+ * The gate is reset BEFORE the stop, so no ask reaches a server going down and the next request is refused by the
+ * gate (the words decide, a warm-up starts the server again) instead of timing out into a cold load and counting a
+ * miss toward the GPU. The server's own keep-alive stays at 24 hours: GenieX never unloads behind the gate's back.
+ */
+function releaseIdleRouter(): void {
+  const srv = routerSrv;
+  if (!srv) return;
+  routerWarmGate.reset();
+  void srv.stop().catch(() => undefined);
+}
+const routerIdle = new RouterIdleRelease(routerIdleMs, releaseIdleRouter);
+/** Runs one use of the router (a question, a sort, a warm-up): the idle window counts from its end. */
+async function routerUse<T>(fn: () => Promise<T>): Promise<T> {
+  routerIdle.begin();
+  try { return await fn(); } finally { routerIdle.end(); }
+}
+
 /** The router's model: the one chosen in the settings when it is installed, else the best installed candidate, else the shipped default. */
 const routerEntryOf = (installed: CatalogEntry[]) =>
   (settings().dynamic?.routerModel ? installed.find((e) => e.id === settings().dynamic!.routerModel && !isFoundryEntry(e)) : undefined)
@@ -1170,7 +1192,8 @@ async function routerAsk(system: string, user: string, maxTokens: number, timeou
     // the router answers the closed questions of every request, whatever model is chosen: one that is not up yet is started now, and this question goes to the chat model (never made to wait)
     if (!routerSrv || routerSrv.status().state !== "ready") { warmRouter(true); return null; }
     const tuned = { ...entry, sampling: routerSampling(maxTokens) } as CatalogEntry;
-    const reply = await collect(sidecarHost, tuned, routerSrv, [{ role: "system", content: system }, { role: "user", content: user }], `router:${Date.now()}`, AbortSignal.timeout(timeoutMs), "off");
+    const srv = routerSrv;
+    const reply = await routerUse(() => collect(sidecarHost, tuned, srv, [{ role: "system", content: system }, { role: "user", content: user }], `router:${Date.now()}`, AbortSignal.timeout(timeoutMs), "off"));
     routerBreaker.close(); // it answers: the next request meets it fresh
     routerWarmGate.markWarmed(); // a reply — any reply — proves the model is loaded on this server
     routerPlacement.answered();
@@ -1238,7 +1261,7 @@ async function routerQuery(text: string): Promise<string | null> {
 /** Starts the router in the background, so that the first request already finds it ready. `force`: the
  *  server was just stopped or replaced, so a warm-up already running (against the old one) is not enough. */
 function warmRouter(force = false) {
-  routerWarmUp.start(async () => {
+  routerWarmUp.start(() => routerUse(async () => {
     if (!readBool(settings(), "dynamic.router")) return;
     if (!findGeniex(settings().geniexPath ?? null)) return;
     const exe = await geniexGate.usable();
@@ -1254,7 +1277,7 @@ function warmRouter(force = false) {
       routerBreaker.close(); // the router answers again: the next request meets it fresh (a wedged one stays open)
       routerWarmGate.markWarmed();
     } catch (e) { routerStats.lastError = (e as Error).message; }
-  }, force);
+  }), force);
 }
 
 /** What the router answered to the last request: the questions it was asked, and what it said to each. */
@@ -1281,10 +1304,10 @@ async function routerSort(text: string, installed: CatalogEntry[], lean?: TaskCa
     const srv = routerSrv;
     const signal = AbortSignal.timeout(ROUTER_TIMEOUT_MS);
     const tuned = { ...entry, sampling: routerSampling(3) } as CatalogEntry;
-    const r = await sortByQuestions(async (ask) => {
+    const r = await routerUse(() => sortByQuestions(async (ask) => {
       const p = yesNoPrompt(text, ask);
       return parseYesNo(await collect(sidecarHost, tuned, srv, [{ role: "system", content: p.system }, { role: "user", content: p.user }], `router:${Date.now()}`, signal, "off"));
-    }, lean);
+    }, lean));
     routerStats.asked++;
     routerPlacement.answered();
     routerStats.lastMs = Date.now() - t0;
@@ -1478,19 +1501,22 @@ dispatcher.register("routerBench", async () => {
   const exe = await geniexGate.require();
   const installed = (await installedEntries()).filter((e) => !isDynamicId(e.id));
   const rows: { id: string; name: string; sizeGB: number; ms: number | null; right: number; total: number; error: string | null }[] = [];
-  for (const e of routerCandidates(installed)) {
-    const row = { id: e.id, name: e.name, sizeGB: e.sizeGB, ms: null as number | null, right: 0, total: ROUTER_PROBES.length, error: null as string | null };
-    try {
-      const srv = await ensureRouterServer(String(exe));
-      const tuned = { ...e, sampling: routerSampling(3) } as CatalogEntry;
-      const ask = async (text: string, id: string) => { const p = yesNoPrompt(text, TREE[id].ask); return parseYesNo(await collect(sidecarHost, tuned, srv, [{ role: "system", content: p.system }, { role: "user", content: p.user }], `router:bench`, AbortSignal.timeout(60_000), "off")); };
-      await ask("hello", "q_code"); // the first request loads the model: not counted
-      const t0 = Date.now();
-      for (const [text, id, want] of ROUTER_PROBES) if ((await ask(text, id)) === want) row.right++;
-      row.ms = Math.round((Date.now() - t0) / ROUTER_PROBES.length);
-    } catch (err) { row.error = (err as Error).message.slice(0, 120); }
-    rows.push(row);
-  }
+  routerIdle.begin(); // no idle release while the candidates are measured
+  try {
+    for (const e of routerCandidates(installed)) {
+      const row = { id: e.id, name: e.name, sizeGB: e.sizeGB, ms: null as number | null, right: 0, total: ROUTER_PROBES.length, error: null as string | null };
+      try {
+        const srv = await ensureRouterServer(String(exe));
+        const tuned = { ...e, sampling: routerSampling(3) } as CatalogEntry;
+        const ask = async (text: string, id: string) => { const p = yesNoPrompt(text, TREE[id].ask); return parseYesNo(await collect(sidecarHost, tuned, srv, [{ role: "system", content: p.system }, { role: "user", content: p.user }], `router:bench`, AbortSignal.timeout(60_000), "off")); };
+        await ask("hello", "q_code"); // the first request loads the model: not counted
+        const t0 = Date.now();
+        for (const [text, id, want] of ROUTER_PROBES) if ((await ask(text, id)) === want) row.right++;
+        row.ms = Math.round((Date.now() - t0) / ROUTER_PROBES.length);
+      } catch (err) { row.error = (err as Error).message.slice(0, 120); }
+      rows.push(row);
+    }
+  } finally { routerIdle.end(); }
   const best = rows.filter((r) => r.ms !== null && r.right === r.total).sort((a, b) => a.ms! - b.ms!)[0];
   if (best) { saveSettings({ dynamic: { ...(settings().dynamic ?? {}), routerModel: best.id } }); routerSortMemory.clear(); }
   return { rows, chosen: best?.id ?? null };
