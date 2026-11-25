@@ -49,6 +49,20 @@ export interface SetupOutcomeView {
 const listNames = (names: string[]) =>
   names.length <= 1 ? names[0] ?? "" : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 
+/** Where each part can be installed later: each lives in its own Settings group. */
+const INSTALL_LATER: Record<StepId, { what: string; where: string }> = {
+  geniex: { what: "the NPU engine", where: "Settings › Developer" },
+  llama: { what: "the graphics card and processor engine", where: "Settings › Speed & memory, after choosing the graphics card or processor" },
+  "voice-stt": { what: "dictation", where: "Settings › Voice" },
+  "voice-tts": { what: "read-aloud", where: "Settings › Voice" },
+};
+
+/** "You can install it later in …", naming the right place for each part. */
+export function installLater(ids: StepId[]): string {
+  if (ids.length === 1) return `You can install it later in ${INSTALL_LATER[ids[0]].where}.`;
+  return `You can install them later: ${ids.map((id) => `${INSTALL_LATER[id].what} in ${INSTALL_LATER[id].where}`).join("; ")}.`;
+}
+
 /** Derive the setup screen's heading and description from the real outcome:
  *  consent first, then installation in progress, then failures, then skipped
  *  components, and only then "ready". Never asserts "this happens once". */
@@ -73,7 +87,7 @@ export function setupOutcomeView(state: SetupState): SetupOutcomeView {
     return {
       outcome: "failed",
       heading: "Some components couldn't be installed",
-      description: `${failed.length === 1 ? "One part" : `${failed.length} parts`} didn't finish installing: ${listNames(failed.map((s) => s.label))}. Use Try again, or continue with fewer features. You can install ${failed.length === 1 ? "it" : "them"} later in Settings › Developer.`,
+      description: `${failed.length === 1 ? "One part" : `${failed.length} parts`} didn't finish installing: ${listNames(failed.map((s) => s.label))}. Use Try again, or continue with fewer features. ${installLater(failed.map((s) => s.id))}`,
     };
   }
   const skipped = state.steps.filter((s) => s.state === "skipped");

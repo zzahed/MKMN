@@ -86,3 +86,17 @@ describe("phase 4, round 2: no promise the code does not keep, and plain setup e
     expect(errs).not.toMatch(/Settings → |Settings, HUMAIN/);
   });
 });
+
+describe("setup says where each part can be installed later", () => {
+  it("names the right Settings group for each failed part", async () => {
+    const { installLater } = await import("../src/core/setupView");
+    expect(installLater(["geniex"])).toBe("You can install it later in Settings › Developer.");
+    expect(installLater(["voice-stt"])).toBe("You can install it later in Settings › Voice.");
+    expect(installLater(["llama", "voice-tts"])).toBe("You can install them later: the graphics card and processor engine in Settings › Speed & memory, after choosing the graphics card or processor; read-aloud in Settings › Voice.");
+  });
+
+  it("the places named exist: Developer, Voice and Speed & memory are Settings groups", () => {
+    const schema = readFileSync("src/shared/settingsSchema.ts", "utf8");
+    for (const g of ["Developer", "Voice", "Speed & memory"]) expect(schema).toContain(`label: "${g}"`);
+  });
+});
